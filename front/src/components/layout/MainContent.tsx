@@ -1,21 +1,90 @@
-import { useEffect, useState, useRef, useMemo } from 'react';
+import { useEffect, useState, useRef, useMemo, memo } from 'react';
 import { useAppStore } from '../../stores/useAppStore';
 import MDEditor from '@uiw/react-md-editor';
-import { getAllDescendants } from '../../lib/db';
+import { getOrderedDescendants } from '../../lib/db';
 import type { Node } from '../../lib/types';
-import { useVirtualizer } from '@tanstack/react-virtual';
+import { useVirtualizer, type VirtualItem } from '@tanstack/react-virtual';
+import { useNodeData } from '../../hooks/useNodeData';
 
-type ProcessedNode = Node & { displayNumber: string; displayContent: string; isChapter: boolean };
+type LightweightNode = Omit<Node, 'content' | 'solution'>;
+type ProcessedLightweightNode = LightweightNode & { displayNumber: string; isChapter: boolean };
 
+// =================================================================================
+// Node Renderer Component
+// =================================================================================
+interface NodeRendererProps {
+  node: ProcessedLightweightNode;
+  measureElement: (element: HTMLElement | null) => void;
+  virtualItem: VirtualItem;
+}
+
+const NodeRenderer = memo(({ node, measureElement, virtualItem }: NodeRendererProps) => {
+  const { node: fullNode, loading } = useNodeData(node.id);
+
+  const displayContent = useMemo(() => {
+    if (loading || !fullNode) return '';
+    if (node.isChapter) return fullNode.content;
+    // Prepend the bolded number to the content for rendering
+    return `**${node.displayNumber}**    ${fullNode.content}`;
+  }, [fullNode, loading, node.isChapter, node.displayNumber]);
+
+  const getTitleClassName = () => {
+    switch (node.type) {
+      case '主章节':
+        return 'text-3xl font-bold mt-4 mb-2 border-b pb-1';
+      case '子章节':
+        return 'text-2xl font-bold mt-1 mb-1';
+      default:
+        return 'text-xl font-bold mb-2 flex items-center';
+    }
+  };
+
+  return (
+    <div
+      ref={measureElement}
+      data-index={virtualItem.index}
+      style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        width: '100%',
+        transform: `translateY(${virtualItem.start}px)`,
+      }}
+      className="px-4 py-1"
+    >
+      {loading ? (
+        <div className="h-24 animate-pulse bg-gray-200 rounded-md"></div>
+      ) : (
+        <>
+          {node.isChapter && (
+            <h2 className={getTitleClassName()}>
+              <span className="font-bold mr-3">{node.displayNumber}</span>
+              {node.title}
+            </h2>
+          )}
+          <div data-color-mode="light" className="text-base">
+            <MDEditor.Markdown source={displayContent} style={{ whiteSpace: 'pre-wrap' }} />
+          </div>
+        </>
+      )}
+    </div>
+  );
+});
+NodeRenderer.displayName = 'NodeRenderer';
+
+
+// =================================================================================
+// Main Content Component
+// =================================================================================
 const MainContent = () => {
   const selectedNode = useAppStore(state => state.selectedNode);
   const expandedBranchId = useAppStore(state => state.expandedBranchId);
-  const [allNodes, setAllNodes] = useState<Node[]>([]);
+  const [lightweightNodes, setLightweightNodes] = useState<LightweightNode[]>([]);
   const parentRef = useRef<HTMLDivElement>(null);
 
-  // Add display numbers and content to nodes
-  const processedNodes = useMemo(() => {
-    if (!allNodes.length) return [];
+  // Pre-process lightweight nodes to add display numbers
+  const processedLightweightNodes = useMemo((): ProcessedLightweightNode[] => {
+    if (!lightweightNodes.length) return [];
 
     const majorCounters: { [key: string]: number } = {};
     const minorCounters: { [key: string]: number } = {};
@@ -24,9 +93,8 @@ const MainContent = () => {
     let currentMajorPrefix = '';
     let currentMinorPrefix = '';
 
-    return allNodes.map((node): ProcessedNode => {
+    return lightweightNodes.map((node) => {
       let displayNumber = '';
-      let displayContent = node.content;
       const isChapter = ['主章节', '子章节'].includes(node.type);
 
       switch (node.type) {
@@ -48,49 +116,47 @@ const MainContent = () => {
           }
           contentCounters[node.type][node.parentId!] = (contentCounters[node.type][node.parentId!] || 0) + 1;
           displayNumber = `${node.type} ${currentMinorPrefix}.${contentCounters[node.type][node.parentId!]}`;
-          // Prepend the bolded number to the content for rendering
-          displayContent = `**${displayNumber}**    ${node.content}`;
           break;
         }
         default:
           break;
       }
-      return { ...node, displayNumber, displayContent, isChapter };
+      return { ...node, displayNumber, isChapter };
     });
-  }, [allNodes]);
+  }, [lightweightNodes]);
 
-  // Fetch nodes for the virtual list when the expanded branch changes
+  // Fetch lightweight nodes when the expanded branch changes
   useEffect(() => {
     const fetchBranchContent = async () => {
       if (expandedBranchId) {
-        const nodes = await getAllDescendants(expandedBranchId);
+        const nodes = await getOrderedDescendants(expandedBranchId);
         // We remove the root node itself from the list to only show content
-        setAllNodes(nodes.slice(1));
+        setLightweightNodes(nodes.slice(1));
       } else {
-        setAllNodes([]); // Clear content if no branch is expanded
+        setLightweightNodes([]); // Clear content if no branch is expanded
       }
     };
     fetchBranchContent();
   }, [expandedBranchId]);
 
   const rowVirtualizer = useVirtualizer({
-    count: processedNodes.length,
+    count: processedLightweightNodes.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 200, // Revert to a static estimate, measurement will correct it
+    estimateSize: () => 200,
     overscan: 5,
   });
 
   // Scroll to the selected node
   useEffect(() => {
     if (selectedNode) {
-      const index = processedNodes.findIndex(node => node.id === selectedNode.id);
+      const index = processedLightweightNodes.findIndex(node => node.id === selectedNode.id);
       if (index !== -1) {
         rowVirtualizer.scrollToIndex(index, { align: 'start', behavior: 'smooth' });
       }
     }
-  }, [selectedNode, processedNodes, rowVirtualizer]);
+  }, [selectedNode, processedLightweightNodes, rowVirtualizer]);
 
-  if (!expandedBranchId || processedNodes.length === 0) {
+  if (!expandedBranchId || processedLightweightNodes.length === 0) {
     return (
       <div className="h-full p-4 flex items-center justify-center">
         <p className="text-muted-foreground">展开一个分支以查看其内容。</p>
@@ -102,43 +168,14 @@ const MainContent = () => {
     <div ref={parentRef} className="h-full overflow-y-auto">
       <div style={{ height: `${rowVirtualizer.getTotalSize()}px`, width: '100%', position: 'relative' }}>
         {rowVirtualizer.getVirtualItems().map(virtualItem => {
-          const node = processedNodes[virtualItem.index];
-          
-          const getTitleClassName = () => {
-            switch (node.type) {
-              case '主章节':
-                return 'text-3xl font-bold mt-4 mb-2 border-b pb-1';
-              case '子章节':
-                return 'text-2xl font-bold mt-1 mb-1';
-              default:
-                return 'text-xl font-bold mb-2 flex items-center';
-            }
-          };
-
+          const node = processedLightweightNodes[virtualItem.index];
           return (
-            <div
+            <NodeRenderer
               key={node.id}
-              ref={rowVirtualizer.measureElement}
-              data-index={virtualItem.index}
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                transform: `translateY(${virtualItem.start}px)`,
-              }}
-              className="px-4 py-1" // Removed py-2
-            >
-              {node.isChapter && (
-                <h2 className={getTitleClassName()}>
-                  <span className="font-bold mr-3">{node.displayNumber}</span>
-                  {node.title}
-                </h2>
-              )}
-              <div data-color-mode="light" className="text-base">
-                <MDEditor.Markdown source={node.displayContent} style={{ whiteSpace: 'pre-wrap' }} />
-              </div>
-            </div>
+              node={node}
+              measureElement={rowVirtualizer.measureElement}
+              virtualItem={virtualItem}
+            />
           );
         })}
       </div>
