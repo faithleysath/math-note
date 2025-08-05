@@ -18,7 +18,7 @@ const MainContent = () => {
 
     const majorCounters: { [key: string]: number } = {};
     const minorCounters: { [key: string]: number } = {};
-    const contentCounters: { [key: string]: number } = {};
+    const contentCounters: { [key: string]: { [key: string]: number } } = {};
     
     let currentMajorPrefix = '';
     let currentMinorPrefix = '';
@@ -42,10 +42,13 @@ const MainContent = () => {
         case 'Definition':
         case 'Theorem':
         case 'Example':
-          contentCounters[node.parentId!] = (contentCounters[node.parentId!] || 0) + 1;
-          displayNumber = `${node.type} ${currentMinorPrefix}.${contentCounters[node.parentId!]}`;
+          if (!contentCounters[node.type]) {
+            contentCounters[node.type] = {};
+          }
+          contentCounters[node.type][node.parentId!] = (contentCounters[node.type][node.parentId!] || 0) + 1;
+          displayNumber = `${node.type} ${currentMinorPrefix}.${contentCounters[node.type][node.parentId!]}`;
           // Prepend the bolded number to the content for rendering
-          displayContent = `**${displayNumber}** ${node.content}`;
+          displayContent = `**${displayNumber}**    ${node.content}`;
           break;
         default:
           break;
@@ -71,7 +74,7 @@ const MainContent = () => {
   const rowVirtualizer = useVirtualizer({
     count: processedNodes.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 100, // A more realistic estimate
+    estimateSize: () => 200, // Revert to a static estimate, measurement will correct it
     overscan: 5,
   });
 
@@ -80,7 +83,7 @@ const MainContent = () => {
     if (selectedNode) {
       const index = processedNodes.findIndex(node => node.id === selectedNode.id);
       if (index !== -1) {
-        rowVirtualizer.scrollToIndex(index, { align: 'start' });
+        rowVirtualizer.scrollToIndex(index, { align: 'start', behavior: 'smooth' });
       }
     }
   }, [selectedNode, processedNodes, rowVirtualizer]);
@@ -104,7 +107,7 @@ const MainContent = () => {
               case 'MajorChapter':
                 return 'text-3xl font-bold mt-4 mb-2 border-b pb-1';
               case 'MinorChapter':
-                return 'text-2xl font-bold mt-3 mb-1';
+                return 'text-2xl font-bold mt-1 mb-1';
               default:
                 return 'text-xl font-bold mb-2 flex items-center';
             }
@@ -113,6 +116,8 @@ const MainContent = () => {
           return (
             <div
               key={node.id}
+              ref={rowVirtualizer.measureElement}
+              data-index={virtualItem.index}
               style={{
                 position: 'absolute',
                 top: 0,
@@ -120,11 +125,11 @@ const MainContent = () => {
                 width: '100%',
                 transform: `translateY(${virtualItem.start}px)`,
               }}
-              className="px-4" // Removed py-2
+              className="px-4 py-1" // Removed py-2
             >
               {node.isChapter && (
                 <h2 className={getTitleClassName()}>
-                  <span className="font-bold mr-2">{node.displayNumber}</span>
+                  <span className="font-bold mr-3">{node.displayNumber}</span>
                   {node.title}
                 </h2>
               )}
