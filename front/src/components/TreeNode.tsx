@@ -58,14 +58,14 @@ const TreeNode: React.FC<TreeNodeProps> = ({ node, numberPrefix = '' }) => {
   };
 
   return (
-    <li className="ml-4">
+    <li className="ml-2">
       <div className="flex items-center cursor-pointer" onClick={handleRowClick}>
         {hasChildren && (
           <span className="mr-1 text-lg w-4 text-center">
             {isExpanded ? '▾' : '▸'}
           </span>
         )}
-        <span className={`${!hasChildren ? 'ml-[22px]' : ''}`}>{`${numberPrefix}${node.title}`}</span>
+        <span className={`my-2 ${!hasChildren ? 'ml-[22px]' : ''}`}>{`${numberPrefix}${node.title}`}</span>
       </div>
       {isExpanded && hasChildren && (
         <ul>

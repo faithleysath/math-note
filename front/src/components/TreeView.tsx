@@ -31,7 +31,7 @@ const TreeView = () => {
   }
 
   return (
-    <ul>
+    <ul className='-ml-2'>
       {rootNodes.map(node => (
         <TreeNode key={node.id} node={node} />
       ))}
