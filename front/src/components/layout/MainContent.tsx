@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
-import { useAppContext } from '../../hooks/useAppContext';
+import { useAppStore } from '../../stores/useAppStore';
 import MDEditor from '@uiw/react-md-editor';
 import { getAllDescendants } from '../../lib/db';
 import type { Node } from '../../lib/types';
@@ -8,7 +8,8 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 type ProcessedNode = Node & { displayNumber: string; displayContent: string; isChapter: boolean };
 
 const MainContent = () => {
-  const { selectedNode, expandedBranchId } = useAppContext();
+  const selectedNode = useAppStore(state => state.selectedNode);
+  const expandedBranchId = useAppStore(state => state.expandedBranchId);
   const [allNodes, setAllNodes] = useState<Node[]>([]);
   const parentRef = useRef<HTMLDivElement>(null);
 

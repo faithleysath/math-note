@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import type { Node, Edge } from '../lib/types';
 import { getEdgesBySource, getEdgesByTarget, getNode } from '../lib/db';
-import { useAppContext } from '../hooks/useAppContext';
+import { useAppStore } from '../stores/useAppStore';
 
 interface RelatedNodeInfo {
   edge: Edge;
@@ -9,7 +9,7 @@ interface RelatedNodeInfo {
 }
 
 const RelatedNodesList = () => {
-  const { selectedNode } = useAppContext();
+  const selectedNode = useAppStore(state => state.selectedNode);
   const [relatedNodes, setRelatedNodes] = useState<RelatedNodeInfo[]>([]);
   const [loading, setLoading] = useState(false);
 

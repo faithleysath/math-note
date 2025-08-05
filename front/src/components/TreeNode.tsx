@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import type { Node } from '../lib/types';
 import { getNodesByParent } from '../lib/db';
-import { useAppContext } from '../hooks/useAppContext';
+import { useAppStore } from '../stores/useAppStore';
 
 interface TreeNodeProps {
   node: Node;
@@ -9,7 +9,9 @@ interface TreeNodeProps {
 }
 
 const TreeNode: React.FC<TreeNodeProps> = ({ node, numberPrefix = '' }) => {
-  const { setSelectedNodeById, expandedBranchId, setExpandedBranchId } = useAppContext();
+  const setSelectedNodeById = useAppStore(state => state.setSelectedNodeById);
+  const expandedBranchId = useAppStore(state => state.expandedBranchId);
+  const setExpandedBranchId = useAppStore(state => state.setExpandedBranchId);
   const [isExpanded, setIsExpanded] = useState(false);
   const [children, setChildren] = useState<Node[]>([]);
   const [loading, setLoading] = useState(false);

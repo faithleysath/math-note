@@ -4,15 +4,12 @@ import './index.css'
 import 'normalize.css'
 import App from './App'
 import { seedDatabase } from './lib/seed'
-import { AppProvider } from './context/AppContext'
 
 // Seed the database with initial data
 seedDatabase().then(() => {
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
-      <AppProvider>
-        <App />
-      </AppProvider>
+      <App />
     </StrictMode>,
   )
 });

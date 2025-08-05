@@ -1,9 +1,9 @@
 import React from 'react';
-import { useAppContext } from '../../hooks/useAppContext';
+import { useAppStore } from '../../stores/useAppStore';
 import RelatedNodesList from '../RelatedNodesList';
 
 const RightSidebar = () => {
-  const { selectedNode } = useAppContext();
+  const selectedNode = useAppStore(state => state.selectedNode);
 
   if (!selectedNode) {
     return (
