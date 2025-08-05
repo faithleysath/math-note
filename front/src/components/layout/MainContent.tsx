@@ -31,9 +31,9 @@ const NodeRenderer = memo(({ node, measureElement, virtualItem }: NodeRendererPr
   const getTitleClassName = () => {
     switch (node.type) {
       case '主章节':
-        return 'text-3xl font-bold mt-4 mb-2 border-b pb-1';
+        return 'text-3xl font-bold mt-4 mb-4 border-b pb-1';
       case '子章节':
-        return 'text-2xl font-bold mt-1 mb-1';
+        return 'text-2xl font-bold mt-1 mb-2';
       default:
         return 'text-xl font-bold mb-2 flex items-center';
     }
@@ -50,23 +50,19 @@ const NodeRenderer = memo(({ node, measureElement, virtualItem }: NodeRendererPr
         width: '100%',
         transform: `translateY(${virtualItem.start}px)`,
       }}
-      className="px-4 py-1"
+      className="px-4 py-1.5"
     >
-      {loading ? (
-        <div className="h-24 animate-pulse bg-gray-200 rounded-md"></div>
-      ) : (
-        <>
-          {node.isChapter && (
-            <h2 className={getTitleClassName()}>
-              <span className="font-bold mr-3">{node.displayNumber}</span>
-              {node.title}
-            </h2>
-          )}
-          <div data-color-mode="light" className="text-base">
-            <MDEditor.Markdown source={displayContent} style={{ whiteSpace: 'pre-wrap' }} />
-          </div>
-        </>
-      )}
+      <>
+        {node.isChapter && (
+          <h2 className={getTitleClassName()}>
+            <span className="font-bold mr-3">{node.displayNumber}</span>
+            {node.title}
+          </h2>
+        )}
+        <div data-color-mode="light" className="text-base">
+          <MDEditor.Markdown source={displayContent} style={{ whiteSpace: 'pre-wrap' }} />
+        </div>
+      </>
     </div>
   );
 });
