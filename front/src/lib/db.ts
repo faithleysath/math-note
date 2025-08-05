@@ -8,7 +8,7 @@ export class MathNoteDB extends Dexie {
 
   constructor() {
     super('MathNoteDB');
-    this.version(1).stores({
+    this.version(2).stores({
       // The 'id' field is the primary key, so it's indexed by default.
       // We add indexes for fields that we will query frequently.
       nodes: '&id, parentId, type',
@@ -77,11 +77,55 @@ export async function deleteNode(id: string) {
  */
 export async function getNodesByParent(parentId: string | null) {
     if (parentId === null) {
-        // Special case for root nodes
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        return await db.nodes.where('parentId').equals(null as any).toArray();
+        // Special case for root nodes. IndexedDB doesn't support null indexes,
+        // so we use a filter for this case. This should be fine as the number
+        // of root nodes (branches) is expected to be small.
+        return await db.nodes.filter(node => node.parentId === null).toArray();
     }
     return await db.nodes.where('parentId').equals(parentId).toArray();
+}
+
+/**
+ * Recursively retrieves all descendant nodes for a given node ID.
+ * @param nodeId - The ID of the node to start from.
+ */
+export async function getAllDescendants(nodeId: string): Promise<Node[]> {
+    const result: Node[] = [];
+    
+    const allNodes = await db.nodes.toArray();
+    const nodesMap = new Map(allNodes.map(node => [node.id, node]));
+    const parentToChildrenMap = new Map<string, Node[]>();
+
+    for (const node of nodesMap.values()) {
+        if (node.parentId) {
+            if (!parentToChildrenMap.has(node.parentId)) {
+                parentToChildrenMap.set(node.parentId, []);
+            }
+            parentToChildrenMap.get(node.parentId)!.push(node);
+        }
+    }
+
+    // Sort children based on the `children` array order
+    for (const [parentId, children] of parentToChildrenMap.entries()) {
+        const parentNode = nodesMap.get(parentId);
+        if (parentNode && parentNode.children.length > 0) {
+            children.sort((a, b) => parentNode.children.indexOf(a.id) - parentNode.children.indexOf(b.id));
+        }
+    }
+
+    const startNode = nodesMap.get(nodeId);
+    if (startNode) {
+        const visit = (node: Node) => {
+            result.push(node);
+            const children = parentToChildrenMap.get(node.id) || [];
+            for (const child of children) {
+                visit(child);
+            }
+        };
+        visit(startNode);
+    }
+
+    return result;
 }
 
 
