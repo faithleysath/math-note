@@ -13,7 +13,7 @@ async function seedDatabase() {
   try {
     // --- Level 1: Branches ---
     const analysisBranch: Omit<Node, 'id' | 'createdAt' | 'updatedAt'> = {
-      type: 'Branch',
+      type: '分支',
       title: '数学分析',
       content: '研究极限及相关理论，如微分、积分、测度、无穷级数和解析函数。',
       parentId: null,
@@ -23,7 +23,7 @@ async function seedDatabase() {
 
     // --- Level 2: Major Chapters ---
     const chapter1: Omit<Node, 'id' | 'createdAt' | 'updatedAt'> = {
-        type: 'MajorChapter',
+        type: '主章节',
         title: '集合与映射',
         content: '本章介绍集合与映射的基本概念。',
         parentId: analysisBranchId,
@@ -36,7 +36,7 @@ async function seedDatabase() {
 
     // --- Level 3: Minor Chapters ---
     const minorChapter1_1: Omit<Node, 'id' | 'createdAt' | 'updatedAt'> = {
-        type: 'MinorChapter',
+        type: '子章节',
         title: '集合',
         content: '集合的基本概念。',
         parentId: chapter1Id,
@@ -45,7 +45,7 @@ async function seedDatabase() {
     const minorChapter1_1Id = await addNode(minorChapter1_1);
 
     const minorChapter1_2: Omit<Node, 'id' | 'createdAt' | 'updatedAt'> = {
-        type: 'MinorChapter',
+        type: '子章节',
         title: '映射',
         content: '映射与函数介绍。',
         parentId: chapter1Id,
@@ -58,7 +58,7 @@ async function seedDatabase() {
 
     // --- Level 4: Definitions/Theorems in a Minor Chapter ---
     const definition1: Omit<Node, 'id' | 'createdAt' | 'updatedAt'> = {
-        type: 'Definition',
+        type: '定义',
         title: '集合的定义',
         content: '集合是明确定义的不同对象的集合，其本身被视为一个对象。',
         parentId: minorChapter1_1Id,
@@ -67,7 +67,7 @@ async function seedDatabase() {
     const definition1Id = await addNode(definition1);
 
     const theorem1: Omit<Node, 'id' | 'createdAt' | 'updatedAt'> = {
-        type: 'Theorem',
+        type: '定理',
         title: '德摩根定律',
         content: '集合的德摩根定律陈述。',
         parentId: minorChapter1_1Id,
@@ -87,7 +87,7 @@ async function seedDatabase() {
 
     // --- Another Branch: Probability Theory ---
     const probBranch: Omit<Node, 'id' | 'createdAt' | 'updatedAt'> = {
-      type: 'Branch',
+      type: '分支',
       title: '概率论',
       content: '研究事件发生可能性的数值描述的数学分支。',
       parentId: null,
@@ -96,7 +96,7 @@ async function seedDatabase() {
     const probBranchId = await addNode(probBranch);
 
     const probChapter1: Omit<Node, 'id' | 'createdAt' | 'updatedAt'> = {
-        type: 'MajorChapter',
+        type: '主章节',
         title: '基本概念',
         content: '概率论的基本概念。',
         parentId: probBranchId,

@@ -7,7 +7,7 @@ export interface Node {
   id: string;
 
   /** 此节点代表的内容类型。 */
-  type: 'Branch' | 'MajorChapter' | 'MinorChapter' | 'Definition' | 'Theorem' | 'Example' | 'Note' | 'Exercise' | 'SolutionRecord';
+  type: '分支' | '主章节' | '子章节' | '定义' | '定理' | '例题' | '笔记' | '练习' | '解题记录';
 
   /** 节点的标题，例如 "集合与映射" 或 "集合的定义"。标号应由程序根据顺序动态生成。 */
   title: string;

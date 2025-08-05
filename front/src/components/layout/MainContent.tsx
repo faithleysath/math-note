@@ -26,33 +26,27 @@ const MainContent = () => {
     return allNodes.map((node): ProcessedNode => {
       let displayNumber = '';
       let displayContent = node.content;
-      const isChapter = ['MajorChapter', 'MinorChapter'].includes(node.type);
+      const isChapter = ['主章节', '子章节'].includes(node.type);
 
       switch (node.type) {
-        case 'MajorChapter':
+        case '主章节':
           majorCounters[node.parentId!] = (majorCounters[node.parentId!] || 0) + 1;
           currentMajorPrefix = `${majorCounters[node.parentId!]}`;
           displayNumber = `第 ${currentMajorPrefix} 章`;
           break;
-        case 'MinorChapter':
+        case '子章节':
           minorCounters[node.parentId!] = (minorCounters[node.parentId!] || 0) + 1;
           currentMinorPrefix = `${currentMajorPrefix}.${minorCounters[node.parentId!]}`;
           displayNumber = `§ ${currentMinorPrefix}`;
           break;
-        case 'Definition':
-        case 'Theorem':
-        case 'Example': {
-          const typeTranslations: { [key: string]: string } = {
-            Definition: '定义',
-            Theorem: '定理',
-            Example: '例题',
-          };
-          const translatedType = typeTranslations[node.type] || node.type;
+        case '定义':
+        case '定理':
+        case '例题': {
           if (!contentCounters[node.type]) {
             contentCounters[node.type] = {};
           }
           contentCounters[node.type][node.parentId!] = (contentCounters[node.type][node.parentId!] || 0) + 1;
-          displayNumber = `${translatedType} ${currentMinorPrefix}.${contentCounters[node.type][node.parentId!]}`;
+          displayNumber = `${node.type} ${currentMinorPrefix}.${contentCounters[node.type][node.parentId!]}`;
           // Prepend the bolded number to the content for rendering
           displayContent = `**${displayNumber}**    ${node.content}`;
           break;
@@ -111,9 +105,9 @@ const MainContent = () => {
           
           const getTitleClassName = () => {
             switch (node.type) {
-              case 'MajorChapter':
+              case '主章节':
                 return 'text-3xl font-bold mt-4 mb-2 border-b pb-1';
-              case 'MinorChapter':
+              case '子章节':
                 return 'text-2xl font-bold mt-1 mb-1';
               default:
                 return 'text-xl font-bold mb-2 flex items-center';

@@ -15,7 +15,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({ node, numberPrefix = '' }) => {
   const [loading, setLoading] = useState(false);
 
   const hasChildren = node.children && node.children.length > 0;
-  const isBranch = node.type === 'Branch';
+  const isBranch = node.type === '分支';
 
   // Sync local expanded state with global context for branches
   useEffect(() => {
@@ -68,7 +68,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({ node, numberPrefix = '' }) => {
       {isExpanded && hasChildren && (
         <ul>
           {loading ? <li>加载中...</li> : children.map((child, index) => {
-            const childNumberPrefix = ['MajorChapter', 'MinorChapter'].includes(child.type) 
+            const childNumberPrefix = ['主章节', '子章节'].includes(child.type) 
               ? `${numberPrefix}${index + 1}.` 
               : '';
             return <TreeNode key={child.id} node={child} numberPrefix={childNumberPrefix ? `${childNumberPrefix} ` : ''} />
