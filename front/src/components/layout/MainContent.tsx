@@ -16,9 +16,10 @@ interface NodeRendererProps {
   node: ProcessedLightweightNode;
   measureElement: (element: HTMLElement | null) => void;
   virtualItem: VirtualItem;
+  onNodeClick: (id: string) => void;
 }
 
-const NodeRenderer = memo(({ node, measureElement, virtualItem }: NodeRendererProps) => {
+const NodeRenderer = memo(({ node, measureElement, virtualItem, onNodeClick }: NodeRendererProps) => {
   const { node: fullNode, loading } = useNodeData(node.id);
 
   const displayContent = useMemo(() => {
@@ -50,7 +51,8 @@ const NodeRenderer = memo(({ node, measureElement, virtualItem }: NodeRendererPr
         width: '100%',
         transform: `translateY(${virtualItem.start}px)`,
       }}
-      className="px-4 py-1.5 transition-colors duration-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg cursor-pointer"
+      className="px-4 py-1.5 transition-colors duration-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+      onClick={() => onNodeClick(node.id)}
     >
       <>
         {node.isChapter && (
@@ -79,6 +81,7 @@ NodeRenderer.displayName = 'NodeRenderer';
 const MainContent = () => {
   const selectedNode = useAppStore(state => state.selectedNode);
   const expandedBranchId = useAppStore(state => state.expandedBranchId);
+  const setSelectedNodeById = useAppStore(state => state.setSelectedNodeById);
   const [lightweightNodes, setLightweightNodes] = useState<LightweightNode[]>([]);
   const parentRef = useRef<HTMLDivElement>(null);
 
@@ -175,6 +178,7 @@ const MainContent = () => {
               node={node}
               measureElement={rowVirtualizer.measureElement}
               virtualItem={virtualItem}
+              onNodeClick={setSelectedNodeById}
             />
           );
         })}
