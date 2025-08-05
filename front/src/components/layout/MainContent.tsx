@@ -23,9 +23,9 @@ const NodeRenderer = memo(({ node, measureElement, virtualItem }: NodeRendererPr
 
   const displayContent = useMemo(() => {
     if (loading || !fullNode) return '';
-    if (node.isChapter) return fullNode.content;
+    if (node.isChapter) return '&emsp;' + fullNode.content;
     // Prepend the bolded number to the content for rendering
-    return `**${node.displayNumber}**    ${fullNode.content}`;
+    return `&emsp;&emsp;**${node.displayNumber}**&emsp;${fullNode.content}`;
   }, [fullNode, loading, node.isChapter, node.displayNumber]);
 
   const getTitleClassName = () => {
@@ -33,7 +33,7 @@ const NodeRenderer = memo(({ node, measureElement, virtualItem }: NodeRendererPr
       case '主章节':
         return 'text-3xl font-bold mt-4 mb-4 border-b pb-1';
       case '子章节':
-        return 'text-2xl font-bold mt-1 mb-2';
+        return 'text-2xl font-bold mt-1 mb-2 text-center';
       default:
         return 'text-xl font-bold mb-2 flex items-center';
     }
@@ -50,17 +50,21 @@ const NodeRenderer = memo(({ node, measureElement, virtualItem }: NodeRendererPr
         width: '100%',
         transform: `translateY(${virtualItem.start}px)`,
       }}
-      className="px-4 py-1.5"
+      className="px-4 py-1.5 transition-colors duration-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg cursor-pointer"
     >
       <>
         {node.isChapter && (
           <h2 className={getTitleClassName()}>
             <span className="font-bold mr-3">{node.displayNumber}</span>
+            &nbsp;&nbsp;
             {node.title}
           </h2>
         )}
-        <div data-color-mode="light" className="text-base">
-          <MDEditor.Markdown source={displayContent} style={{ whiteSpace: 'pre-wrap' }} />
+        <div className="text-base">
+          <MDEditor.Markdown
+            source={displayContent}
+            style={{ whiteSpace: 'pre-wrap', backgroundColor: 'transparent' }}
+          />
         </div>
       </>
     </div>
