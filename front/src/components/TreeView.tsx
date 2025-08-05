@@ -11,7 +11,8 @@ const TreeView = () => {
     async function fetchRootNodes() {
       try {
         const nodes = await getNodesByParent(null);
-        setRootNodes(nodes);
+        // 只显示“分支”类型的节点作为根节点
+        setRootNodes(nodes.filter(node => node.type === '分支'));
       } catch (error) {
         console.error("Failed to fetch root nodes:", error);
       } finally {

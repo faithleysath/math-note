@@ -112,14 +112,14 @@ async function seedDatabase() {
         children: [],
     }, []);
 
-    const solutionRecord1Id = await addNodeAndUpdateParent({
+    const solutionRecord1Id = await addNode({
         type: '解题记录',
         title: '我对“幂集大小”的解法',
         content: '我的初步想法是 n*n，因为感觉是两两组合。但这个思路很快就发现不对。',
         solution: '后来参考了答案，理解了每个元素都有“在”或“不在”子集中这两种状态，所以是 2^n。这个思路非常巧妙，需要记住。',
-        parentId: exercise1Id, // 作为练习题的解题记录
+        parentId: null,
         children: [],
-    }, []);
+    });
 
     // =================================================================
     // --- 分支 2: 线性代数 ---
