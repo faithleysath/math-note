@@ -1,6 +1,9 @@
 import { useEffect, useState, useRef, useMemo, memo } from 'react';
 import { useAppStore } from '../../stores/useAppStore';
 import MDEditor from '@uiw/react-md-editor';
+import 'katex/dist/katex.css';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
 import { getOrderedDescendants } from '../../lib/db';
 import type { Node } from '../../lib/types';
 import { useVirtualizer, type VirtualItem } from '@tanstack/react-virtual';
@@ -66,6 +69,8 @@ const NodeRenderer = memo(({ node, measureElement, virtualItem, onNodeClick }: N
           <MDEditor.Markdown
             source={displayContent}
             style={{ whiteSpace: 'pre-wrap', backgroundColor: 'transparent' }}
+            remarkPlugins={[remarkMath]}
+            rehypePlugins={[[rehypeKatex, { throwOnError: false }]]}
           />
         </div>
       </>

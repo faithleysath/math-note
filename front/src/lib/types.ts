@@ -14,25 +14,35 @@ export interface Node {
 
   /** 
    * 节点的主要内容，以 Markdown 格式存储。具体用途取决于节点类型：
-   * - 'Branch', 'MajorChapter', 'MinorChapter': 对该部分的介绍、概述或学习目标。
-   * - 'Definition', 'Theorem', 'Note': 具体的文本内容。
-   * - 'Example', 'Exercise': 题干描述。
-   * - 'SolutionRecord': 对个人解法的评判或备注。
+   * - '分支', '主章节', '子章节': 对该部分的介绍、概述或学习目标。
+   * - '定义', '定理', '笔记': 具体的文本内容。
+   * - '例题', '练习': 题干描述。
+   * - '解题记录': 对个人解法的评判或备注。
    */
   content: string;
 
   /**
-   * 可选字段，用于存放解法内容。
-   * - 对于 'Example'/'Exercise' 类型，这里是“标准答案”。
-   * - 对于 'SolutionRecord' 类型，这里是“个人解法”。
+   * 可选字段，用于存放解法或证明内容。
+   * - 对于 '定理' 类型，这里是“教科书式证明”。
+   * - 对于 '例题'/'练习' 类型，这里是“标准答案”。
+   * - 对于 '解题记录' 类型，这里是“个人解法”。
    */
   solution?: string;
 
-  /** 层级结构中父节点的 ID。根节点 (Branch) 的 parentId 为 `null`。 */
+  /** 层级结构中父节点的 ID。根节点 ('分支') 的 parentId 为 `null`。 */
   parentId: string | null;
 
   /** 用于维持顺序的子节点 ID 的有序列表。 */
   children: string[];
+
+  /** 用于分类和筛选的标签列表。 */
+  tags?: string[];
+
+  /** 别名，用于增强检索 */
+  aliases?: string[];
+
+  /** 来源 */
+  source?: string;
 
   /** 节点创建时的时间戳。 */
   createdAt: number;
@@ -45,8 +55,11 @@ export interface Node {
  * 定义了节点之间所有可能的关系类型，以确保一致性。
  */
 export type EdgeLabel = 
-  | '引用' // A 引用 B (例如, 定理引用定义)
+  | '是...的定义' // A 是 B 的定义 (例如, 定义关联到章节或定理)
+  | '是...的定理' // A 是 B 的定理 (例如, 定理关联到章节或定义)
+  | '引用' // A 引用 B (例如, 定理引用定义，笔记引用定理，解法引用定理)
   | '证明'     // A 证明 B (例如, 笔记或例题证明定理)
+  | '是...的例题' // A 是 B 的例题 (例如, 例题关联到章节或定义)
   | '是...的练习题' // A 是 B 的练习题 (例如, 习题关联到章节)
   | '是...的解题记录'; // A 是 B 的解题记录
 
@@ -66,4 +79,7 @@ export interface Edge {
 
   /** 描述关系性质的标签，必须是预定义的 EdgeLabel 类型之一。 */
   label: EdgeLabel;
+
+  /** 对该关系的额外描述，例如解释一个“引用”的具体原因。 */
+  description?: string;
 }

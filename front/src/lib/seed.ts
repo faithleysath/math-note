@@ -69,7 +69,7 @@ async function seedDatabase() {
     const theorem1: Omit<Node, 'id' | 'createdAt' | 'updatedAt'> = {
         type: '定理',
         title: '德摩根定律',
-        content: '集合的德摩根定律陈述。',
+        content: "集合的德摩根定律陈述：$$(A \\cup B)' = A' \\cap B'$$",
         parentId: minorChapter1_1Id,
         children: [],
     };
