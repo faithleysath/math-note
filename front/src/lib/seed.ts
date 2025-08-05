@@ -1,6 +1,19 @@
 import { db, addNode, addEdge } from './db';
 import type { Node } from './types';
 
+// 一个辅助函数，用于减少重复的父子关系更新代码
+async function addNodeAndUpdateParent(
+  nodeData: Omit<Node, 'id' | 'createdAt' | 'updatedAt'>,
+  parentChildren: string[]
+): Promise<string> {
+  const nodeId = await addNode(nodeData);
+  if (nodeData.parentId) {
+    await db.nodes.update(nodeData.parentId, { children: [...parentChildren, nodeId] });
+  }
+  return nodeId;
+}
+
+
 async function seedDatabase() {
   const count = await db.nodes.count();
   if (count > 0) {
@@ -11,99 +24,173 @@ async function seedDatabase() {
   console.log('Seeding database...');
 
   try {
-    // --- Level 1: Branches ---
-    const analysisBranch: Omit<Node, 'id' | 'createdAt' | 'updatedAt'> = {
+    // =================================================================
+    // --- 分支 1: 数学分析 ---
+    // =================================================================
+    const analysisBranchId = await addNode({
       type: '分支',
       title: '数学分析',
       content: '研究极限及相关理论，如微分、积分、测度、无穷级数和解析函数。',
       parentId: null,
       children: [],
-    };
-    const analysisBranchId = await addNode(analysisBranch);
-
-    // --- Level 2: Major Chapters ---
-    const chapter1: Omit<Node, 'id' | 'createdAt' | 'updatedAt'> = {
-        type: '主章节',
-        title: '集合与映射',
-        content: '本章介绍集合与映射的基本概念。',
-        parentId: analysisBranchId,
-        children: [],
-    };
-    const chapter1Id = await addNode(chapter1);
-
-    // Update parent's children array
-    await db.nodes.update(analysisBranchId, { children: [chapter1Id] });
-
-    // --- Level 3: Minor Chapters ---
-    const minorChapter1_1: Omit<Node, 'id' | 'createdAt' | 'updatedAt'> = {
-        type: '子章节',
-        title: '集合',
-        content: '集合的基本概念。',
-        parentId: chapter1Id,
-        children: [],
-    };
-    const minorChapter1_1Id = await addNode(minorChapter1_1);
-
-    const minorChapter1_2: Omit<Node, 'id' | 'createdAt' | 'updatedAt'> = {
-        type: '子章节',
-        title: '映射',
-        content: '映射与函数介绍。',
-        parentId: chapter1Id,
-        children: [],
-    };
-    const minorChapter1_2Id = await addNode(minorChapter1_2);
-    
-    // Update parent's children array
-    await db.nodes.update(chapter1Id, { children: [minorChapter1_1Id, minorChapter1_2Id] });
-
-    // --- Level 4: Definitions/Theorems in a Minor Chapter ---
-    const definition1: Omit<Node, 'id' | 'createdAt' | 'updatedAt'> = {
-        type: '定义',
-        title: '集合的定义',
-        content: '集合是明确定义的不同对象的集合，其本身被视为一个对象。',
-        parentId: minorChapter1_1Id,
-        children: [],
-    };
-    const definition1Id = await addNode(definition1);
-
-    const theorem1: Omit<Node, 'id' | 'createdAt' | 'updatedAt'> = {
-        type: '定理',
-        title: '德摩根定律',
-        content: "集合的德摩根定律陈述：$$(A \\cup B)' = A' \\cap B'$$",
-        parentId: minorChapter1_1Id,
-        children: [],
-    };
-    const theorem1Id = await addNode(theorem1);
-
-    // Update parent's children array
-    await db.nodes.update(minorChapter1_1Id, { children: [definition1Id, theorem1Id] });
-
-    // --- Level 5: Edges ---
-    await addEdge({
-        source: theorem1Id,
-        target: definition1Id,
-        label: '引用',
+      tags: ['核心数学'],
     });
 
-    // --- Another Branch: Probability Theory ---
-    const probBranch: Omit<Node, 'id' | 'createdAt' | 'updatedAt'> = {
+    // --- 主章节 1.1: 集合与映射 ---
+    const chapter1Id = await addNodeAndUpdateParent({
+      type: '主章节',
+      title: '集合与映射',
+      content: '本章介绍集合与映射的基本概念，它们是构建整个数学分析大厦的基础。',
+      parentId: analysisBranchId,
+      children: [],
+    }, []); // analysisBranch 还没有子节点，所以是空数组
+
+    // --- 子章节 1.1.1: 集合 ---
+    const minorChapter1_1Id = await addNodeAndUpdateParent({
+      type: '子章节',
+      title: '集合',
+      content: '集合的基本概念、运算和性质。',
+      parentId: chapter1Id,
+      children: [],
+    }, []);
+
+    // --- 子章节 1.1.1 下的内容 ---
+    const definition1Id = await addNodeAndUpdateParent({
+      type: '定义',
+      title: '集合的定义',
+      content: '集合是明确定义的不同对象的集合，其本身被视为一个对象。元素具有无序性和互异性。',
+      parentId: minorChapter1_1Id,
+      children: [],
+      tags: ['基础概念', '集合论'],
+      aliases: ['Set'],
+      source: '《陶哲轩实分析》第一章',
+    }, []);
+
+    const theorem1Id = await addNodeAndUpdateParent({
+      type: '定理',
+      title: '德摩根定律',
+      content: "集合的德摩根定律陈述了并集和交集的补集之间的关系：\n1. $$(A \\cup B)' = A' \\cap B'$$\n2. $$(A \\cap B)' = A' \\cup B'$$",
+      solution: '证明：以第一条为例，设 x ∈ (A ∪ B)\'，则 x ∉ A ∪ B，即 x ∉ A 且 x ∉ B。所以 x ∈ A\' 且 x ∈ B\'，即 x ∈ A\' ∩ B\'。反之亦然。',
+      parentId: minorChapter1_1Id,
+      children: [],
+      tags: ['集合论', '逻辑'],
+    }, [definition1Id]);
+
+    const example1Id = await addNodeAndUpdateParent({
+      type: '例题',
+      title: '德摩根定律应用',
+      content: '设全集 U = {1, 2, 3, 4, 5}，A = {1, 2}, B = {2, 3}。验证 (A ∪ B)\' = A\' ∩ B\'。',
+      solution: '左边：A ∪ B = {1, 2, 3}，所以 (A ∪ B)\' = {4, 5}。\n右边：A\' = {3, 4, 5}, B\' = {1, 4, 5}，所以 A\' ∩ B\' = {4, 5}。\n左右相等，得证。',
+      parentId: theorem1Id, // 作为定理的例题
+      children: [],
+    }, []);
+
+    const note1Id = await addNodeAndUpdateParent({
+        type: '笔记',
+        title: '关于德摩根定律的思考',
+        content: '德摩根定律不仅在集合论中重要，它在布尔代数和数字电路设计中也有完全相同的形式，是逻辑否定的基本规则。',
+        parentId: minorChapter1_1Id,
+        children: [],
+    }, [definition1Id, theorem1Id]);
+
+    // --- 在子章节末尾创建“习题”笔记 ---
+    const exercisesNoteId = await addNodeAndUpdateParent({
+      type: '笔记',
+      title: '习题',
+      content: '本章节相关练习题。',
+      parentId: minorChapter1_1Id,
+      children: [],
+    }, [definition1Id, theorem1Id, note1Id]);
+
+    // --- 将练习题挂载到“习题”笔记下 ---
+    const exercise1Id = await addNodeAndUpdateParent({
+        type: '练习',
+        title: '幂集大小',
+        content: '一个有 n 个元素的有限集合，其幂集（所有子集构成的集合）有多少个元素？',
+        solution: '$$2^n$$。因为对于每个元素，我们都可以选择“包含”或“不包含”在子集中，两种选择，总共有 n 个元素，因此是 2 的 n 次方。',
+        parentId: exercisesNoteId, // 挂载到“习题”笔记下
+        children: [],
+    }, []);
+
+    const solutionRecord1Id = await addNodeAndUpdateParent({
+        type: '解题记录',
+        title: '我对“幂集大小”的解法',
+        content: '我的初步想法是 n*n，因为感觉是两两组合。但这个思路很快就发现不对。',
+        solution: '后来参考了答案，理解了每个元素都有“在”或“不在”子集中这两种状态，所以是 2^n。这个思路非常巧妙，需要记住。',
+        parentId: exercise1Id, // 作为练习题的解题记录
+        children: [],
+    }, []);
+
+    // =================================================================
+    // --- 分支 2: 线性代数 ---
+    // =================================================================
+    const linalgBranchId = await addNode({
       type: '分支',
-      title: '概率论',
-      content: '研究事件发生可能性的数值描述的数学分支。',
+      title: '线性代数',
+      content: '研究向量空间、线性变换和有限维线性方程组。',
       parentId: null,
       children: [],
-    };
-    const probBranchId = await addNode(probBranch);
+      tags: ['核心数学', '代数'],
+    });
 
-    const probChapter1: Omit<Node, 'id' | 'createdAt' | 'updatedAt'> = {
-        type: '主章节',
-        title: '基本概念',
-        content: '概率论的基本概念。',
-        parentId: probBranchId,
+    const linalgChapter1Id = await addNodeAndUpdateParent({
+      type: '主章节',
+      title: '向量空间',
+      content: '向量空间的定义、子空间、基与维数。',
+      parentId: linalgBranchId,
+      children: [],
+    }, []);
+
+    const vectorSpaceDefId = await addNodeAndUpdateParent({
+      type: '定义',
+      title: '向量空间',
+      content: '一个向量空间（或线性空间）是一个由称为向量的元素组成的集合，其中定义了两种运算：向量加法和标量乘法，并满足八条公理。',
+      parentId: linalgChapter1Id,
+      children: [],
+      tags: ['核心概念', '抽象代数'],
+      source: '《Linear Algebra Done Right》 by Sheldon Axler',
+    }, []);
+
+    // =================================================================
+    // --- 建立边（Edges），构建知识图谱 ---
+    // =================================================================
+    console.log('Adding edges...');
+
+    // 德摩根定律“引用”了集合的定义
+    await addEdge({
+      source: theorem1Id,
+      target: definition1Id,
+      label: '引用',
+      description: '德摩根定律是关于集合运算的，因此其证明和理解依赖于集合的基本定义。',
+    });
+
+    // 例题是定理的例题
+    await addEdge({ source: example1Id, target: theorem1Id, label: '是...的例题' });
+    
+    // 练习题是定义的练习题
+    await addEdge({ source: exercise1Id, target: definition1Id, label: '是...的练习题' });
+
+    // 解题记录是练习题的解题记录
+    await addEdge({ source: solutionRecord1Id, target: exercise1Id, label: '是...的解题记录' });
+
+    // 笔记引用了德摩根定律
+    await addEdge({ source: note1Id, target: theorem1Id, label: '引用' });
+
+    // --- 跨学科的引用！---
+    const crossDisciplineNoteId = await addNodeAndUpdateParent({
+        type: '笔记',
+        title: '函数的向量空间',
+        content: '所有从实数域 R 到 R 的连续函数集合，在函数加法和标量乘法下，可以构成一个无穷维的向量空间。这是泛函分析的起点。',
+        parentId: chapter1Id, // 放在数学分析的“集合与映射”章节下
         children: [],
-    };
-    const probChapter1Id = await addNode(probChapter1);
-    await db.nodes.update(probBranchId, { children: [probChapter1Id] });
+    }, [minorChapter1_1Id]); // 假设放在子章节1.1之后
+
+    await addEdge({
+      source: crossDisciplineNoteId,
+      target: vectorSpaceDefId, // 目标是线性代数中的“向量空间”定义
+      label: '引用',
+      description: '此概念将分析学中的“函数”与代数学中的“向量空间”联系起来。',
+    });
 
 
     console.log('Database seeded successfully!');
