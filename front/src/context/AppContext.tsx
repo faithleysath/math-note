@@ -1,16 +1,11 @@
-import React, { createContext, useState, useContext, type ReactNode } from 'react';
+import React, { useState, type ReactNode } from 'react';
 import type { Node } from '../lib/types';
 import { getNode } from '../lib/db';
-
-interface AppContextType {
-  selectedNode: Node | null;
-  setSelectedNodeById: (id: string | null) => void;
-}
-
-const AppContext = createContext<AppContextType | undefined>(undefined);
+import { AppContext } from './AppContextDefinition';
 
 export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
+  const [expandedBranchId, setExpandedBranchId] = useState<string | null>(null);
 
   const setSelectedNodeById = async (id: string | null) => {
     console.log(`Attempting to select node with ID: ${id}`);
@@ -29,15 +24,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const value = { selectedNode, setSelectedNodeById };
+  const value = { selectedNode, setSelectedNodeById, expandedBranchId, setExpandedBranchId };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
-};
-
-export const useAppContext = () => {
-  const context = useContext(AppContext);
-  if (context === undefined) {
-    throw new Error('useAppContext must be used within an AppProvider');
-  }
-  return context;
 };

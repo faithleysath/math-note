@@ -85,6 +85,27 @@ async function seedDatabase() {
         label: 'references',
     });
 
+    // --- Another Branch: Probability Theory ---
+    const probBranch: Omit<Node, 'id' | 'createdAt' | 'updatedAt'> = {
+      type: 'Branch',
+      title: 'Probability Theory',
+      content: 'The branch of mathematics concerning numerical descriptions of how likely an event is to occur.',
+      parentId: null,
+      children: [],
+    };
+    const probBranchId = await addNode(probBranch);
+
+    const probChapter1: Omit<Node, 'id' | 'createdAt' | 'updatedAt'> = {
+        type: 'MajorChapter',
+        title: 'Basic Concepts',
+        content: 'Fundamental concepts of probability.',
+        parentId: probBranchId,
+        children: [],
+    };
+    const probChapter1Id = await addNode(probChapter1);
+    await db.nodes.update(probBranchId, { children: [probChapter1Id] });
+
+
     console.log('Database seeded successfully!');
   } catch (error) {
     console.error('Error seeding database:', error);

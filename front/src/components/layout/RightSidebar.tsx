@@ -1,5 +1,5 @@
 import React from 'react';
-import { useAppContext } from '../../context/AppContext';
+import { useAppContext } from '../../hooks/useAppContext';
 import RelatedNodesList from '../RelatedNodesList';
 
 const RightSidebar = () => {

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import type { Node, Edge } from '../lib/types';
 import { getEdgesBySource, getEdgesByTarget, getNode } from '../lib/db';
-import { useAppContext } from '../context/AppContext';
+import { useAppContext } from '../hooks/useAppContext';
 
 interface RelatedNodeInfo {
   edge: Edge;

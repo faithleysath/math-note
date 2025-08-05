@@ -8,7 +8,7 @@ export class MathNoteDB extends Dexie {
 
   constructor() {
     super('MathNoteDB');
-    this.version(2).stores({
+    this.version(3).stores({
       // The 'id' field is the primary key, so it's indexed by default.
       // We add indexes for fields that we will query frequently.
       nodes: '&id, parentId, type',

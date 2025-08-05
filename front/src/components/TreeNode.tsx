@@ -1,22 +1,32 @@
 import React, { useState, useEffect } from 'react';
 import type { Node } from '../lib/types';
 import { getNodesByParent } from '../lib/db';
-import { useAppContext } from '../context/AppContext';
+import { useAppContext } from '../hooks/useAppContext';
 
 interface TreeNodeProps {
   node: Node;
+  numberPrefix?: string;
 }
 
-const TreeNode: React.FC<TreeNodeProps> = ({ node }) => {
-  const { setSelectedNodeById } = useAppContext();
+const TreeNode: React.FC<TreeNodeProps> = ({ node, numberPrefix = '' }) => {
+  const { setSelectedNodeById, expandedBranchId, setExpandedBranchId } = useAppContext();
   const [isExpanded, setIsExpanded] = useState(false);
   const [children, setChildren] = useState<Node[]>([]);
   const [loading, setLoading] = useState(false);
 
   const hasChildren = node.children && node.children.length > 0;
+  const isBranch = node.type === 'Branch';
+
+  // Sync local expanded state with global context for branches
+  useEffect(() => {
+    if (isBranch) {
+      setIsExpanded(expandedBranchId === node.id);
+    }
+  }, [expandedBranchId, isBranch, node.id]);
 
   useEffect(() => {
-    if (isExpanded && hasChildren) {
+    // Fetch children if expanded and they haven't been fetched yet
+    if (isExpanded && hasChildren && children.length === 0) {
       setLoading(true);
       getNodesByParent(node.id)
         .then(childNodes => {
@@ -30,12 +40,18 @@ const TreeNode: React.FC<TreeNodeProps> = ({ node }) => {
         .catch(error => console.error(`Failed to fetch children for node ${node.id}:`, error))
         .finally(() => setLoading(false));
     }
-  }, [isExpanded, hasChildren, node.id]);
+  }, [isExpanded, hasChildren, node.id, children.length, node.children]);
 
   const handleRowClick = () => {
     setSelectedNodeById(node.id);
     if (hasChildren) {
-      setIsExpanded(!isExpanded);
+      if (isBranch) {
+        // For branches, toggle via global context for accordion effect
+        setExpandedBranchId(isExpanded ? null : node.id);
+      } else {
+        // For other nodes, toggle locally
+        setIsExpanded(!isExpanded);
+      }
     }
   };
 
@@ -47,11 +63,16 @@ const TreeNode: React.FC<TreeNodeProps> = ({ node }) => {
             {isExpanded ? '▾' : '▸'}
           </span>
         )}
-        <span className={`${!hasChildren ? 'ml-[22px]' : ''}`}>{node.title}</span>
+        <span className={`${!hasChildren ? 'ml-[22px]' : ''}`}>{`${numberPrefix}${node.title}`}</span>
       </div>
       {isExpanded && hasChildren && (
         <ul>
-          {loading ? <li>Loading...</li> : children.map(child => <TreeNode key={child.id} node={child} />)}
+          {loading ? <li>Loading...</li> : children.map((child, index) => {
+            const childNumberPrefix = ['MajorChapter', 'MinorChapter'].includes(child.type) 
+              ? `${numberPrefix}${index + 1}.` 
+              : '';
+            return <TreeNode key={child.id} node={child} numberPrefix={childNumberPrefix ? `${childNumberPrefix} ` : ''} />
+          })}
         </ul>
       )}
     </li>
