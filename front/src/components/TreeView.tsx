@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Node } from '../lib/types';
 import { getNodesByParent } from '../lib/db';
 import TreeNode from './TreeNode';

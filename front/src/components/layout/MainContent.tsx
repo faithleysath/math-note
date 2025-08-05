@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useMemo } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { useAppStore } from '../../stores/useAppStore';
 import MDEditor from '@uiw/react-md-editor';
 import { getAllDescendants } from '../../lib/db';

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import type { Node } from '../lib/types';
 import { getNodesByParent } from '../lib/db';
 import { useAppStore } from '../stores/useAppStore';

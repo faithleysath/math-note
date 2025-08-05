@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Node, Edge } from '../lib/types';
 import { getEdgesBySource, getEdgesByTarget, getNode } from '../lib/db';
 import { useAppStore } from '../stores/useAppStore';
