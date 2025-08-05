@@ -32,7 +32,7 @@ const MainContent = () => {
         case 'MajorChapter':
           majorCounters[node.parentId!] = (majorCounters[node.parentId!] || 0) + 1;
           currentMajorPrefix = `${majorCounters[node.parentId!]}`;
-          displayNumber = `Chapter ${currentMajorPrefix}`;
+          displayNumber = `第 ${currentMajorPrefix} 章`;
           break;
         case 'MinorChapter':
           minorCounters[node.parentId!] = (minorCounters[node.parentId!] || 0) + 1;
@@ -41,15 +41,22 @@ const MainContent = () => {
           break;
         case 'Definition':
         case 'Theorem':
-        case 'Example':
+        case 'Example': {
+          const typeTranslations: { [key: string]: string } = {
+            Definition: '定义',
+            Theorem: '定理',
+            Example: '例题',
+          };
+          const translatedType = typeTranslations[node.type] || node.type;
           if (!contentCounters[node.type]) {
             contentCounters[node.type] = {};
           }
           contentCounters[node.type][node.parentId!] = (contentCounters[node.type][node.parentId!] || 0) + 1;
-          displayNumber = `${node.type} ${currentMinorPrefix}.${contentCounters[node.type][node.parentId!]}`;
+          displayNumber = `${translatedType} ${currentMinorPrefix}.${contentCounters[node.type][node.parentId!]}`;
           // Prepend the bolded number to the content for rendering
           displayContent = `**${displayNumber}**    ${node.content}`;
           break;
+        }
         default:
           break;
       }
@@ -91,7 +98,7 @@ const MainContent = () => {
   if (!expandedBranchId || processedNodes.length === 0) {
     return (
       <div className="h-full p-4 flex items-center justify-center">
-        <p className="text-muted-foreground">Expand a branch to see its content.</p>
+        <p className="text-muted-foreground">展开一个分支以查看其内容。</p>
       </div>
     );
   }

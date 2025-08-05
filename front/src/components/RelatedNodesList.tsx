@@ -46,11 +46,11 @@ const RelatedNodesList = () => {
   }, [selectedNode]);
 
   if (loading) {
-    return <p>Loading related nodes...</p>;
+    return <p>正在加载相关节点...</p>;
   }
 
   if (relatedNodes.length === 0) {
-    return <p>No related nodes found.</p>;
+    return <p>未找到相关节点。</p>;
   }
 
   return (

@@ -14,8 +14,8 @@ async function seedDatabase() {
     // --- Level 1: Branches ---
     const analysisBranch: Omit<Node, 'id' | 'createdAt' | 'updatedAt'> = {
       type: 'Branch',
-      title: 'Mathematical Analysis',
-      content: 'The study of limits and related theories, such as differentiation, integration, measure, infinite series, and analytic functions.',
+      title: '数学分析',
+      content: '研究极限及相关理论，如微分、积分、测度、无穷级数和解析函数。',
       parentId: null,
       children: [],
     };
@@ -24,8 +24,8 @@ async function seedDatabase() {
     // --- Level 2: Major Chapters ---
     const chapter1: Omit<Node, 'id' | 'createdAt' | 'updatedAt'> = {
         type: 'MajorChapter',
-        title: 'Sets and Mappings',
-        content: 'This chapter introduces the fundamental concepts of sets and mappings.',
+        title: '集合与映射',
+        content: '本章介绍集合与映射的基本概念。',
         parentId: analysisBranchId,
         children: [],
     };
@@ -37,8 +37,8 @@ async function seedDatabase() {
     // --- Level 3: Minor Chapters ---
     const minorChapter1_1: Omit<Node, 'id' | 'createdAt' | 'updatedAt'> = {
         type: 'MinorChapter',
-        title: 'Sets',
-        content: 'Basic concepts of sets.',
+        title: '集合',
+        content: '集合的基本概念。',
         parentId: chapter1Id,
         children: [],
     };
@@ -46,8 +46,8 @@ async function seedDatabase() {
 
     const minorChapter1_2: Omit<Node, 'id' | 'createdAt' | 'updatedAt'> = {
         type: 'MinorChapter',
-        title: 'Mappings',
-        content: 'Introduction to mappings and functions.',
+        title: '映射',
+        content: '映射与函数介绍。',
         parentId: chapter1Id,
         children: [],
     };
@@ -59,8 +59,8 @@ async function seedDatabase() {
     // --- Level 4: Definitions/Theorems in a Minor Chapter ---
     const definition1: Omit<Node, 'id' | 'createdAt' | 'updatedAt'> = {
         type: 'Definition',
-        title: 'Definition of a Set',
-        content: 'A set is a well-defined collection of distinct objects, considered as an object in its own right.',
+        title: '集合的定义',
+        content: '集合是明确定义的不同对象的集合，其本身被视为一个对象。',
         parentId: minorChapter1_1Id,
         children: [],
     };
@@ -68,8 +68,8 @@ async function seedDatabase() {
 
     const theorem1: Omit<Node, 'id' | 'createdAt' | 'updatedAt'> = {
         type: 'Theorem',
-        title: 'De Morgan\'s Laws',
-        content: 'Statement of De Morgan\'s laws for sets.',
+        title: '德摩根定律',
+        content: '集合的德摩根定律陈述。',
         parentId: minorChapter1_1Id,
         children: [],
     };
@@ -82,14 +82,14 @@ async function seedDatabase() {
     await addEdge({
         source: theorem1Id,
         target: definition1Id,
-        label: 'references',
+        label: '引用',
     });
 
     // --- Another Branch: Probability Theory ---
     const probBranch: Omit<Node, 'id' | 'createdAt' | 'updatedAt'> = {
       type: 'Branch',
-      title: 'Probability Theory',
-      content: 'The branch of mathematics concerning numerical descriptions of how likely an event is to occur.',
+      title: '概率论',
+      content: '研究事件发生可能性的数值描述的数学分支。',
       parentId: null,
       children: [],
     };
@@ -97,8 +97,8 @@ async function seedDatabase() {
 
     const probChapter1: Omit<Node, 'id' | 'createdAt' | 'updatedAt'> = {
         type: 'MajorChapter',
-        title: 'Basic Concepts',
-        content: 'Fundamental concepts of probability.',
+        title: '基本概念',
+        content: '概率论的基本概念。',
         parentId: probBranchId,
         children: [],
     };

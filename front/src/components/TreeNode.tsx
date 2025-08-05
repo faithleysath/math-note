@@ -67,7 +67,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({ node, numberPrefix = '' }) => {
       </div>
       {isExpanded && hasChildren && (
         <ul>
-          {loading ? <li>Loading...</li> : children.map((child, index) => {
+          {loading ? <li>加载中...</li> : children.map((child, index) => {
             const childNumberPrefix = ['MajorChapter', 'MinorChapter'].includes(child.type) 
               ? `${numberPrefix}${index + 1}.` 
               : '';
