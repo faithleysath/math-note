@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { db } from '../lib/db';
+import { getEdgesBySource, getEdgesByTarget, getNode } from '../lib/data-provider';
 import type { Edge, Node } from '../lib/types';
 import { useAppStore } from '../stores/useAppStore';
 
@@ -29,28 +29,29 @@ export function useRelatedNodes(nodeId: string | undefined) {
     setLoading(true);
 
     const fetchRelated = async () => {
+      if (!nodeId) return;
       try {
         // Fetch outgoing edges (current node is the source)
-        const outEdges = await db.edges.where('source').equals(nodeId).toArray();
-        const outTargetIds = outEdges.map(e => e.target);
-        const outTargetNodes = await db.nodes.where('id').anyOf(outTargetIds).toArray();
-        const outTargetNodesMap = new Map(outTargetNodes.map(n => [n.id, n]));
+        const outEdges = await getEdgesBySource(nodeId);
+        const outTargetNodesData = await Promise.all(
+          outEdges.map(e => getNode(e.target))
+        );
         
-        const outgoingInfo = outEdges.map(edge => ({
+        const outgoingInfo = outEdges.map((edge, index) => ({
           edge,
-          relatedNode: outTargetNodesMap.get(edge.target)!
-        })).filter(info => info.relatedNode); // Filter out any potential dangling edges
+          relatedNode: outTargetNodesData[index]
+        })).filter(info => info.relatedNode) as RelatedNodeInfo[];
 
         // Fetch incoming edges (current node is the target)
-        const inEdges = await db.edges.where('target').equals(nodeId).toArray();
-        const inSourceIds = inEdges.map(e => e.source);
-        const inSourceNodes = await db.nodes.where('id').anyOf(inSourceIds).toArray();
-        const inSourceNodesMap = new Map(inSourceNodes.map(n => [n.id, n]));
+        const inEdges = await getEdgesByTarget(nodeId);
+        const inSourceNodesData = await Promise.all(
+          inEdges.map(e => getNode(e.source))
+        );
 
-        const incomingInfo = inEdges.map(edge => ({
+        const incomingInfo = inEdges.map((edge, index) => ({
           edge,
-          relatedNode: inSourceNodesMap.get(edge.source)!
-        })).filter(info => info.relatedNode);
+          relatedNode: inSourceNodesData[index]
+        })).filter(info => info.relatedNode) as RelatedNodeInfo[];
 
         if (isMounted) {
           setOutgoing(outgoingInfo);

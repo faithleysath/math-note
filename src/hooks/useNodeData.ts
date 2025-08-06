@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getNode } from '../lib/db';
+import { getNode } from '../lib/data-provider';
 import type { Node } from '../lib/types';
 import { useAppStore } from '../stores/useAppStore';
 

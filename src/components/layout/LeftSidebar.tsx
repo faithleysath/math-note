@@ -23,7 +23,7 @@ import {
 } from '../ui/dialog';
 import { Input } from '../ui/input';
 import { useAppStore } from '../../stores/useAppStore';
-import { exportData, importData } from '../../lib/db';
+import { exportData, importData } from '../../lib/data-provider';
 import { toast } from 'sonner';
 import Search from '../Search';
 import { Upload, Download, Share2 } from 'lucide-react';

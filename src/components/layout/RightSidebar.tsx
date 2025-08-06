@@ -6,7 +6,7 @@ import { useRelatedNodes } from '../../hooks/useRelatedNodes';
 import { Button } from '../ui/button';
 import AddEdgeDialog from '../AddEdgeDialog';
 import { Link, ChevronRight } from 'lucide-react';
-import { getAncestors } from '../../lib/db';
+import { getAncestors } from '../../lib/data-provider';
 import type { Node } from '../../lib/types';
 
 const RightSidebar = () => {

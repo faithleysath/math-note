@@ -68,6 +68,21 @@ export async function searchNodes(term: string): Promise<Node[]> {
   return localDb.searchNodes(term);
 }
 
+// --- Import/Export Operations ---
+
+export async function exportData() {
+  // Export is always from local DB
+  return localDb.exportData();
+}
+
+export async function importData(data: { nodes: Node[], edges: Edge[] }) {
+  const { isReadOnly } = useAppStore.getState();
+  if (isReadOnly) {
+    throw new Error("Cannot import data in read-only mode.");
+  }
+  return localDb.importData(data);
+}
+
 // --- Write Operations ---
 // These operations are disabled in read-only mode.
 

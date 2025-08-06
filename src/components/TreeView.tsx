@@ -3,12 +3,11 @@ import { useAppStore } from '../stores/useAppStore';
 import TreeNode from './TreeNode';
 
 const TreeView = () => {
-  const { rootNodes, isLoadingTree, fetchRootNodes } = useAppStore();
+  const { rootNodes, isLoadingTree, fetchRootNodes, structureVersion } = useAppStore();
 
   useEffect(() => {
     fetchRootNodes();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [fetchRootNodes, structureVersion]);
 
   if (isLoadingTree) {
     return <div>Loading...</div>;

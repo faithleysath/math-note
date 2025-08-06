@@ -154,6 +154,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
       set({ remoteData: data, isReadOnly: true });
       await get().fetchRootNodes(); // 直接在设置远程数据后获取根节点
+      get().triggerStructureRefresh(); // 触发UI刷新
       toast.success('只读笔记已加载。');
       set({ isLoadingTree: false });
     } catch (error) {
