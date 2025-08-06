@@ -35,6 +35,8 @@ const LeftSidebar = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isImportConfirmOpen, setIsImportConfirmOpen] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
+  const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
+  const [shareUrl, setShareUrl] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const fileToImportRef = useRef<File | null>(null);
 
@@ -81,10 +83,10 @@ const LeftSidebar = () => {
       }
 
       const result = await response.json();
-      const shareUrl = `${window.location.origin}/#${result.url}`;
+      const fullShareUrl = `${window.location.origin}/#${result.url}`;
       
-      await navigator.clipboard.writeText(shareUrl);
-      toast.success('分享链接已复制到剪贴板。');
+      setShareUrl(fullShareUrl);
+      setIsShareDialogOpen(true);
 
     } catch (error) {
       console.error('Failed to share data:', error);
@@ -222,6 +224,29 @@ const LeftSidebar = () => {
             </DialogContent>
           </Dialog>
         </div>
+        <Dialog open={isShareDialogOpen} onOpenChange={setIsShareDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>分享链接</DialogTitle>
+            </DialogHeader>
+            <div className="py-4 flex items-center space-x-2">
+              <Input value={shareUrl} readOnly />
+              <Button onClick={() => {
+                navigator.clipboard.writeText(shareUrl);
+                toast.success('链接已复制到剪贴板。');
+              }}>
+                复制
+              </Button>
+            </div>
+            <DialogFooter>
+              <DialogClose asChild>
+                <Button type="button" variant="secondary">
+                  关闭
+                </Button>
+              </DialogClose>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
         <AlertDialog open={isImportConfirmOpen} onOpenChange={setIsImportConfirmOpen}>
           <AlertDialogContent>
             <AlertDialogHeader>

@@ -15,9 +15,10 @@ export default async function handler(request, response) {
     }
 
     const jsonString = JSON.stringify(body);
-    const blob = await put(`notes-${uuidv4()}.json`, jsonString, {
+    const buffer = Buffer.from(jsonString, 'utf-8');
+    const blob = await put(`notes-${uuidv4()}.json`, buffer, {
       access: 'public',
-      contentType: 'application/json',
+      contentType: 'application/json; charset=utf-8',
     });
 
     return response.status(200).json({ url: blob.url });
