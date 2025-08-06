@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { Node } from '../lib/types';
-import { getNode, getNodesByParent, addNode } from '../lib/db';
+import { getNode, getNodesByParent, addNode, updateNode } from '../lib/db';
 
 interface AppState {
   rootNodes: Node[];
@@ -17,6 +17,11 @@ interface AppState {
   setEditingNodeId: (id: string | null) => void; // Action to set the editing node
   triggerContentRefresh: () => void;
   triggerStructureRefresh: () => void;
+  addNewNode: (
+    nodeData: Omit<Node, 'id' | 'createdAt' | 'updatedAt'>,
+    parent: Node,
+    insertAfterNodeId: string | null
+  ) => Promise<void>;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -80,5 +85,31 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   triggerStructureRefresh: () => {
     set(state => ({ structureVersion: state.structureVersion + 1 }));
+  },
+  addNewNode: async (nodeData, parent, insertAfterNodeId) => {
+    const newNodeId = await addNode(nodeData);
+
+    let newChildren: string[];
+    if (insertAfterNodeId) {
+      const index = parent.children.indexOf(insertAfterNodeId);
+      if (index !== -1) {
+        const childrenCopy = [...parent.children];
+        childrenCopy.splice(index + 1, 0, newNodeId);
+        newChildren = childrenCopy;
+      } else {
+        newChildren = [...parent.children, newNodeId];
+      }
+    } else {
+      newChildren = [...parent.children, newNodeId];
+    }
+    await updateNode(parent.id, { children: newChildren });
+
+    get().triggerStructureRefresh();
+    set({ editingNodeId: newNodeId });
+
+    // Use a timeout to ensure the UI has re-rendered before scrolling
+    setTimeout(() => {
+      get().setSelectedNodeById(newNodeId);
+    }, 100);
   },
 }));

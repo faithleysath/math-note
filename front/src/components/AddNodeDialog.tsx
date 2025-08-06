@@ -10,7 +10,6 @@ import {
   DialogTitle,
 } from './ui/dialog';
 import { Input } from './ui/input';
-import { addNode, updateNode } from '../lib/db';
 import { useAppStore } from '../stores/useAppStore';
 
 // Define the allowed children types for each node type
@@ -36,8 +35,7 @@ interface AddNodeDialogProps {
 const AddNodeDialog = ({ parent, isOpen, onClose, insertAfterNodeId }: AddNodeDialogProps) => {
   const [title, setTitle] = useState('');
   const [selectedType, setSelectedType] = useState<Node['type'] | null>(null);
-  const triggerStructureRefresh = useAppStore(state => state.triggerStructureRefresh);
-  const setEditingNodeId = useAppStore(state => state.setEditingNodeId);
+  const addNewNode = useAppStore(state => state.addNewNode);
 
   const possibleChildren = allowedChildren[parent.type] || [];
 
@@ -48,37 +46,18 @@ const AddNodeDialog = ({ parent, isOpen, onClose, insertAfterNodeId }: AddNodeDi
     }
 
     try {
-      // 1. Add the new node to the database
-      const newNodeId = await addNode({
-        title,
-        type: selectedType,
-        content: '', // Start with empty content
-        parentId: parent.id,
-        children: [],
-      });
-
-      // 2. Update the parent's children array
-      let newChildren: string[];
-      if (insertAfterNodeId) {
-        const index = parent.children.indexOf(insertAfterNodeId);
-        if (index !== -1) {
-          const childrenCopy = [...parent.children];
-          childrenCopy.splice(index + 1, 0, newNodeId);
-          newChildren = childrenCopy;
-        } else {
-          newChildren = [...parent.children, newNodeId];
-        }
-      } else {
-        newChildren = [...parent.children, newNodeId];
-      }
-      await updateNode(parent.id, { children: newChildren });
-
-      // 3. Trigger a global refresh to update the UI
-      triggerStructureRefresh();
-      
-      // 4. Close the dialog and set the new node to be edited
+      await addNewNode(
+        {
+          title,
+          type: selectedType,
+          content: '', // Start with empty content
+          parentId: parent.id,
+          children: [],
+        },
+        parent,
+        insertAfterNodeId || null
+      );
       handleClose();
-      setEditingNodeId(newNodeId);
     } catch (error) {
       console.error('Failed to create new node:', error);
     }
@@ -94,26 +73,26 @@ const AddNodeDialog = ({ parent, isOpen, onClose, insertAfterNodeId }: AddNodeDi
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>在 "{parent.title}" 下添加新节点</DialogTitle>
+          <DialogTitle>在 "{parent.type}:{parent.title}" 下添加新节点</DialogTitle>
           <DialogDescription>
             选择一个节点类型并为它命名。
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
-          <div className="grid grid-cols-4 items-center gap-4">
-            <label htmlFor="title" className="text-right">
+          <div className="grid grid-cols-6 items-center gap-4">
+            <label htmlFor="title" className="text-left">
               标题
             </label>
             <Input
               id="title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="col-span-3"
+              className="col-span-5"
             />
           </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <label className="text-right">类型</label>
-            <div className="col-span-3 flex flex-wrap gap-2">
+          <div className="grid grid-cols-6 items-center gap-4">
+            <label className="text-left">类型</label>
+            <div className="col-span-5 flex flex-wrap gap-2">
               {possibleChildren.map(type => (
                 <Button
                   key={type}
