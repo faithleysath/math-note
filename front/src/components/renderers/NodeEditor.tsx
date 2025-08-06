@@ -17,6 +17,8 @@ const NodeEditor = ({ node }: NodeEditorProps) => {
   const [title, setTitle] = useState(node.title);
   const [content, setContent] = useState(node.content);
   const [solution, setSolution] = useState(node.solution || '');
+  const [tags, setTags] = useState(node.tags?.join(', ') || '');
+  const [source, setSource] = useState(node.source || '');
   const setEditingNodeId = useAppStore(state => state.setEditingNodeId);
   const triggerContentRefresh = useAppStore(state => state.triggerContentRefresh);
   const triggerStructureRefresh = useAppStore(state => state.triggerStructureRefresh);
@@ -46,11 +48,14 @@ const NodeEditor = ({ node }: NodeEditorProps) => {
     setTitle(node.title);
     setContent(node.content);
     setSolution(node.solution || '');
+    setTags(node.tags?.join(', ') || '');
+    setSource(node.source || '');
   }, [node]);
 
   const handleSave = async () => {
     try {
-      await updateNode(node.id, { title, content, solution });
+      const tagsArray = tags.split(',').map(tag => tag.trim()).filter(Boolean);
+      await updateNode(node.id, { title, content, solution, tags: tagsArray, source });
       toast.success(`节点 "${title}" 已保存。`);
       setEditingNodeId(null); // Exit editing mode
       triggerContentRefresh(); // Trigger a content refresh
@@ -77,6 +82,28 @@ const NodeEditor = ({ node }: NodeEditorProps) => {
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             className="text-lg"
+          />
+        </div>
+
+        <div>
+          <label htmlFor="tags" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            标签 (用逗号分隔)
+          </label>
+          <Input
+            id="tags"
+            value={tags}
+            onChange={(e) => setTags(e.target.value)}
+          />
+        </div>
+
+        <div>
+          <label htmlFor="source" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            来源
+          </label>
+          <Input
+            id="source"
+            value={source}
+            onChange={(e) => setSource(e.target.value)}
           />
         </div>
 

@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useAppStore } from '../../stores/useAppStore';
 import RelatedNodesList from '../RelatedNodesList';
+import RelationshipGraph from '../RelationshipGraph';
+import { useRelatedNodes } from '../../hooks/useRelatedNodes';
 import { Button } from '../ui/button';
 import AddEdgeDialog from '../AddEdgeDialog';
 import { Link, ChevronRight } from 'lucide-react';
@@ -12,6 +14,7 @@ const RightSidebar = () => {
   const setSelectedNodeById = useAppStore(state => state.setSelectedNodeById);
   const [isAddEdgeOpen, setIsAddEdgeOpen] = useState(false);
   const [ancestors, setAncestors] = useState<Node[]>([]);
+  const { outgoing, incoming, loading } = useRelatedNodes(selectedNode?.id);
 
   useEffect(() => {
     if (selectedNode) {
@@ -62,12 +65,6 @@ const RightSidebar = () => {
             <span className="ml-2 text-muted-foreground">{selectedNode.aliases.join(', ')}</span>
           </div>
         )}
-        {selectedNode.source && (
-          <div>
-            <span className="font-semibold">来源:</span>
-            <span className="ml-2 text-muted-foreground">{selectedNode.source}</span>
-          </div>
-        )}
         <div>
           <span className="font-semibold">类型:</span>
           <span className="ml-2 text-muted-foreground">{selectedNode.type}</span>
@@ -88,6 +85,12 @@ const RightSidebar = () => {
             </div>
           </div>
         )}
+        {selectedNode.source && (
+          <div>
+            <span className="font-semibold">来源:</span>
+            <span className="ml-2 text-muted-foreground">{selectedNode.source}</span>
+          </div>
+        )}
         <div>
           <span className="font-semibold">创建时间:</span>
           <span className="ml-2 text-muted-foreground">{new Date(selectedNode.createdAt).toLocaleString()}</span>
@@ -100,11 +103,16 @@ const RightSidebar = () => {
 
       <div className="flex items-center justify-between mb-2 border-b pb-2">
         <h3 className="text-md font-semibold">关系链接</h3>
-        <Button className='cursor-pointer' variant="ghost" size="sm" onClick={() => setIsAddEdgeOpen(true)}>
+        <Button variant="ghost" size="sm" onClick={() => setIsAddEdgeOpen(true)}>
           <Link className="h-4 w-4 mr-2" />
           链接新节点
         </Button>
       </div>
+      {!loading && (incoming.length > 0 || outgoing.length > 0) && (
+        <div className="mb-4">
+          <RelationshipGraph selectedNode={selectedNode} incoming={incoming} outgoing={outgoing} />
+        </div>
+      )}
       <div className="text-sm">
         <RelatedNodesList />
       </div>

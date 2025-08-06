@@ -3,11 +3,24 @@ import { Input } from './ui/input';
 import { searchNodes } from '../lib/db';
 import type { Node } from '../lib/types';
 import { useAppStore } from '../stores/useAppStore';
+import { cn } from '@/lib/utils';
 import { useDebounce } from '@/hooks/useDebounce';
 
 interface SearchProps {
   onSelectNode?: (node: Node) => void;
 }
+
+const nodeTypeColors: Record<Node['type'], string> = {
+  分支: 'bg-gray-200 text-gray-800',
+  主章节: 'bg-slate-200 text-slate-800',
+  子章节: 'bg-stone-200 text-stone-800',
+  定义: 'bg-blue-100 text-blue-800',
+  定理: 'bg-green-100 text-green-800',
+  例题: 'bg-orange-100 text-orange-800',
+  练习: 'bg-purple-100 text-purple-800',
+  解题记录: 'bg-red-100 text-red-800',
+  笔记: 'bg-yellow-100 text-yellow-800',
+};
 
 const Search = ({ onSelectNode }: SearchProps) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -56,8 +69,16 @@ const Search = ({ onSelectNode }: SearchProps) => {
               onMouseDown={(e) => e.preventDefault()} // Prevent onBlur from firing before onClick
               onClick={() => handleSelectNode(node)}
             >
-              <p className="font-semibold">{node.title}</p>
-              <p className="text-xs text-muted-foreground truncate">{node.content}</p>
+              <div className="flex justify-between items-center">
+                <p className="font-semibold truncate">{node.title}</p>
+                <span className={cn(
+                  "text-xs font-semibold px-2 py-0.5 rounded-full",
+                  nodeTypeColors[node.type] || 'bg-gray-200 text-gray-800'
+                )}>
+                  {node.type}
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground truncate mt-1">{node.content}</p>
             </div>
           ))}
         </div>
