@@ -8,14 +8,14 @@ import { toast } from 'sonner';
 
 const RelationGroup = ({ title, relations }: { title: string; relations: RelatedNodeInfo[] }) => {
   const setSelectedNodeById = useAppStore(state => state.setSelectedNodeById);
-  const triggerContentRefresh = useAppStore(state => state.triggerContentRefresh);
+  const triggerEdgeRefresh = useAppStore(state => state.triggerEdgeRefresh);
 
   const handleDeleteEdge = async (edgeId: string) => {
     try {
       // We can add a confirmation dialog later if needed
       await deleteEdge(edgeId);
       toast.success('链接已删除。');
-      triggerContentRefresh(); // Refresh the list
+      triggerEdgeRefresh(); // Refresh the list
     } catch (error) {
       console.error('Failed to delete edge:', error);
       toast.error('删除链接失败。');

@@ -20,6 +20,7 @@ interface AppState {
   editingNodeId: string | null; // ID of the node currently being edited
   contentVersion: number; // Triggers re-fetch of node content
   structureVersion: number; // Triggers re-fetch of lists and re-mount of components
+  edgeVersion: number; // Triggers re-fetch of graph relationships
   fetchRootNodes: () => Promise<void>;
   addBranch: (title: string) => Promise<void>;
   setSelectedNodeById: (id: string | null) => Promise<void>;
@@ -28,6 +29,7 @@ interface AppState {
   setIsLoadingTree: (isLoading: boolean) => void;
   triggerContentRefresh: () => void;
   triggerStructureRefresh: () => void;
+  triggerEdgeRefresh: () => void;
   addNewNode: (
     nodeData: Omit<Node, 'id' | 'createdAt' | 'updatedAt'>,
     parent: Node,
@@ -47,6 +49,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   editingNodeId: null,
   contentVersion: 0,
   structureVersion: 0,
+  edgeVersion: 0,
   fetchRootNodes: async () => {
     try {
       const nodes = await getNodesByParent(null);
@@ -106,6 +109,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   triggerStructureRefresh: () => {
     set(state => ({ structureVersion: state.structureVersion + 1 }));
+  },
+  triggerEdgeRefresh: () => {
+    set(state => ({ edgeVersion: state.edgeVersion + 1 }));
   },
   addNewNode: async (nodeData, parent, insertAfterNodeId) => {
     try {

@@ -13,9 +13,7 @@ export function useRelatedNodes(nodeId: string | undefined) {
   const [incoming, setIncoming] = useState<RelatedNodeInfo[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // We listen to both content and structure refresh triggers
-  const contentVersion = useAppStore(state => state.contentVersion);
-  const structureVersion = useAppStore(state => state.structureVersion);
+  const edgeVersion = useAppStore(state => state.edgeVersion);
 
   useEffect(() => {
     if (!nodeId) {
@@ -71,7 +69,7 @@ export function useRelatedNodes(nodeId: string | undefined) {
     return () => {
       isMounted = false;
     };
-  }, [nodeId, contentVersion, structureVersion]);
+  }, [nodeId, edgeVersion]);
 
   return { outgoing, incoming, loading };
 }

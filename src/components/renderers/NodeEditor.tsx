@@ -58,8 +58,13 @@ const NodeEditor = ({ node }: NodeEditorProps) => {
       await updateNode(node.id, { title, content, solution, tags: tagsArray, source });
       toast.success(`节点 "${title}" 已保存。`);
       setEditingNodeId(null); // Exit editing mode
-      triggerContentRefresh(); // Trigger a content refresh
-      triggerStructureRefresh(); // Trigger a structure refresh
+      
+      // 优化：仅当标题更改时才触发结构刷新
+      if (node.title !== title) {
+        triggerStructureRefresh();
+      }
+      triggerContentRefresh(); // 内容刷新总是需要的
+
     } catch (error) {
       console.error("Failed to save node:", error);
       if (error instanceof Error && error.message.includes("read-only")) {

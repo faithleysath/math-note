@@ -27,7 +27,7 @@ interface AddEdgeDialogProps {
 const AddEdgeDialog = ({ sourceNode, isOpen, onClose }: AddEdgeDialogProps) => {
   const [selectedTarget, setSelectedTarget] = useState<Node | null>(null);
   const [selectedLabel, setSelectedLabel] = useState<EdgeLabel | null>(null);
-  const triggerContentRefresh = useAppStore(state => state.triggerContentRefresh);
+  const triggerEdgeRefresh = useAppStore(state => state.triggerEdgeRefresh);
 
   const handleCreate = async () => {
     if (!selectedTarget || !selectedLabel) {
@@ -41,7 +41,7 @@ const AddEdgeDialog = ({ sourceNode, isOpen, onClose }: AddEdgeDialogProps) => {
         label: selectedLabel,
       });
       toast.success('链接已成功创建。');
-      triggerContentRefresh();
+      triggerEdgeRefresh();
       handleClose();
     } catch (error) {
       console.error('Failed to create edge:', error);
