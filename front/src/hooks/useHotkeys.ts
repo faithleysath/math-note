@@ -21,8 +21,8 @@ export const useHotkeys = () => {
 
       // --- Contextual Hotkeys (depend on selectedNode) ---
       if (selectedNode) {
-        // Enter edit mode with 'E'
-        if (event.key === 'e' && !editingNodeId) {
+        // Enter edit mode with Cmd/Ctrl + E
+        if ((event.metaKey || event.ctrlKey) && event.key === 'e' && !editingNodeId) {
           event.preventDefault();
           setEditingNodeId(selectedNode.id);
         }
