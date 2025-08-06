@@ -4,6 +4,8 @@ import { getOrderedDescendants } from '../../lib/db';
 import type { LightweightNode, ProcessedLightweightNode } from '../../lib/types';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import NodeRenderer from '../renderers/NodeRenderer';
+import { Button } from '../ui/button';
+import { Edit2 } from 'lucide-react';
 
 // =================================================================================
 // Main Content Component
@@ -12,6 +14,8 @@ const MainContent = () => {
   const selectedNode = useAppStore(state => state.selectedNode);
   const expandedBranchId = useAppStore(state => state.expandedBranchId);
   const setSelectedNodeById = useAppStore(state => state.setSelectedNodeById);
+  const setEditingNodeId = useAppStore(state => state.setEditingNodeId);
+  const dataVersion = useAppStore(state => state.dataVersion);
   const [lightweightNodes, setLightweightNodes] = useState<LightweightNode[]>([]);
   const parentRef = useRef<HTMLDivElement>(null);
 
@@ -70,7 +74,7 @@ const MainContent = () => {
       }
     };
     fetchBranchContent();
-  }, [expandedBranchId]);
+  }, [expandedBranchId, dataVersion]);
 
   const rowVirtualizer = useVirtualizer({
     count: processedLightweightNodes.length,
@@ -84,7 +88,7 @@ const MainContent = () => {
     if (selectedNode) {
       const index = processedLightweightNodes.findIndex(node => node.id === selectedNode.id);
       if (index !== -1) {
-        rowVirtualizer.scrollToIndex(index, { align: 'start', behavior: 'smooth' });
+        rowVirtualizer.scrollToIndex(index, { align: 'center', behavior: 'smooth' });
       }
     }
   }, [selectedNode, processedLightweightNodes, rowVirtualizer]);
@@ -114,10 +118,21 @@ const MainContent = () => {
                 width: '100%',
                 transform: `translateY(${virtualItem.start}px)`,
               }}
-              className="px-4 py-1.5 transition-colors duration-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+              className="group relative px-4 py-1.5 transition-colors duration-200 hover:bg-slate-100 dark:hover:bg-slate-800"
               onClick={() => setSelectedNodeById(node.id)}
             >
               <NodeRenderer node={node} />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute top-2 right-2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                onClick={(e) => {
+                  e.stopPropagation(); // Prevent the div's onClick from firing
+                  setEditingNodeId(node.id);
+                }}
+              >
+                <Edit2 className="h-4 w-4" />
+              </Button>
             </div>
           );
         })}

@@ -1,6 +1,8 @@
 import { memo } from 'react';
 import type { ProcessedLightweightNode } from '../../lib/types';
 import { useNodeData } from '../../hooks/useNodeData';
+import { useAppStore } from '../../stores/useAppStore';
+import NodeEditor from './NodeEditor'; // We will create this component next
 import MainChapterNodeRenderer from './MainChapterNodeRenderer';
 import SubChapterNodeRenderer from './SubChapterNodeRenderer';
 import DefinitionNodeRenderer from './DefinitionNodeRenderer';
@@ -16,10 +18,15 @@ interface NodeRendererProps {
 
 const NodeRenderer = memo(({ node }: NodeRendererProps) => {
   const { node: fullNode, loading } = useNodeData(node.id);
+  const editingNodeId = useAppStore(state => state.editingNodeId);
 
   if (loading || !fullNode) {
     // You might want to render a loading skeleton here
     return <div>Loading...</div>;
+  }
+
+  if (editingNodeId === node.id) {
+    return <NodeEditor node={fullNode} />;
   }
 
   switch (node.type) {

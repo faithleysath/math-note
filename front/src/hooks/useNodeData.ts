@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { getNode } from '../lib/db';
 import type { Node } from '../lib/types';
+import { useAppStore } from '../stores/useAppStore';
 
 /**
  * A hook to fetch the full data for a single node by its ID.
@@ -10,6 +11,7 @@ import type { Node } from '../lib/types';
 export function useNodeData(nodeId: string | undefined) {
   const [node, setNode] = useState<Node | null | undefined>(undefined);
   const [loading, setLoading] = useState(true);
+  const dataVersion = useAppStore(state => state.dataVersion);
 
   useEffect(() => {
     if (!nodeId) {
@@ -36,7 +38,7 @@ export function useNodeData(nodeId: string | undefined) {
     return () => {
       isMounted = false;
     };
-  }, [nodeId]);
+  }, [nodeId, dataVersion]); // Re-fetch when nodeId or dataVersion changes
 
   return { node, loading };
 }
