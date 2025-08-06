@@ -69,8 +69,8 @@ async function seedDatabase() {
     const theorem1Id = await addNodeAndUpdateParent({
       type: '定理',
       title: '德摩根定律',
-      content: `对于任意两个集合$A$ 和 $B$，有以下等式：\n$$\n(A \\cup B)' = A' \\cap B' \\\\\n(A \\cap B)' = A' \\cup B'\n$$`,
-      solution: `证明：\n1. 对于任意元素 $x$，如果 $x \\in (A \\cup B)'$，则 $x \\notin A \\cup B$，即 $x \\notin A$ 且 $x \\notin B$，因此 $x \\in A'$ 且 $x \\in B'$，所以 $x \\in A' \\cap B'$。\n2. 类似地，对于 $(A \\cap B)'$ 的证明。`,
+      content: `对于任意两个集合$A$ 和 $B$，有以下等式：\n$$\n(A \\cup B)' = A' \\cap B'\n$$\n$$\n(A \\cap B)' = A' \\cup B'\n$$`,
+      solution: `**证** &emsp;1. 对于任意元素 $x$，如果 $x \\in (A \\cup B)'$，则 $x \\notin A \\cup B$，即 $x \\notin A$ 且 $x \\notin B$，因此 $x \\in A'$ 且 $x \\in B'$，所以 $x \\in A' \\cap B'$。\n2. 类似地，对于 $(A \\cap B)'$ 的证明。`,
       parentId: minorChapter1_1Id,
       children: [],
       tags: ['集合论', '逻辑'],
@@ -80,7 +80,7 @@ async function seedDatabase() {
       type: '例题',
       title: '德摩根定律应用',
       content: `设 $A = \\{1, 2, 3\\}$ 和 $B = \\{2, 3, 4\\}$，求 $(A \\cup B)'$ 和 $(A \\cap B)'$ 的结果。`,
-      solution: `解：\n$A \\cup B = \\{1, 2, 3, 4\\}$，因此 $(A \\cup B)' = \\{\\text{所有不在 } A \\cup B 的元素\\}$。\n$A \\cap B = \\{2, 3\\}$，因此 $(A \\cap B)' = \\{\\text{所有不在 } A \\cap B 的元素\\}$。`,
+      solution: `**解** &emsp;$A \\cup B = \\{1, 2, 3, 4\\}$，因此 $(A \\cup B)' = \\{\\text{所有不在 } A \\cup B 的元素\\}$。\n$A \\cap B = \\{2, 3\\}$，因此 $(A \\cap B)' = \\{\\text{所有不在 } A \\cap B 的元素\\}$。`,
       parentId: theorem1Id, // 作为定理的例题
       children: [],
     }, []);

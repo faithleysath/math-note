@@ -60,7 +60,11 @@ const TreeNode: React.FC<TreeNodeProps> = ({ node, numberPrefix = '' }) => {
   const typePrefix =
     node.type === '定义' ? 'Def: ' :
     node.type === '定理' ? 'Th: ' :
-    node.type === '例题' ? 'Eg: ' : '';
+    node.type === '例题' ? 'Eg: ' : 
+    node.type === '练习' ? 'Ex: ' :
+    node.type === '解题记录' ? 'Sol: ' :
+    node.type === '笔记' ? 'Note: ' :
+    '';
 
   const colorClass =
     node.type === '定义' ? 'text-blue-600 dark:text-blue-400' :

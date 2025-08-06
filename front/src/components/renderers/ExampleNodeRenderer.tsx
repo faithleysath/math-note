@@ -21,8 +21,8 @@ const ExampleNodeRenderer = ({ node, fullNode }: ExampleNodeRendererProps) => {
   }, [fullNode.content, fullNode.solution, node.displayNumber, showSolution]);
 
   const handleClick = () => {
-    if (fullNode.solution && !showSolution) {
-      setShowSolution(true);
+    if (fullNode.solution) {
+      setShowSolution(prev => !prev);
     }
   };
 
