@@ -16,6 +16,8 @@ const nodeTypeColors: Record<Node['type'], string> = {
   子章节: 'bg-stone-200 text-stone-800',
   定义: 'bg-blue-100 text-blue-800',
   定理: 'bg-green-100 text-green-800',
+  引理: 'bg-teal-100 text-teal-800',
+  推论: 'bg-cyan-100 text-cyan-800',
   例题: 'bg-orange-100 text-orange-800',
   练习: 'bg-purple-100 text-purple-800',
   解题记录: 'bg-red-100 text-red-800',

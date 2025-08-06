@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import MDEditor from '@uiw/react-md-editor';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
@@ -70,6 +70,36 @@ const NodeEditor = ({ node }: NodeEditorProps) => {
     setEditingNodeId(null); // Exit editing mode
   };
 
+  const contentLabel = useMemo(() => {
+    switch (node.type) {
+      case '例题':
+      case '练习':
+        return '题干';
+      case '定理':
+      case '引理':
+      case '推论':
+        return '陈述';
+      default:
+        return '内容';
+    }
+  }, [node.type]);
+
+  const solutionLabel = useMemo(() => {
+    switch (node.type) {
+      case '例题':
+      case '练习':
+        return '标准答案';
+      case '定理':
+      case '引理':
+      case '推论':
+        return '证明';
+      case '解题记录':
+        return '个人解法';
+      default:
+        return '解法';
+    }
+  }, [node.type]);
+
   return (
     <div className="p-4 border rounded-lg bg-slate-50 dark:bg-slate-900">
       <div className="space-y-4">
@@ -109,7 +139,7 @@ const NodeEditor = ({ node }: NodeEditorProps) => {
 
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            内容 (题干)
+            {contentLabel}
           </label>
           <MDEditor
             value={content}
@@ -122,10 +152,10 @@ const NodeEditor = ({ node }: NodeEditorProps) => {
           />
         </div>
 
-        {['定理', '例题', '练习', '解题记录'].includes(node.type) && (
+        {['定理', '引理', '推论', '例题', '练习', '解题记录'].includes(node.type) && (
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              解法 / 证明
+              {solutionLabel}
             </label>
             <MDEditor
               value={solution}

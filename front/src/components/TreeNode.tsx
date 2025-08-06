@@ -70,6 +70,8 @@ const TreeNode: React.FC<TreeNodeProps> = ({ node, numberPrefix = '' }) => {
   const typePrefix =
     node.type === '定义' ? 'Def: ' :
     node.type === '定理' ? 'Th: ' :
+    node.type === '引理' ? 'Lem: ' :
+    node.type === '推论' ? 'Cor: ' :
     node.type === '例题' ? 'Eg: ' : 
     node.type === '练习' ? 'Ex: ' :
     node.type === '解题记录' ? 'Sol: ' :
@@ -79,6 +81,8 @@ const TreeNode: React.FC<TreeNodeProps> = ({ node, numberPrefix = '' }) => {
   const colorClass =
     node.type === '定义' ? 'text-blue-600 dark:text-blue-400' :
     node.type === '定理' ? 'text-green-600 dark:text-green-400' :
+    node.type === '引理' ? 'text-teal-600 dark:text-teal-400' :
+    node.type === '推论' ? 'text-cyan-600 dark:text-cyan-400' :
     node.type === '例题' ? 'text-orange-600 dark:text-orange-400' :
     node.type === '练习' ? 'text-purple-600 dark:text-purple-400' :
     node.type === '解题记录' ? 'text-red-600 dark:text-red-400' :

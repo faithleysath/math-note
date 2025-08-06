@@ -143,6 +143,8 @@ const MainContent = () => {
           break;
         case '定义':
         case '定理':
+        case '引理':
+        case '推论':
         case '例题': {
           if (!contentCounters[node.type]) {
             contentCounters[node.type] = {};
