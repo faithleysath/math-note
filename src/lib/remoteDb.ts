@@ -12,6 +12,10 @@ export function getNode(id: string, data: RemoteData): Node | undefined {
 }
 
 export function getNodesByParent(parentId: string | null, data: RemoteData): Node[] {
+  // Handle both null and undefined for root nodes, as JSON parsing might omit the parentId key.
+  if (parentId === null) {
+    return data.nodes.filter(node => node.parentId === null || node.parentId === undefined);
+  }
   return data.nodes.filter(node => node.parentId === parentId);
 }
 
