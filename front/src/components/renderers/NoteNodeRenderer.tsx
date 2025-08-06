@@ -18,7 +18,7 @@ const NoteNodeRenderer = ({ fullNode }: NoteNodeRendererProps) => {
     <div className="text-base p-4 border-l-4 border-yellow-400 bg-yellow-50 my-2">
       <MDEditor.Markdown
         source={displayContent}
-        style={{ whiteSpace: 'pre-wrap', backgroundColor: 'transparent' }}
+        style={{ backgroundColor: 'transparent' }}
         remarkPlugins={[remarkMath]}
         rehypePlugins={[[rehypeKatex, { throwOnError: false }]]}
       />

@@ -79,8 +79,8 @@ async function seedDatabase() {
     const example1Id = await addNodeAndUpdateParent({
       type: '例题',
       title: '德摩根定律应用',
-      content: `设 $A = \\{1, 2, 3\\}$ 和 $B = \\{2, 3, 4\\}$，求 $(A \\cup B)'$ 和 $(A \\cap B)'$ 的结果。\n\n`,
-      solution: `解：\n1. $A \\cup B = \\{1, 2, 3, 4\\}$，因此 $(A \\cup B)' = \\{\\text{所有不在 } A \\cup B 的元素\\}$。\n2. $A \\cap B = \\{2, 3\\}$，因此 $(A \\cap B)' = \\{\\text{所有不在 } A \\cap B 的元素\\}$。`,
+      content: `设 $A = \\{1, 2, 3\\}$ 和 $B = \\{2, 3, 4\\}$，求 $(A \\cup B)'$ 和 $(A \\cap B)'$ 的结果。`,
+      solution: `解：\n$A \\cup B = \\{1, 2, 3, 4\\}$，因此 $(A \\cup B)' = \\{\\text{所有不在 } A \\cup B 的元素\\}$。\n$A \\cap B = \\{2, 3\\}$，因此 $(A \\cap B)' = \\{\\text{所有不在 } A \\cap B 的元素\\}$。`,
       parentId: theorem1Id, // 作为定理的例题
       children: [],
     }, []);

@@ -22,7 +22,7 @@ const MainChapterNodeRenderer = ({ node, fullNode }: MainChapterNodeRendererProp
       <div className="text-base">
         <MDEditor.Markdown
           source={displayContent}
-          style={{ whiteSpace: 'pre-wrap', backgroundColor: 'transparent' }}
+          style={{ backgroundColor: 'transparent' }}
           remarkPlugins={[remarkMath]}
           rehypePlugins={[[rehypeKatex, { throwOnError: false }]]}
         />

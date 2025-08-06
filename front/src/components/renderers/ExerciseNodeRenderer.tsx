@@ -22,7 +22,7 @@ const ExerciseNodeRenderer = ({ fullNode }: ExerciseNodeRendererProps) => {
     <div className="text-base p-4 border-l-4 border-blue-400 bg-blue-50 my-2">
       <MDEditor.Markdown
         source={displayContent}
-        style={{ whiteSpace: 'pre-wrap', backgroundColor: 'transparent' }}
+        style={{ backgroundColor: 'transparent' }}
         remarkPlugins={[remarkMath]}
         rehypePlugins={[[rehypeKatex, { throwOnError: false }]]}
       />
@@ -31,7 +31,7 @@ const ExerciseNodeRenderer = ({ fullNode }: ExerciseNodeRendererProps) => {
           <hr className="my-4" />
           <MDEditor.Markdown
             source={solutionContent}
-            style={{ whiteSpace: 'pre-wrap', backgroundColor: 'transparent' }}
+            style={{ backgroundColor: 'transparent' }}
             remarkPlugins={[remarkMath]}
             rehypePlugins={[[rehypeKatex, { throwOnError: false }]]}
           />

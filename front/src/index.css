@@ -118,7 +118,3 @@
     @apply bg-background text-foreground;
   }
 }
-
-.katex-display {
-  margin-top: -2em !important;
-}
