@@ -26,7 +26,7 @@ import { useAppStore } from '../../stores/useAppStore';
 import { exportData, importData } from '../../lib/db';
 import { toast } from 'sonner';
 import Search from '../Search';
-import { Upload, Download } from 'lucide-react';
+import { Upload, Download, Share2 } from 'lucide-react';
 
 const LeftSidebar = () => {
   const addBranch = useAppStore(state => state.addBranch);
@@ -34,6 +34,7 @@ const LeftSidebar = () => {
   const [newBranchTitle, setNewBranchTitle] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isImportConfirmOpen, setIsImportConfirmOpen] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const fileToImportRef = useRef<File | null>(null);
 
@@ -59,6 +60,37 @@ const LeftSidebar = () => {
     } catch (error) {
       console.error('Failed to export data:', error);
       toast.error('数据导出失败。');
+    }
+  };
+
+  const handleShare = async () => {
+    setIsSharing(true);
+    try {
+      const data = await exportData();
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || 'Upload failed');
+      }
+
+      const result = await response.json();
+      const shareUrl = `${window.location.origin}/#${result.url}`;
+      
+      await navigator.clipboard.writeText(shareUrl);
+      toast.success('分享链接已复制到剪贴板。');
+
+    } catch (error) {
+      console.error('Failed to share data:', error);
+      toast.error(`分享失败: ${error instanceof Error ? error.message : '未知错误'}`);
+    } finally {
+      setIsSharing(false);
     }
   };
 
@@ -113,6 +145,16 @@ const LeftSidebar = () => {
         <div className="flex justify-between items-center mb-2">
           <h2 className="text-lg font-semibold">目录</h2>
           <div className="flex items-center space-x-1">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleShare} disabled={isSharing}>
+                  <Share2 className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>分享 (上传并复制链接)</p>
+              </TooltipContent>
+            </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleImportClick}>
