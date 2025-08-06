@@ -83,7 +83,9 @@ const LeftSidebar = () => {
       }
 
       const result = await response.json();
-      const fullShareUrl = `${window.location.origin}/#${result.url}`;
+      // Encode the URL in Base64 to make it cleaner
+      const encodedUrl = btoa(result.url);
+      const fullShareUrl = `${window.location.origin}?note_url=${encodedUrl}`;
       
       setShareUrl(fullShareUrl);
       setIsShareDialogOpen(true);

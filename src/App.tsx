@@ -22,21 +22,30 @@ function App() {
 
   useEffect(() => {
     const initializeApp = async () => {
-      const hash = window.location.hash.substring(1);
-      if (hash) {
+      const params = new URLSearchParams(window.location.search);
+      const noteUrl = params.get('note_url');
+      let urlToLoad: string | null = null;
+
+      if (noteUrl) {
+        // First, try to treat it as a direct URL
         try {
-          // 验证 hash 是否是有效的 URL
-          const url = new URL(hash);
-          await loadRemoteData(url.toString());
-        } catch (error) {
-          console.error("Invalid URL in hash, loading local data:", error);
-          // 如果 hash 无效，则加载本地数据
-          setIsLoadingTree(true);
-          await fetchRootNodes();
-          setIsLoadingTree(false);
+          new URL(noteUrl); // Validate if it's a full URL
+          urlToLoad = noteUrl;
+        } catch {
+          // If it's not a valid URL, assume it's Base64 encoded
+          try {
+            urlToLoad = atob(noteUrl);
+          } catch (error) {
+            console.error("Invalid Base64 in note_url, ignoring:", error);
+            urlToLoad = null;
+          }
         }
+      }
+
+      if (urlToLoad) {
+        await loadRemoteData(urlToLoad);
       } else {
-        // 如果没有 hash，则加载本地数据
+        // If no valid URL is found, load local data
         setIsLoadingTree(true);
         await fetchRootNodes();
         setIsLoadingTree(false);
