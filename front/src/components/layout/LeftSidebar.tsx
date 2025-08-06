@@ -1,6 +1,17 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import TreeView from '../TreeView';
 import { Button } from '../ui/button';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Dialog,
   DialogContent,
@@ -12,12 +23,19 @@ import {
 } from '../ui/dialog';
 import { Input } from '../ui/input';
 import { useAppStore } from '../../stores/useAppStore';
+import { exportData, importData } from '../../lib/db';
+import { toast } from 'sonner';
 import Search from '../Search';
+import { Upload, Download } from 'lucide-react';
 
 const LeftSidebar = () => {
   const addBranch = useAppStore(state => state.addBranch);
+  const triggerStructureRefresh = useAppStore(state => state.triggerStructureRefresh);
   const [newBranchTitle, setNewBranchTitle] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isImportConfirmOpen, setIsImportConfirmOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const fileToImportRef = useRef<File | null>(null);
 
   const handleAddBranch = () => {
     if (newBranchTitle.trim()) {
@@ -27,50 +45,157 @@ const LeftSidebar = () => {
     }
   };
 
+  const handleExport = async () => {
+    try {
+      const data = await exportData();
+      const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(
+        JSON.stringify(data, null, 2)
+      )}`;
+      const link = document.createElement("a");
+      link.href = jsonString;
+      link.download = `math-note-backup-${new Date().toISOString()}.json`;
+      link.click();
+      toast.success('数据已成功导出。');
+    } catch (error) {
+      console.error('Failed to export data:', error);
+      toast.error('数据导出失败。');
+    }
+  };
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      fileToImportRef.current = file;
+      setIsImportConfirmOpen(true);
+    }
+  };
+
+  const confirmImport = async () => {
+    const file = fileToImportRef.current;
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const text = e.target?.result;
+        if (typeof text !== 'string') {
+          throw new Error('File content is not a string.');
+        }
+        const data = JSON.parse(text);
+        // Basic validation
+        if (!data.nodes || !data.edges) {
+          throw new Error('Invalid data format.');
+        }
+        await importData(data);
+        triggerStructureRefresh();
+        toast.success('数据已成功导入。');
+      } catch (error) {
+        console.error('Failed to import data:', error);
+        toast.error(`数据导入失败: ${error instanceof Error ? error.message : '未知错误'}`);
+      } finally {
+        setIsImportConfirmOpen(false);
+        fileToImportRef.current = null;
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+      }
+    };
+    reader.readAsText(file);
+  };
+
   return (
-    <div className="h-full p-4 flex flex-col">
-      <div className="flex justify-between items-center mb-2">
-        <h2 className="text-lg font-semibold">目录</h2>
-      </div>
-      <div className="mb-4">
-        <Search />
-      </div>
-      <div className="flex-grow overflow-y-auto">
-        <TreeView />
-      </div>
-      <div className="mt-4">
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="w-full">
-              添加分支
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>创建新分支</DialogTitle>
-            </DialogHeader>
-            <div className="py-4">
-              <Input
-                placeholder="请输入分支名称"
-                value={newBranchTitle}
-                onChange={(e) => setNewBranchTitle(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleAddBranch()}
-              />
-            </div>
-            <DialogFooter>
-              <DialogClose asChild>
-                <Button type="button" variant="secondary">
-                  取消
+    <TooltipProvider>
+      <div className="h-full p-4 flex flex-col">
+        <div className="flex justify-between items-center mb-2">
+          <h2 className="text-lg font-semibold">目录</h2>
+          <div className="flex items-center space-x-1">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleImportClick}>
+                  <Upload className="h-4 w-4" />
                 </Button>
-              </DialogClose>
-              <Button onClick={handleAddBranch}>
-                创建
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>导入</p>
+              </TooltipContent>
+            </Tooltip>
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileChange}
+              accept=".json"
+              className="hidden"
+            />
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleExport}>
+                  <Download className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>导出</p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
+        </div>
+        <div className="mb-4">
+          <Search />
+        </div>
+        <div className="flex-grow overflow-y-auto">
+          <TreeView />
+        </div>
+        <div className="mt-4">
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="w-full">
+                添加分支
               </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>创建新分支</DialogTitle>
+              </DialogHeader>
+              <div className="py-4">
+                <Input
+                  placeholder="请输入分支名称"
+                  value={newBranchTitle}
+                  onChange={(e) => setNewBranchTitle(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleAddBranch()}
+                />
+              </div>
+              <DialogFooter>
+                <DialogClose asChild>
+                  <Button type="button" variant="secondary">
+                    取消
+                  </Button>
+                </DialogClose>
+                <Button onClick={handleAddBranch}>
+                  创建
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
+        <AlertDialog open={isImportConfirmOpen} onOpenChange={setIsImportConfirmOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>确认导入？</AlertDialogTitle>
+              <AlertDialogDescription>
+                这将覆盖您当前的所有数据，此操作无法撤销。请确保您已备份当前数据。
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setIsImportConfirmOpen(false)}>取消</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmImport}>确认导入</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
-    </div>
+    </TooltipProvider>
   );
 };
 

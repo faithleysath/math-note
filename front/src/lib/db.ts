@@ -214,3 +214,31 @@ export async function getAncestors(nodeId: string): Promise<Node[]> {
 
   return ancestors.reverse(); // Return in order from root to parent
 }
+
+// --- Data Import/Export ---
+
+/**
+ * Exports all data from the database into a JSON object.
+ */
+export async function exportData() {
+  const nodes = await db.nodes.toArray();
+  const edges = await db.edges.toArray();
+  return { nodes, edges };
+}
+
+/**
+ * Imports data from a JSON object into the database.
+ * This will clear all existing data before importing.
+ * @param data - The data object containing nodes and edges.
+ */
+export async function importData(data: { nodes: Node[]; edges: Edge[] }) {
+  await db.transaction('rw', db.nodes, db.edges, async () => {
+    // Clear existing data
+    await db.nodes.clear();
+    await db.edges.clear();
+
+    // Bulk add new data
+    await db.nodes.bulkAdd(data.nodes);
+    await db.edges.bulkAdd(data.edges);
+  });
+}
