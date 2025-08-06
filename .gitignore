@@ -1,12 +1,3 @@
-# Dependencies
-/node_modules
-/.pnp
-.pnp.js
-
-# Build outputs
-/dist
-/.vercel
-
 # Logs
 logs
 *.log
@@ -16,19 +7,16 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-# OS generated files
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
+node_modules
+dist
+dist-ssr
+*.local
 
 # Editor directories and files
-.idea
 .vscode/*
 !.vscode/extensions.json
+.idea
+.DS_Store
 *.suo
 *.ntvs*
 *.njsproj
