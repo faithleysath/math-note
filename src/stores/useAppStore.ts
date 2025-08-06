@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { toast } from 'sonner';
 import type { Node, Edge } from '../lib/types';
-import { getNode, getNodesByParent, addNode, updateNode, getAncestors } from '../lib/db';
+import { getNode, getNodesByParent, addNode, updateNode, getAncestors } from '../lib/data-provider';
 
 interface RemoteData {
   nodes: Node[];
@@ -133,7 +133,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       }, 100);
     } catch (error) {
       console.error("Failed to add new node:", error);
-      toast.error('添加新节点失败。');
+      if (error instanceof Error && error.message.includes("read-only")) {
+        toast.error("无法在只读模式下添加节点。");
+      } else {
+        toast.error('添加新节点失败。');
+      }
     }
   },
   loadRemoteData: async (url: string) => {

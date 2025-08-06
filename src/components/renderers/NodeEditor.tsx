@@ -5,7 +5,7 @@ import rehypeKatex from 'rehype-katex';
 import { toast } from 'sonner';
 import type { Node } from '../../lib/types';
 import { useAppStore } from '../../stores/useAppStore';
-import { updateNode } from '../../lib/db';
+import { updateNode } from '../../lib/data-provider';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 
@@ -62,7 +62,11 @@ const NodeEditor = ({ node }: NodeEditorProps) => {
       triggerStructureRefresh(); // Trigger a structure refresh
     } catch (error) {
       console.error("Failed to save node:", error);
-      toast.error('保存失败。');
+      if (error instanceof Error && error.message.includes("read-only")) {
+        toast.error("无法在只读模式下保存节点。");
+      } else {
+        toast.error('保存失败。');
+      }
     }
   };
 

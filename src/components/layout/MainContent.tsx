@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { toast } from 'sonner';
 import { useAppStore } from '../../stores/useAppStore';
-import { getOrderedDescendants, getNode, deleteNode, updateNode } from '../../lib/db';
+import { getOrderedDescendants, getNode, deleteNode, updateNode } from '../../lib/data-provider';
 import type { ProcessedNode } from '../../lib/types';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import NodeRenderer from '../renderers/NodeRenderer';
@@ -78,7 +78,11 @@ const MainContent = () => {
         triggerStructureRefresh();
       } catch (error) {
         console.error("Failed to delete node:", error);
-        toast.error('删除节点失败。');
+        if (error instanceof Error && error.message.includes("read-only")) {
+          toast.error("无法在只读模式下删除节点。");
+        } else {
+          toast.error('删除节点失败。');
+        }
       } finally {
         setNodeToDelete(null);
         setDeleteDialogOpen(false);
@@ -111,7 +115,11 @@ const MainContent = () => {
       toast.success('节点顺序已更新。');
     } catch (error) {
       console.error("Failed to move node:", error);
-      toast.error('移动节点失败。');
+      if (error instanceof Error && error.message.includes("read-only")) {
+        toast.error("无法在只读模式下移动节点。");
+      } else {
+        toast.error('移动节点失败。');
+      }
     }
   };
 
