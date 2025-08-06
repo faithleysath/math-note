@@ -13,6 +13,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({ node, numberPrefix = '' }) => {
   const expandedBranchId = useAppStore(state => state.expandedBranchId);
   const setExpandedBranchId = useAppStore(state => state.setExpandedBranchId);
   const expandedNodeIds = useAppStore(state => state.expandedNodeIds);
+  const structureVersion = useAppStore(state => state.structureVersion);
   const [isExpanded, setIsExpanded] = useState(false);
   const [children, setChildren] = useState<Node[]>([]);
   const [loading, setLoading] = useState(false);
@@ -32,8 +33,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({ node, numberPrefix = '' }) => {
   }, [expandedBranchId, isBranch, node.id, expandedNodeIds]);
 
   useEffect(() => {
-    // Fetch children if expanded and they haven't been fetched yet
-    if (isExpanded && hasChildren && children.length === 0) {
+    const fetchChildren = () => {
       setLoading(true);
       getNodesByParent(node.id)
         .then(childNodes => {
@@ -46,8 +46,13 @@ const TreeNode: React.FC<TreeNodeProps> = ({ node, numberPrefix = '' }) => {
         })
         .catch(error => console.error(`Failed to fetch children for node ${node.id}:`, error))
         .finally(() => setLoading(false));
+    };
+
+    // Fetch children if expanded and they haven't been fetched yet, or if a structural update happened
+    if (isExpanded && hasChildren) {
+      fetchChildren();
     }
-  }, [isExpanded, hasChildren, node.id, children.length, node.children]);
+  }, [isExpanded, hasChildren, node.id, node.children, structureVersion]);
 
   const handleRowClick = () => {
     setSelectedNodeById(node.id);

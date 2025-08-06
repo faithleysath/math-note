@@ -19,6 +19,7 @@ const NodeEditor = ({ node }: NodeEditorProps) => {
   const [solution, setSolution] = useState(node.solution || '');
   const setEditingNodeId = useAppStore(state => state.setEditingNodeId);
   const triggerContentRefresh = useAppStore(state => state.triggerContentRefresh);
+  const triggerStructureRefresh = useAppStore(state => state.triggerStructureRefresh);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -53,6 +54,7 @@ const NodeEditor = ({ node }: NodeEditorProps) => {
       toast.success(`节点 "${title}" 已保存。`);
       setEditingNodeId(null); // Exit editing mode
       triggerContentRefresh(); // Trigger a content refresh
+      triggerStructureRefresh(); // Trigger a structure refresh
     } catch (error) {
       console.error("Failed to save node:", error);
       toast.error('保存失败。');
