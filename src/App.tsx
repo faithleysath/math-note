@@ -1,3 +1,4 @@
+import { useEffect } from "react"
 import {
   ResizableHandle,
   ResizablePanel,
@@ -12,7 +13,33 @@ import { Toaster } from "@/components/ui/sonner"
 
 function App() {
   const structureVersion = useAppStore(state => state.structureVersion);
+  const loadRemoteData = useAppStore(state => state.loadRemoteData);
+  const fetchRootNodes = useAppStore(state => state.fetchRootNodes);
+
   useHotkeys();
+
+  useEffect(() => {
+    const initializeApp = async () => {
+      const hash = window.location.hash.substring(1);
+      if (hash) {
+        try {
+          // 验证 hash 是否是有效的 URL
+          const url = new URL(hash);
+          await loadRemoteData(url.toString());
+        } catch (error) {
+          console.error("Invalid URL in hash, loading local data:", error);
+          // 如果 hash 无效，则加载本地数据
+          await fetchRootNodes();
+        }
+      } else {
+        // 如果没有 hash，则加载本地数据
+        await fetchRootNodes();
+      }
+    };
+
+    initializeApp();
+  }, [loadRemoteData, fetchRootNodes]);
+
 
   return (
     <div className="h-screen w-screen bg-background text-foreground">

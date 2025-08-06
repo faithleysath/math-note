@@ -148,9 +148,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (!data.nodes || !data.edges) {
         throw new Error('Invalid data format.');
       }
-      set({ remoteData: data, isReadOnly: true, isLoadingTree: false });
-      get().triggerStructureRefresh(); // Refresh views to use the new data
+      set({ remoteData: data, isReadOnly: true });
+      await get().fetchRootNodes(); // 直接在设置远程数据后获取根节点
       toast.success('只读笔记已加载。');
+      set({ isLoadingTree: false });
     } catch (error) {
       console.error('Failed to load remote data:', error);
       toast.error(`加载远程笔记失败: ${error instanceof Error ? error.message : '未知错误'}`);
