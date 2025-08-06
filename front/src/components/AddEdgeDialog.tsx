@@ -10,7 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from './ui/dialog';
-import { addEdge } from '../lib/db';
+import { addEdge } from '../lib/data-provider';
 import { useAppStore } from '../stores/useAppStore';
 import Search from './Search';
 

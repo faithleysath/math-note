@@ -1,9 +1,16 @@
 import { create } from 'zustand';
 import { toast } from 'sonner';
-import type { Node } from '../lib/types';
+import type { Node, Edge } from '../lib/types';
 import { getNode, getNodesByParent, addNode, updateNode, getAncestors } from '../lib/db';
 
+interface RemoteData {
+  nodes: Node[];
+  edges: Edge[];
+}
+
 interface AppState {
+  isReadOnly: boolean;
+  remoteData: RemoteData | null;
   rootNodes: Node[];
   isLoadingTree: boolean;
   selectedNode: Node | null;
@@ -24,9 +31,12 @@ interface AppState {
     parent: Node,
     insertAfterNodeId: string | null
   ) => Promise<void>;
+  loadRemoteData: (url: string) => Promise<void>;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
+  isReadOnly: false,
+  remoteData: null,
   rootNodes: [],
   isLoadingTree: true,
   selectedNode: null,
@@ -124,6 +134,27 @@ export const useAppStore = create<AppState>((set, get) => ({
     } catch (error) {
       console.error("Failed to add new node:", error);
       toast.error('添加新节点失败。');
+    }
+  },
+  loadRemoteData: async (url: string) => {
+    set({ isLoadingTree: true });
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      // Basic validation
+      if (!data.nodes || !data.edges) {
+        throw new Error('Invalid data format.');
+      }
+      set({ remoteData: data, isReadOnly: true, isLoadingTree: false });
+      get().triggerStructureRefresh(); // Refresh views to use the new data
+      toast.success('只读笔记已加载。');
+    } catch (error) {
+      console.error('Failed to load remote data:', error);
+      toast.error(`加载远程笔记失败: ${error instanceof Error ? error.message : '未知错误'}`);
+      set({ isLoadingTree: false });
     }
   },
 }));

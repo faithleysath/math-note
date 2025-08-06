@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Input } from './ui/input';
-import { searchNodes } from '../lib/db';
+import { searchNodes } from '../lib/data-provider';
 import type { Node } from '../lib/types';
 import { useAppStore } from '../stores/useAppStore';
 import { cn } from '@/lib/utils';

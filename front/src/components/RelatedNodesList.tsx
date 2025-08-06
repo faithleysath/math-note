@@ -3,7 +3,7 @@ import { useRelatedNodes } from '../hooks/useRelatedNodes';
 import type { RelatedNodeInfo } from '../hooks/useRelatedNodes';
 import { Link, X } from 'lucide-react';
 import { Button } from './ui/button';
-import { deleteEdge } from '../lib/db';
+import { deleteEdge } from '../lib/data-provider';
 import { toast } from 'sonner';
 
 const RelationGroup = ({ title, relations }: { title: string; relations: RelatedNodeInfo[] }) => {

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { Node } from '../lib/types';
-import { getNodesByParent, deleteNode } from '../lib/db';
+import { getNodesByParent, deleteNode } from '../lib/data-provider';
 import { useAppStore } from '../stores/useAppStore';
 import { Button } from './ui/button';
 import { Trash2 } from 'lucide-react';
