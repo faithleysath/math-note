@@ -11,7 +11,7 @@ import { useAppStore } from '../stores/useAppStore';
 export function useNodeData(nodeId: string | undefined) {
   const [node, setNode] = useState<Node | null | undefined>(undefined);
   const [loading, setLoading] = useState(true);
-  const dataVersion = useAppStore(state => state.dataVersion);
+  const contentVersion = useAppStore(state => state.contentVersion);
 
   useEffect(() => {
     if (!nodeId) {
@@ -38,7 +38,7 @@ export function useNodeData(nodeId: string | undefined) {
     return () => {
       isMounted = false;
     };
-  }, [nodeId, dataVersion]); // Re-fetch when nodeId or dataVersion changes
+  }, [nodeId, contentVersion]); // Re-fetch when nodeId or contentVersion changes
 
   return { node, loading };
 }

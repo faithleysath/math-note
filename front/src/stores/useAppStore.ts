@@ -8,13 +8,15 @@ interface AppState {
   selectedNode: Node | null;
   expandedBranchId: string | null;
   editingNodeId: string | null; // ID of the node currently being edited
-  dataVersion: number; // A simple counter to trigger data refreshes
+  contentVersion: number; // Triggers re-fetch of node content
+  structureVersion: number; // Triggers re-fetch of lists and re-mount of components
   fetchRootNodes: () => Promise<void>;
   addBranch: (title: string) => Promise<void>;
   setSelectedNodeById: (id: string | null) => Promise<void>;
   setExpandedBranchId: (id: string | null) => void;
   setEditingNodeId: (id: string | null) => void; // Action to set the editing node
-  triggerDataRefresh: () => void;
+  triggerContentRefresh: () => void;
+  triggerStructureRefresh: () => void;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -23,7 +25,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   selectedNode: null,
   expandedBranchId: null,
   editingNodeId: null,
-  dataVersion: 0,
+  contentVersion: 0,
+  structureVersion: 0,
   fetchRootNodes: async () => {
     set({ isLoadingTree: true });
     try {
@@ -72,7 +75,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   setEditingNodeId: (id: string | null) => {
     set({ editingNodeId: id });
   },
-  triggerDataRefresh: () => {
-    set(state => ({ dataVersion: state.dataVersion + 1 }));
+  triggerContentRefresh: () => {
+    set(state => ({ contentVersion: state.contentVersion + 1 }));
+  },
+  triggerStructureRefresh: () => {
+    set(state => ({ structureVersion: state.structureVersion + 1 }));
   },
 }));

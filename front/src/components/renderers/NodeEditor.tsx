@@ -17,7 +17,7 @@ const NodeEditor = ({ node }: NodeEditorProps) => {
   const [content, setContent] = useState(node.content);
   const [solution, setSolution] = useState(node.solution || '');
   const setEditingNodeId = useAppStore(state => state.setEditingNodeId);
-  const triggerDataRefresh = useAppStore(state => state.triggerDataRefresh);
+  const triggerContentRefresh = useAppStore(state => state.triggerContentRefresh);
 
   useEffect(() => {
     setTitle(node.title);
@@ -29,7 +29,7 @@ const NodeEditor = ({ node }: NodeEditorProps) => {
     try {
       await updateNode(node.id, { title, content, solution });
       setEditingNodeId(null); // Exit editing mode
-      triggerDataRefresh(); // Trigger a global data refresh
+      triggerContentRefresh(); // Trigger a content refresh
     } catch (error) {
       console.error("Failed to save node:", error);
       // Handle error UI if necessary

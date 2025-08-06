@@ -1,11 +1,14 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { useAppStore } from '../../stores/useAppStore';
-import { getOrderedDescendants } from '../../lib/db';
+import { getOrderedDescendants, getNode, deleteNode } from '../../lib/db';
 import type { LightweightNode, ProcessedLightweightNode } from '../../lib/types';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import NodeRenderer from '../renderers/NodeRenderer';
 import { Button } from '../ui/button';
-import { Edit2 } from 'lucide-react';
+import { Edit2, Plus, Trash2 } from 'lucide-react';
+import AddNodeDialog from '../AddNodeDialog';
+import ConfirmDeleteDialog from '../ConfirmDeleteDialog';
+import type { Node } from '../../lib/types';
 
 // =================================================================================
 // Main Content Component
@@ -15,9 +18,47 @@ const MainContent = () => {
   const expandedBranchId = useAppStore(state => state.expandedBranchId);
   const setSelectedNodeById = useAppStore(state => state.setSelectedNodeById);
   const setEditingNodeId = useAppStore(state => state.setEditingNodeId);
-  const dataVersion = useAppStore(state => state.dataVersion);
+  const triggerStructureRefresh = useAppStore(state => state.triggerStructureRefresh);
+  const structureVersion = useAppStore(state => state.structureVersion);
   const [lightweightNodes, setLightweightNodes] = useState<LightweightNode[]>([]);
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [parentNode, setParentNode] = useState<Node | null>(null);
+  const [nodeToDelete, setNodeToDelete] = useState<Node | null>(null);
   const parentRef = useRef<HTMLDivElement>(null);
+
+  const handleAddClick = async (nodeId: string) => {
+    const fullParentNode = await getNode(nodeId);
+    if (fullParentNode) {
+      setParentNode(fullParentNode);
+      setAddDialogOpen(true);
+    } else {
+      console.error("Could not find parent node to add child to.");
+    }
+  };
+
+  const handleDeleteClick = async (nodeId: string) => {
+    const fullNodeToDelete = await getNode(nodeId);
+    if (fullNodeToDelete) {
+      setNodeToDelete(fullNodeToDelete);
+      setDeleteDialogOpen(true);
+    } else {
+      console.error("Could not find node to delete.");
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (nodeToDelete) {
+      // If the node being deleted is the currently selected one, unselect it.
+      if (selectedNode && selectedNode.id === nodeToDelete.id) {
+        setSelectedNodeById(null);
+      }
+      await deleteNode(nodeToDelete.id);
+      triggerStructureRefresh();
+      setNodeToDelete(null);
+      setDeleteDialogOpen(false);
+    }
+  };
 
   // Pre-process lightweight nodes to add display numbers
   const processedLightweightNodes = useMemo((): ProcessedLightweightNode[] => {
@@ -74,7 +115,7 @@ const MainContent = () => {
       }
     };
     fetchBranchContent();
-  }, [expandedBranchId, dataVersion]);
+  }, [expandedBranchId, structureVersion]);
 
   const rowVirtualizer = useVirtualizer({
     count: processedLightweightNodes.length,
@@ -88,7 +129,7 @@ const MainContent = () => {
     if (selectedNode) {
       const index = processedLightweightNodes.findIndex(node => node.id === selectedNode.id);
       if (index !== -1) {
-        rowVirtualizer.scrollToIndex(index, { align: 'center', behavior: 'smooth' });
+        rowVirtualizer.scrollToIndex(index, { align: 'start', behavior: 'smooth' });
       }
     }
   }, [selectedNode, processedLightweightNodes, rowVirtualizer]);
@@ -122,21 +163,60 @@ const MainContent = () => {
               onClick={() => setSelectedNodeById(node.id)}
             >
               <NodeRenderer node={node} />
-              <Button
-                variant="ghost"
-                size="icon"
-                className="absolute top-2 right-2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                onClick={(e) => {
-                  e.stopPropagation(); // Prevent the div's onClick from firing
-                  setEditingNodeId(node.id);
-                }}
-              >
-                <Edit2 className="h-4 w-4" />
-              </Button>
+              <div className="absolute top-2 right-2 flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 cursor-pointer"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleAddClick(node.id);
+                  }}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 cursor-pointer"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setEditingNodeId(node.id);
+                  }}
+                >
+                  <Edit2 className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 cursor-pointer hover:bg-destructive/10 hover:text-destructive"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeleteClick(node.id);
+                  }}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           );
         })}
       </div>
+      {addDialogOpen && parentNode && (
+        <AddNodeDialog
+          parent={parentNode}
+          isOpen={addDialogOpen}
+          onClose={() => setAddDialogOpen(false)}
+        />
+      )}
+      {deleteDialogOpen && nodeToDelete && (
+        <ConfirmDeleteDialog
+          node={nodeToDelete}
+          isOpen={deleteDialogOpen}
+          onClose={() => setDeleteDialogOpen(false)}
+          onConfirm={confirmDelete}
+        />
+      )}
     </div>
   );
 };

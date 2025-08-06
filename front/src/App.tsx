@@ -6,8 +6,11 @@ import {
 import LeftSidebar from "./components/layout/LeftSidebar"
 import MainContent from "./components/layout/MainContent"
 import RightSidebar from "./components/layout/RightSidebar"
+import { useAppStore } from "./stores/useAppStore"
 
 function App() {
+  const structureVersion = useAppStore(state => state.structureVersion);
+
   return (
     <div className="h-screen w-screen bg-background text-foreground">
       <ResizablePanelGroup direction="horizontal">
@@ -15,7 +18,7 @@ function App() {
           <LeftSidebar />
         </ResizablePanel>
         <ResizableHandle withHandle />
-        <ResizablePanel defaultSize={55} minSize={30}>
+        <ResizablePanel defaultSize={55} minSize={30} key={structureVersion}>
           <MainContent />
         </ResizablePanel>
         <ResizableHandle withHandle />
