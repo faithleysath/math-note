@@ -60,14 +60,13 @@ const TreeNode: React.FC<TreeNodeProps> = ({ node, numberPrefix = '' }) => {
 
   const handleRowClick = () => {
     setSelectedNodeById(node.id);
-    if (hasChildren) {
-      if (isBranch) {
-        // For branches, toggle via global context for accordion effect
-        setExpandedBranchId(isExpanded ? null : node.id);
-      } else {
-        // For other nodes, toggle locally
-        setIsExpanded(!isExpanded);
-      }
+    if (isBranch) {
+      // For branches, always toggle via global context for accordion effect,
+      // even if it has no children. This allows showing the "add node" button.
+      setExpandedBranchId(isExpanded ? null : node.id);
+    } else if (hasChildren) {
+      // For other nodes, only toggle locally if they have children.
+      setIsExpanded(!isExpanded);
     }
   };
 
