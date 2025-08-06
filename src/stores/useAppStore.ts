@@ -14,6 +14,7 @@ interface AppState {
   remoteData: RemoteData | null;
   rootNodes: Node[];
   isLoadingTree: boolean;
+  loadError: boolean;
   selectedNode: Node | null;
   expandedBranchId: string | null;
   expandedNodeIds: Set<string>; // For auto-expanding the tree view
@@ -27,6 +28,7 @@ interface AppState {
   setExpandedBranchId: (id: string | null) => void;
   setEditingNodeId: (id: string | null) => void; // Action to set the editing node
   setIsLoadingTree: (isLoading: boolean) => void;
+  setLoadError: (error: boolean) => void;
   triggerContentRefresh: () => void;
   triggerStructureRefresh: () => void;
   triggerEdgeRefresh: () => void;
@@ -43,6 +45,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   remoteData: null,
   rootNodes: [],
   isLoadingTree: true,
+  loadError: false,
   selectedNode: null,
   expandedBranchId: null,
   expandedNodeIds: new Set(),
@@ -104,6 +107,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   setIsLoadingTree: (isLoading: boolean) => {
     set({ isLoadingTree: isLoading });
   },
+  setLoadError: (error: boolean) => {
+    set({ loadError: error, isLoadingTree: false });
+  },
   triggerContentRefresh: () => {
     set(state => ({ contentVersion: state.contentVersion + 1 }));
   },
@@ -150,7 +156,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
   loadRemoteData: async (url: string) => {
-    set({ isLoadingTree: true });
+    set({ isLoadingTree: true, loadError: false });
     try {
       const response = await fetch(url);
       if (!response.ok) {
@@ -162,10 +168,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         throw new Error('Invalid data format.');
       }
       
-      // Directly use the fetched data to find root nodes, avoiding state race conditions.
       const rootNodes = getRemoteNodesByParent(null, data).filter(node => node.type === '分支');
 
-      // Atomically update all relevant state.
       set({ 
         remoteData: data, 
         isReadOnly: true,
@@ -173,12 +177,11 @@ export const useAppStore = create<AppState>((set, get) => ({
         isLoadingTree: false 
       });
 
-      get().triggerStructureRefresh(); // Still trigger refresh for other components.
+      get().triggerStructureRefresh();
       toast.success('只读笔记已加载。');
     } catch (error) {
       console.error('Failed to load remote data:', error);
-      toast.error(`加载远程笔记失败: ${error instanceof Error ? error.message : '未知错误'}`);
-      set({ isLoadingTree: false }); // Ensure loading is turned off on error.
+      set({ isLoadingTree: false, loadError: true });
     }
   },
 }));

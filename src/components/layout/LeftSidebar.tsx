@@ -34,7 +34,7 @@ const expirationOptions = [
   { label: '1 小时', value: 3600 },
   { label: '1 天', value: 86400 },
   { label: '7 天', value: 604800 },
-  { label: '永久', value: 31536000 }, // 1 year as "permanent"
+  { label: '永久', value: 3153600000 }, // 100 year as "permanent"
 ];
 
 type Unit = 'minutes' | 'hours' | 'days';
