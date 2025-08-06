@@ -4,13 +4,13 @@ import './index.css'
 import 'normalize.css'
 import 'katex/dist/katex.min.css'
 import App from './App'
-import { seedDatabase } from './lib/seed'
+// import { seedDatabase } from './lib/seed'
 
 // Seed the database with initial data
-seedDatabase().then(() => {
-  createRoot(document.getElementById('root')!).render(
-    <StrictMode>
-      <App />
-    </StrictMode>,
-  )
-});
+// seedDatabase();
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <App />
+  </StrictMode>,
+)
