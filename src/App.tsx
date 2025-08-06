@@ -22,25 +22,30 @@ function App() {
 
   useEffect(() => {
     const initializeApp = async () => {
+      console.log('%c[App.tsx] initializeApp started.', 'color: #0f0');
       const hash = window.location.hash.substring(1);
       if (hash) {
         try {
           // 验证 hash 是否是有效的 URL
+          console.log('%c[App.tsx] Found hash, attempting to load remote data.', 'color: #0f0');
           const url = new URL(hash);
           await loadRemoteData(url.toString());
         } catch (error) {
           console.error("Invalid URL in hash, loading local data:", error);
           // 如果 hash 无效，则加载本地数据
+          console.log('%c[App.tsx] Invalid hash, loading local data.', 'color: #0f0');
           setIsLoadingTree(true);
           await fetchRootNodes();
           setIsLoadingTree(false);
         }
       } else {
         // 如果没有 hash，则加载本地数据
+        console.log('%c[App.tsx] No hash found, loading local data.', 'color: #0f0');
         setIsLoadingTree(true);
         await fetchRootNodes();
         setIsLoadingTree(false);
       }
+      console.log('%c[App.tsx] initializeApp finished.', 'color: #0f0');
     };
 
     initializeApp();

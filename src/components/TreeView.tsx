@@ -5,7 +5,10 @@ import TreeNode from './TreeNode';
 const TreeView = () => {
   const { rootNodes, isLoadingTree, fetchRootNodes, structureVersion } = useAppStore();
 
+  console.log('%c[TreeView] Rendering with isLoadingTree:', 'color: #00f', isLoadingTree, 'and rootNodes:', rootNodes);
+
   useEffect(() => {
+    console.log('%c[TreeView] useEffect triggered by structureVersion:', 'color: #00f', structureVersion);
     fetchRootNodes();
   }, [fetchRootNodes, structureVersion]);
 

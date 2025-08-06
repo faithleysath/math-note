@@ -144,6 +144,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
   loadRemoteData: async (url: string) => {
+    console.log('%c[useAppStore] loadRemoteData started.', 'color: #f0f');
     set({ isLoadingTree: true });
     try {
       const response = await fetch(url);
@@ -151,6 +152,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       const data = await response.json();
+      console.log('%c[useAppStore] Remote data fetched:', 'color: #f0f', data);
       // Basic validation
       if (!data.nodes || !data.edges) {
         throw new Error('Invalid data format.');
@@ -158,6 +160,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       
       // Directly use the fetched data to find root nodes, avoiding state race conditions.
       const rootNodes = getRemoteNodesByParent(null, data).filter(node => node.type === '分支');
+      console.log('%c[useAppStore] Calculated remote root nodes:', 'color: #f0f', rootNodes);
 
       // Atomically update all relevant state.
       set({ 
@@ -166,6 +169,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         rootNodes: rootNodes,
         isLoadingTree: false 
       });
+      console.log('%c[useAppStore] State updated with remote data.', 'color: #f0f');
 
       get().triggerStructureRefresh(); // Still trigger refresh for other components.
       toast.success('只读笔记已加载。');
