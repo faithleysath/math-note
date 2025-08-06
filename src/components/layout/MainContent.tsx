@@ -41,6 +41,19 @@ const MainContent = () => {
     }
   };
 
+  const handleAddNewNodeToBranch = async () => {
+    if (!expandedBranchId) return;
+    const branchNode = await getNode(expandedBranchId);
+    if (branchNode) {
+      setParentNode(branchNode);
+      setInsertAfterNodeId(null);
+      setAddDialogOpen(true);
+    } else {
+      console.error("Could not find branch node to add child to.");
+      toast.error("无法找到分支节点。");
+    }
+  };
+
   const handleInsertSiblingClick = async (currentNode: Node) => {
     if (!currentNode.parentId) {
       console.error("Cannot add a sibling to a root node.");
@@ -227,10 +240,22 @@ const MainContent = () => {
     }
   }, [selectedNode, processedNodes, rowVirtualizer]);
 
-  if (!expandedBranchId || processedNodes.length === 0) {
+  if (!expandedBranchId) {
     return (
       <div className="h-full p-4 flex items-center justify-center">
         <p className="text-muted-foreground">展开一个分支以查看其内容。</p>
+      </div>
+    );
+  }
+
+  if (nodes.length === 0) {
+    return (
+      <div className="h-full p-4 flex flex-col items-center justify-center">
+        <p className="text-muted-foreground mb-4">此分支为空。</p>
+        <Button onClick={handleAddNewNodeToBranch}>
+          <Plus className="h-4 w-4 mr-2" />
+          添加第一个主章节
+        </Button>
       </div>
     );
   }
