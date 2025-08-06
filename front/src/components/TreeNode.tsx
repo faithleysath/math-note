@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react';
 import type { Node } from '../lib/types';
-import { getNodesByParent } from '../lib/db';
+import { getNodesByParent, deleteNode } from '../lib/db';
 import { useAppStore } from '../stores/useAppStore';
+import { Button } from './ui/button';
+import { Trash2 } from 'lucide-react';
+import ConfirmDeleteDialog from './ConfirmDeleteDialog';
 
 interface TreeNodeProps {
   node: Node;
@@ -17,6 +20,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({ node, numberPrefix = '' }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [children, setChildren] = useState<Node[]>([]);
   const [loading, setLoading] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   const hasChildren = node.children && node.children.length > 0;
   const isBranch = node.type === '分支';
@@ -78,6 +82,16 @@ const TreeNode: React.FC<TreeNodeProps> = ({ node, numberPrefix = '' }) => {
     node.type === '笔记' ? 'Note: ' :
     '';
 
+  const fetchRootNodes = useAppStore(state => state.fetchRootNodes);
+  const setSelectedNodeByIdStore = useAppStore(state => state.setSelectedNodeById);
+
+  const handleDeleteConfirm = async () => {
+    await deleteNode(node.id);
+    await fetchRootNodes();
+    setSelectedNodeByIdStore(null);
+    setIsDeleteDialogOpen(false);
+  };
+
   const colorClass =
     node.type === '定义' ? 'text-blue-600 dark:text-blue-400' :
     node.type === '定理' ? 'text-green-600 dark:text-green-400' :
@@ -90,14 +104,29 @@ const TreeNode: React.FC<TreeNodeProps> = ({ node, numberPrefix = '' }) => {
     '';
 
   return (
-    <li className="ml-2">
-      <div className="flex items-center cursor-pointer rounded-md p-1 transition-colors duration-200 hover:bg-gray-100 dark:hover:bg-gray-800" onClick={handleRowClick}>
-        {hasChildren && (
-          <span className="mr-1 text-lg w-4 text-center">
-            {isExpanded ? '▾' : '▸'}
-          </span>
+    <li className="ml-2 group">
+      <div className="flex items-center justify-between cursor-pointer rounded-md p-1 transition-colors duration-200 hover:bg-gray-100 dark:hover:bg-gray-800" onClick={handleRowClick}>
+        <div className="flex items-center">
+          {hasChildren && (
+            <span className="mr-1 text-lg w-4 text-center">
+              {isExpanded ? '▾' : '▸'}
+            </span>
+          )}
+          <span className={`${!hasChildren ? 'ml-[22px]' : ''} ${colorClass}`}>{`${numberPrefix}${typePrefix}${node.title}`}</span>
+        </div>
+        {isBranch && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 opacity-0 group-hover:opacity-100 cursor-pointer"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsDeleteDialogOpen(true);
+            }}
+          >
+            <Trash2 className="h-3 w-3 text-destructive" />
+          </Button>
         )}
-        <span className={`${!hasChildren ? 'ml-[22px]' : ''} ${colorClass}`}>{`${numberPrefix}${typePrefix}${node.title}`}</span>
       </div>
       {isExpanded && hasChildren && (
         <ul>
@@ -108,6 +137,14 @@ const TreeNode: React.FC<TreeNodeProps> = ({ node, numberPrefix = '' }) => {
             return <TreeNode key={child.id} node={child} numberPrefix={childNumberPrefix ? `${childNumberPrefix} ` : ''} />
           })}
         </ul>
+      )}
+      {isDeleteDialogOpen && (
+        <ConfirmDeleteDialog
+          node={node}
+          isOpen={isDeleteDialogOpen}
+          onClose={() => setIsDeleteDialogOpen(false)}
+          onConfirm={handleDeleteConfirm}
+        />
       )}
     </li>
   );
