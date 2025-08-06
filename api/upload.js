@@ -7,7 +7,7 @@ export default async function handler(request) {
   }
 
   try {
-    const body = await request.json();
+    const body = request.body;
 
     // Strict validation
     if (!body || typeof body !== 'object' || !Array.isArray(body.nodes) || !Array.isArray(body.edges)) {
