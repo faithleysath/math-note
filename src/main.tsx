@@ -15,6 +15,7 @@ const initializeApp = () => {
   if (hash) {
     try {
       const url = new URL(hash);
+      console.log("Loading remote data from URL:", url);
       useAppStore.getState().loadRemoteData(url.toString());
     } catch (error) {
       console.error("Invalid URL in hash:", error);
