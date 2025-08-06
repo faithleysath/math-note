@@ -12,16 +12,11 @@ export function getNode(id: string, data: RemoteData): Node | undefined {
 }
 
 export function getNodesByParent(parentId: string | null, data: RemoteData): Node[] {
-  console.log('%c[remoteDb] getNodesByParent called with parentId:', 'color: #999', parentId);
   // Handle both null and undefined for root nodes, as JSON parsing might omit the parentId key.
   if (parentId === null) {
-    const result = data.nodes.filter(node => node.parentId === null || node.parentId === undefined);
-    console.log('%c[remoteDb] Found root nodes:', 'color: #999', result);
-    return result;
+    return data.nodes.filter(node => node.parentId === null || node.parentId === undefined);
   }
-  const result = data.nodes.filter(node => node.parentId === parentId);
-  console.log(`%c[remoteDb] Found nodes for parent ${parentId}:`, 'color: #999', result);
-  return result;
+  return data.nodes.filter(node => node.parentId === parentId);
 }
 
 export function getOrderedDescendants(nodeId: string, data: RemoteData): Node[] {
