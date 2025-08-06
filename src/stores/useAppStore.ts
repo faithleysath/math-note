@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { toast } from 'sonner';
 import type { Node, Edge } from '../lib/types';
 import { getNode, getNodesByParent, addNode, updateNode, getAncestors } from '../lib/data-provider';
+import { getNodesByParent as getRemoteNodesByParent } from '../lib/remoteDb';
 
 interface RemoteData {
   nodes: Node[];
@@ -154,15 +155,24 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (!data.nodes || !data.edges) {
         throw new Error('Invalid data format.');
       }
-      set({ remoteData: data, isReadOnly: true });
-      await get().fetchRootNodes(); // This will now fetch remote nodes
-      get().triggerStructureRefresh(); // Ensure components depending on this refresh
+      
+      // Directly use the fetched data to find root nodes, avoiding state race conditions.
+      const rootNodes = getRemoteNodesByParent(null, data).filter(node => node.type === '分支');
+
+      // Atomically update all relevant state.
+      set({ 
+        remoteData: data, 
+        isReadOnly: true,
+        rootNodes: rootNodes,
+        isLoadingTree: false 
+      });
+
+      get().triggerStructureRefresh(); // Still trigger refresh for other components.
       toast.success('只读笔记已加载。');
     } catch (error) {
       console.error('Failed to load remote data:', error);
       toast.error(`加载远程笔记失败: ${error instanceof Error ? error.message : '未知错误'}`);
-    } finally {
-      set({ isLoadingTree: false });
+      set({ isLoadingTree: false }); // Ensure loading is turned off on error.
     }
   },
 }));
