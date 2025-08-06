@@ -20,6 +20,27 @@ const NodeEditor = ({ node }: NodeEditorProps) => {
   const triggerContentRefresh = useAppStore(state => state.triggerContentRefresh);
 
   useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Save with Cmd/Ctrl + S
+      if ((event.metaKey || event.ctrlKey) && event.key === 's') {
+        event.preventDefault();
+        handleSave();
+      }
+      // Cancel with Escape
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        handleCancel();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [title, content, solution]); // Re-bind when content changes to save the latest state
+
+  useEffect(() => {
     setTitle(node.title);
     setContent(node.content);
     setSolution(node.solution || '');

@@ -20,6 +20,7 @@ const MainContent = () => {
   const setEditingNodeId = useAppStore(state => state.setEditingNodeId);
   const triggerStructureRefresh = useAppStore(state => state.triggerStructureRefresh);
   const structureVersion = useAppStore(state => state.structureVersion);
+  const editingNodeId = useAppStore(state => state.editingNodeId);
   const [lightweightNodes, setLightweightNodes] = useState<LightweightNode[]>([]);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -143,6 +144,34 @@ const MainContent = () => {
     });
   }, [lightweightNodes]);
 
+  // Hotkeys for navigation
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (editingNodeId) return; // Don't navigate while editing
+
+      if (event.key === 'j' || event.key === 'k') {
+        event.preventDefault();
+        const currentIndex = selectedNode ? processedLightweightNodes.findIndex(n => n.id === selectedNode.id) : -1;
+        
+        let nextIndex = -1;
+        if (event.key === 'j') { // Move down
+          nextIndex = currentIndex === -1 ? 0 : Math.min(currentIndex + 1, processedLightweightNodes.length - 1);
+        } else { // Move up
+          nextIndex = currentIndex === -1 ? 0 : Math.max(currentIndex - 1, 0);
+        }
+
+        if (nextIndex !== -1 && processedLightweightNodes[nextIndex]) {
+          setSelectedNodeById(processedLightweightNodes[nextIndex].id);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [selectedNode, processedLightweightNodes, editingNodeId, setSelectedNodeById]);
+
   // Fetch lightweight nodes when the expanded branch changes
   useEffect(() => {
     const fetchBranchContent = async () => {
@@ -169,7 +198,7 @@ const MainContent = () => {
     if (selectedNode) {
       const index = processedLightweightNodes.findIndex(node => node.id === selectedNode.id);
       if (index !== -1) {
-        rowVirtualizer.scrollToIndex(index, { align: 'start', behavior: 'smooth' });
+        rowVirtualizer.scrollToIndex(index, { align: 'center', behavior: 'smooth' });
       }
     }
   }, [selectedNode, processedLightweightNodes, rowVirtualizer]);

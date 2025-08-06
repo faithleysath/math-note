@@ -12,6 +12,7 @@ import {
 } from '../ui/dialog';
 import { Input } from '../ui/input';
 import { useAppStore } from '../../stores/useAppStore';
+import Search from '../Search';
 
 const LeftSidebar = () => {
   const addBranch = useAppStore(state => state.addBranch);
@@ -28,8 +29,11 @@ const LeftSidebar = () => {
 
   return (
     <div className="h-full p-4 flex flex-col">
-      <div className="flex justify-between items-center mb-4">
+      <div className="flex justify-between items-center mb-2">
         <h2 className="text-lg font-semibold">目录</h2>
+      </div>
+      <div className="mb-4">
+        <Search />
       </div>
       <div className="flex-grow overflow-y-auto">
         <TreeView />

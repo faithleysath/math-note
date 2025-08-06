@@ -1,67 +1,72 @@
-import { useEffect, useState } from 'react';
-import type { Node, Edge } from '../lib/types';
-import { getEdgesBySource, getEdgesByTarget, getNode } from '../lib/db';
 import { useAppStore } from '../stores/useAppStore';
+import { useRelatedNodes } from '../hooks/useRelatedNodes';
+import type { RelatedNodeInfo } from '../hooks/useRelatedNodes';
+import { Link, X } from 'lucide-react';
+import { Button } from './ui/button';
+import { deleteEdge } from '../lib/db';
 
-interface RelatedNodeInfo {
-  edge: Edge;
-  node: Node;
-}
+const RelationGroup = ({ title, relations }: { title: string; relations: RelatedNodeInfo[] }) => {
+  const setSelectedNodeById = useAppStore(state => state.setSelectedNodeById);
+  const triggerContentRefresh = useAppStore(state => state.triggerContentRefresh);
 
-const RelatedNodesList = () => {
-  const selectedNode = useAppStore(state => state.selectedNode);
-  const [relatedNodes, setRelatedNodes] = useState<RelatedNodeInfo[]>([]);
-  const [loading, setLoading] = useState(false);
+  const handleDeleteEdge = async (edgeId: string) => {
+    // We can add a confirmation dialog later if needed
+    await deleteEdge(edgeId);
+    triggerContentRefresh(); // Refresh the list
+  };
 
-  useEffect(() => {
-    if (!selectedNode) {
-      setRelatedNodes([]);
-      return;
-    }
-
-    const fetchRelatedNodes = async () => {
-      setLoading(true);
-      try {
-        const sourceEdges = await getEdgesBySource(selectedNode.id);
-        const targetEdges = await getEdgesByTarget(selectedNode.id);
-        
-        const allEdges = [...sourceEdges, ...targetEdges];
-        const relatedNodePromises = allEdges.map(async (edge) => {
-          const otherNodeId = edge.source === selectedNode.id ? edge.target : edge.source;
-          const node = await getNode(otherNodeId);
-          return node ? { edge, node } : null;
-        });
-
-        const results = (await Promise.all(relatedNodePromises)).filter((r): r is RelatedNodeInfo => r !== null);
-        setRelatedNodes(results);
-
-      } catch (error) {
-        console.error("Failed to fetch related nodes:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchRelatedNodes();
-  }, [selectedNode]);
-
-  if (loading) {
-    return <p>正在加载相关节点...</p>;
-  }
-
-  if (relatedNodes.length === 0) {
-    return <p>未找到相关节点。</p>;
+  if (relations.length === 0) {
+    return null;
   }
 
   return (
-    <ul>
-      {relatedNodes.map(({ edge, node }) => (
-        <li key={edge.id} className="mb-2">
-          <span className="font-semibold">{edge.label}:</span>
-          <span className="ml-2 text-blue-500 cursor-pointer hover:underline">{node.title}</span>
-        </li>
-      ))}
-    </ul>
+    <div>
+      <h4 className="font-semibold text-muted-foreground mb-2">{title}</h4>
+      <ul className="space-y-2">
+        {relations.map(({ edge, relatedNode }) => (
+          <li key={edge.id} className="text-sm flex items-start group">
+            <Link className="h-3 w-3 mr-2 mt-1 text-muted-foreground" />
+            <div className="flex-1">
+              <span
+                className="text-primary hover:underline cursor-pointer"
+                onClick={() => setSelectedNodeById(relatedNode.id)}
+              >
+                {relatedNode.title}
+              </span>
+              <p className="text-xs text-muted-foreground">{edge.label}</p>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+              onClick={() => handleDeleteEdge(edge.id)}
+            >
+              <X className="h-3 w-3" />
+            </Button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+};
+
+const RelatedNodesList = () => {
+  const selectedNode = useAppStore(state => state.selectedNode);
+  const { outgoing, incoming, loading } = useRelatedNodes(selectedNode?.id);
+
+  if (loading) {
+    return <p className="text-sm text-muted-foreground">加载中...</p>;
+  }
+
+  if (outgoing.length === 0 && incoming.length === 0) {
+    return <p className="text-sm text-muted-foreground">无相关节点。</p>;
+  }
+
+  return (
+    <div className="space-y-4">
+      <RelationGroup title="本节点引用" relations={outgoing} />
+      <RelationGroup title="引用本节点" relations={incoming} />
+    </div>
   );
 };
 

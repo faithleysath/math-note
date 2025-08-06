@@ -12,6 +12,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({ node, numberPrefix = '' }) => {
   const setSelectedNodeById = useAppStore(state => state.setSelectedNodeById);
   const expandedBranchId = useAppStore(state => state.expandedBranchId);
   const setExpandedBranchId = useAppStore(state => state.setExpandedBranchId);
+  const expandedNodeIds = useAppStore(state => state.expandedNodeIds);
   const [isExpanded, setIsExpanded] = useState(false);
   const [children, setChildren] = useState<Node[]>([]);
   const [loading, setLoading] = useState(false);
@@ -19,12 +20,16 @@ const TreeNode: React.FC<TreeNodeProps> = ({ node, numberPrefix = '' }) => {
   const hasChildren = node.children && node.children.length > 0;
   const isBranch = node.type === '分支';
 
-  // Sync local expanded state with global context for branches
+  // Sync local expanded state with global context
   useEffect(() => {
     if (isBranch) {
+      // Accordion effect for top-level branches
       setIsExpanded(expandedBranchId === node.id);
+    } else {
+      // Auto-expand if this node is an ancestor of the selected node
+      setIsExpanded(expandedNodeIds.has(node.id));
     }
-  }, [expandedBranchId, isBranch, node.id]);
+  }, [expandedBranchId, isBranch, node.id, expandedNodeIds]);
 
   useEffect(() => {
     // Fetch children if expanded and they haven't been fetched yet

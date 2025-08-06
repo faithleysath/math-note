@@ -1,12 +1,13 @@
 import { create } from 'zustand';
 import type { Node } from '../lib/types';
-import { getNode, getNodesByParent, addNode, updateNode } from '../lib/db';
+import { getNode, getNodesByParent, addNode, updateNode, getAncestors } from '../lib/db';
 
 interface AppState {
   rootNodes: Node[];
   isLoadingTree: boolean;
   selectedNode: Node | null;
   expandedBranchId: string | null;
+  expandedNodeIds: Set<string>; // For auto-expanding the tree view
   editingNodeId: string | null; // ID of the node currently being edited
   contentVersion: number; // Triggers re-fetch of node content
   structureVersion: number; // Triggers re-fetch of lists and re-mount of components
@@ -29,6 +30,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   isLoadingTree: true,
   selectedNode: null,
   expandedBranchId: null,
+  expandedNodeIds: new Set(),
   editingNodeId: null,
   contentVersion: 0,
   structureVersion: 0,
@@ -59,16 +61,19 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
   setSelectedNodeById: async (id: string | null) => {
-    console.log(`Attempting to select node with ID: ${id}`);
     if (id === null) {
       set({ selectedNode: null });
-      console.log('Selected node cleared.');
       return;
     }
     try {
       const node = await getNode(id);
-      set({ selectedNode: node || null });
-      console.log('Node fetched and state set:', node);
+      if (node) {
+        const ancestors = await getAncestors(node.id);
+        const ancestorIds = new Set(ancestors.map(a => a.id));
+        set({ selectedNode: node, expandedNodeIds: ancestorIds });
+      } else {
+        set({ selectedNode: null });
+      }
     } catch (error) {
       console.error(`Failed to fetch node with id ${id}:`, error);
       set({ selectedNode: null });

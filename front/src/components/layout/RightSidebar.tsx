@@ -1,8 +1,13 @@
+import { useState } from 'react';
 import { useAppStore } from '../../stores/useAppStore';
 import RelatedNodesList from '../RelatedNodesList';
+import { Button } from '../ui/button';
+import AddEdgeDialog from '../AddEdgeDialog';
+import { Link } from 'lucide-react';
 
 const RightSidebar = () => {
   const selectedNode = useAppStore(state => state.selectedNode);
+  const [isAddEdgeOpen, setIsAddEdgeOpen] = useState(false);
 
   if (!selectedNode) {
     return (
@@ -33,10 +38,23 @@ const RightSidebar = () => {
           <span className="ml-2 text-muted-foreground">{new Date(selectedNode.updatedAt).toLocaleString()}</span>
         </div>
       </div>
-      <h3 className="text-md font-semibold mt-6 mb-2 border-b pb-2">相关节点</h3>
+      <div className="flex items-center justify-between mt-6 mb-2 border-b pb-2">
+        <h3 className="text-md font-semibold">相关节点</h3>
+        <Button variant="ghost" size="sm" onClick={() => setIsAddEdgeOpen(true)}>
+          <Link className="h-4 w-4 mr-2" />
+          链接新节点
+        </Button>
+      </div>
       <div className="text-sm">
         <RelatedNodesList />
       </div>
+      {isAddEdgeOpen && (
+        <AddEdgeDialog
+          sourceNode={selectedNode}
+          isOpen={isAddEdgeOpen}
+          onClose={() => setIsAddEdgeOpen(false)}
+        />
+      )}
     </div>
   );
 };

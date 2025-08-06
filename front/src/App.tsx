@@ -7,9 +7,11 @@ import LeftSidebar from "./components/layout/LeftSidebar"
 import MainContent from "./components/layout/MainContent"
 import RightSidebar from "./components/layout/RightSidebar"
 import { useAppStore } from "./stores/useAppStore"
+import { useHotkeys } from "./hooks/useHotkeys"
 
 function App() {
   const structureVersion = useAppStore(state => state.structureVersion);
+  useHotkeys();
 
   return (
     <div className="h-screen w-screen bg-background text-foreground">

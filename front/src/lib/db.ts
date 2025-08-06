@@ -229,3 +229,42 @@ export async function getEdgesByTarget(targetId: string) {
 export async function deleteEdge(id: string) {
   return await db.edges.delete(id);
 }
+
+// --- Search Operations ---
+
+/**
+ * Searches for nodes across multiple fields.
+ * @param term - The search term.
+ */
+export async function searchNodes(term: string) {
+  if (!term) return [];
+  const lowerCaseTerm = term.toLowerCase();
+  
+  return await db.nodes.filter(node => 
+    node.title.toLowerCase().includes(lowerCaseTerm) ||
+    node.content.toLowerCase().includes(lowerCaseTerm) ||
+    !!(node.aliases?.some(alias => alias.toLowerCase().includes(lowerCaseTerm))) ||
+    !!(node.tags?.some(tag => tag.toLowerCase().includes(lowerCaseTerm)))
+  ).limit(50).toArray(); // Limit to 50 results for performance
+}
+
+/**
+ * Retrieves all ancestor nodes for a given node ID.
+ * @param nodeId - The ID of the node to start from.
+ */
+export async function getAncestors(nodeId: string): Promise<Node[]> {
+  const ancestors: Node[] = [];
+  let currentId: string | null = nodeId;
+
+  while (currentId) {
+    const node: Node | undefined = await db.nodes.get(currentId);
+    if (node) {
+      ancestors.push(node);
+      currentId = node.parentId;
+    } else {
+      currentId = null;
+    }
+  }
+
+  return ancestors.reverse(); // Return in order from root to parent
+}
