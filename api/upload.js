@@ -7,18 +7,26 @@ export default async function handler(request, response) {
   }
 
   try {
-    const body = request.body;
+    const { nodes, edges, expirationInSeconds } = request.body;
 
     // Strict validation
-    if (!body || typeof body !== 'object' || !Array.isArray(body.nodes) || !Array.isArray(body.edges)) {
+    if (!nodes || !edges || !Array.isArray(nodes) || !Array.isArray(edges)) {
       return response.status(400).send('Invalid JSON format: "nodes" and "edges" arrays are required.');
     }
 
-    const jsonString = JSON.stringify(body);
+    // Default to 1 year if expiration is not provided or invalid
+    const cacheAge = typeof expirationInSeconds === 'number' && expirationInSeconds > 0 
+      ? expirationInSeconds 
+      : 31536000;
+
+    const dataToStore = { nodes, edges };
+    const jsonString = JSON.stringify(dataToStore);
     const buffer = Buffer.from(jsonString, 'utf-8');
+    
     const blob = await put(`notes-${uuidv4()}.json`, buffer, {
       access: 'public',
       contentType: 'application/json; charset=utf-8',
+      cacheControlMaxAge: cacheAge,
     });
 
     return response.status(200).json({ url: blob.url });
