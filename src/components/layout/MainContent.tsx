@@ -240,120 +240,116 @@ const MainContent = () => {
     }
   }, [selectedNode, processedNodes, rowVirtualizer]);
 
-  if (!expandedBranchId) {
-    return (
-      <div className="h-full p-4 flex items-center justify-center">
-        <p className="text-muted-foreground">展开一个分支以查看其内容。</p>
-      </div>
-    );
-  }
-
-  if (nodes.length === 0) {
-    return (
-      <div className="h-full p-4 flex flex-col items-center justify-center">
-        <p className="text-muted-foreground mb-4">此分支为空。</p>
-        <Button onClick={handleAddNewNodeToBranch}>
-          <Plus className="h-4 w-4 mr-2" />
-          添加第一个主章节
-        </Button>
-      </div>
-    );
-  }
-
   return (
-    <div ref={parentRef} className="h-full overflow-y-auto">
-      <div style={{ height: `${rowVirtualizer.getTotalSize()}px`, width: '100%', position: 'relative' }}>
-        {rowVirtualizer.getVirtualItems().map((virtualItem) => {
-          const node = processedNodes[virtualItem.index];
-          const siblings = nodes.filter(n => n.parentId === node.parentId);
-          const nodeIndexWithinSiblings = siblings.findIndex(n => n.id === node.id);
+    <>
+      <div ref={parentRef} className="h-full overflow-y-auto">
+        {!expandedBranchId ? (
+          <div className="h-full p-4 flex items-center justify-center">
+            <p className="text-muted-foreground">展开一个分支以查看其内容。</p>
+          </div>
+        ) : nodes.length === 0 ? (
+          <div className="h-full p-4 flex flex-col items-center justify-center">
+            <p className="text-muted-foreground mb-4">此分支为空。</p>
+            <Button onClick={handleAddNewNodeToBranch}>
+              <Plus className="h-4 w-4 mr-2" />
+              添加第一个主章节
+            </Button>
+          </div>
+        ) : (
+          <div style={{ height: `${rowVirtualizer.getTotalSize()}px`, width: '100%', position: 'relative' }}>
+            {rowVirtualizer.getVirtualItems().map((virtualItem) => {
+              const node = processedNodes[virtualItem.index];
+              const siblings = nodes.filter(n => n.parentId === node.parentId);
+              const nodeIndexWithinSiblings = siblings.findIndex(n => n.id === node.id);
 
-          return (
-            <div
-              key={node.id}
-              ref={rowVirtualizer.measureElement}
-              data-index={virtualItem.index}
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                transform: `translateY(${virtualItem.start}px)`,
-              }}
-              className="group/item relative px-4 py-1.5 transition-colors duration-200 hover:bg-slate-100 dark:hover:bg-slate-800"
-              onClick={() => setSelectedNodeById(node.id)}
-            >
-              <NodeRenderer node={node} />
-              <div
-                className="group/insert absolute -bottom-2 left-0 w-full h-4 flex items-center justify-center cursor-pointer"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleInsertSiblingClick(node);
-                }}
-              >
-                <div className="w-full h-full flex items-center justify-center relative">
-                  <div className="w-1/2 h-0.5 bg-primary rounded-full opacity-0 group-hover/insert:opacity-100 transition-opacity" />
-                  <div className="absolute flex items-center justify-center w-6 h-6 bg-background border rounded-full opacity-0 group-hover/insert:opacity-100 transition-opacity">
-                    <Plus className="h-4 w-4 text-primary" />
+              return (
+                <div
+                  key={node.id}
+                  ref={rowVirtualizer.measureElement}
+                  data-index={virtualItem.index}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    transform: `translateY(${virtualItem.start}px)`,
+                  }}
+                  className="group/item relative px-4 py-1.5 transition-colors duration-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  onClick={() => setSelectedNodeById(node.id)}
+                >
+                  <NodeRenderer node={node} />
+                  <div
+                    className="group/insert absolute -bottom-2 left-0 w-full h-4 flex items-center justify-center cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleInsertSiblingClick(node);
+                    }}
+                  >
+                    <div className="w-full h-full flex items-center justify-center relative">
+                      <div className="w-1/2 h-0.5 bg-primary rounded-full opacity-0 group-hover/insert:opacity-100 transition-opacity" />
+                      <div className="absolute flex items-center justify-center w-6 h-6 bg-background border rounded-full opacity-0 group-hover/insert:opacity-100 transition-opacity">
+                        <Plus className="h-4 w-4 text-primary" />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="absolute top-2 right-2 flex items-center space-x-1 opacity-0 group-hover/item:opacity-100 transition-opacity">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 cursor-pointer"
+                      onClick={(e) => { e.stopPropagation(); handleMove(node.id, 'up'); }}
+                      disabled={nodeIndexWithinSiblings === 0}
+                    >
+                      <ArrowUp className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 cursor-pointer"
+                      onClick={(e) => { e.stopPropagation(); handleMove(node.id, 'down'); }}
+                      disabled={nodeIndexWithinSiblings === siblings.length - 1}
+                    >
+                      <ArrowDown className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 cursor-pointer"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAddClick(node.id);
+                      }}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 cursor-pointer"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingNodeId(node.id);
+                      }}
+                    >
+                      <Edit2 className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 cursor-pointer hover:bg-destructive/10 hover:text-destructive"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteClick(node.id);
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
-              </div>
-              <div className="absolute top-2 right-2 flex items-center space-x-1 opacity-0 group-hover/item:opacity-100 transition-opacity">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 cursor-pointer"
-                  onClick={(e) => { e.stopPropagation(); handleMove(node.id, 'up'); }}
-                  disabled={nodeIndexWithinSiblings === 0}
-                >
-                  <ArrowUp className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 cursor-pointer"
-                  onClick={(e) => { e.stopPropagation(); handleMove(node.id, 'down'); }}
-                  disabled={nodeIndexWithinSiblings === siblings.length - 1}
-                >
-                  <ArrowDown className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 cursor-pointer"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleAddClick(node.id);
-                  }}
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 cursor-pointer"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setEditingNodeId(node.id);
-                  }}
-                >
-                  <Edit2 className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 cursor-pointer hover:bg-destructive/10 hover:text-destructive"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDeleteClick(node.id);
-                  }}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          );
-        })}
+              );
+            })}
+          </div>
+        )}
       </div>
       {addDialogOpen && parentNode && (
         <AddNodeDialog
@@ -371,7 +367,7 @@ const MainContent = () => {
           onConfirm={confirmDelete}
         />
       )}
-    </div>
+    </>
   );
 };
 
