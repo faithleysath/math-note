@@ -9,6 +9,7 @@ import TheoremNodeRenderer from './TheoremNodeRenderer';
 import ExampleNodeRenderer from './ExampleNodeRenderer';
 import NoteNodeRenderer from './NoteNodeRenderer';
 import ExerciseNodeRenderer from './ExerciseNodeRenderer';
+import SolutionRecordRenderer from './SolutionRecordRenderer';
 import DefaultNodeRenderer from './DefaultNodeRenderer';
 
 interface NodeRendererProps {
@@ -37,6 +38,8 @@ const NodeRenderer = memo(({ node }: NodeRendererProps) => {
       return <NoteNodeRenderer node={node} />;
     case '练习':
       return <ExerciseNodeRenderer node={node} />;
+    case '解题记录':
+      return <SolutionRecordRenderer node={node} />;
     default:
       return <DefaultNodeRenderer node={node} />;
   }

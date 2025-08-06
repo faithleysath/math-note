@@ -170,8 +170,8 @@ async function seedDatabase() {
     // 练习题是定义的练习题
     await addEdge({ source: exercise1Id, target: definition1Id, label: '是...的练习题' });
 
-    // 解题记录是练习题的解题记录
-    await addEdge({ source: solutionRecord1Id, target: exercise1Id, label: '是...的解题记录' });
+    // 解题记录是例题的解题记录
+    await addEdge({ source: solutionRecord1Id, target: example1Id, label: '是...的解题记录' });
 
     // 笔记引用了德摩根定律
     await addEdge({ source: note1Id, target: theorem1Id, label: '引用' });
