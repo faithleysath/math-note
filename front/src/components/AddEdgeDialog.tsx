@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { toast } from 'sonner';
 import type { Node, EdgeLabel } from '../lib/types';
 import { Button } from './ui/button';
 import {
@@ -30,7 +31,7 @@ const AddEdgeDialog = ({ sourceNode, isOpen, onClose }: AddEdgeDialogProps) => {
 
   const handleCreate = async () => {
     if (!selectedTarget || !selectedLabel) {
-      alert('Please select a target node and a relationship type.');
+      toast.warning('请选择一个目标节点和关系类型。');
       return;
     }
     try {
@@ -39,10 +40,12 @@ const AddEdgeDialog = ({ sourceNode, isOpen, onClose }: AddEdgeDialogProps) => {
         target: selectedTarget.id,
         label: selectedLabel,
       });
+      toast.success('链接已成功创建。');
       triggerContentRefresh();
       handleClose();
     } catch (error) {
       console.error('Failed to create edge:', error);
+      toast.error('创建链接失败。');
     }
   };
 

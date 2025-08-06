@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import MDEditor from '@uiw/react-md-editor';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
+import { toast } from 'sonner';
 import type { Node } from '../../lib/types';
 import { useAppStore } from '../../stores/useAppStore';
 import { updateNode } from '../../lib/db';
@@ -49,11 +50,12 @@ const NodeEditor = ({ node }: NodeEditorProps) => {
   const handleSave = async () => {
     try {
       await updateNode(node.id, { title, content, solution });
+      toast.success(`节点 "${title}" 已保存。`);
       setEditingNodeId(null); // Exit editing mode
       triggerContentRefresh(); // Trigger a content refresh
     } catch (error) {
       console.error("Failed to save node:", error);
-      // Handle error UI if necessary
+      toast.error('保存失败。');
     }
   };
 

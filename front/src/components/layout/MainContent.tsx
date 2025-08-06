@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
+import { toast } from 'sonner';
 import { useAppStore } from '../../stores/useAppStore';
 import { getOrderedDescendants, getNode, deleteNode, updateNode } from '../../lib/db';
 import type { LightweightNode, ProcessedLightweightNode } from '../../lib/types';
@@ -67,14 +68,21 @@ const MainContent = () => {
 
   const confirmDelete = async () => {
     if (nodeToDelete) {
-      // If the node being deleted is the currently selected one, unselect it.
-      if (selectedNode && selectedNode.id === nodeToDelete.id) {
-        setSelectedNodeById(null);
+      try {
+        // If the node being deleted is the currently selected one, unselect it.
+        if (selectedNode && selectedNode.id === nodeToDelete.id) {
+          setSelectedNodeById(null);
+        }
+        await deleteNode(nodeToDelete.id);
+        toast.success(`节点 "${nodeToDelete.title}" 已被删除。`);
+        triggerStructureRefresh();
+      } catch (error) {
+        console.error("Failed to delete node:", error);
+        toast.error('删除节点失败。');
+      } finally {
+        setNodeToDelete(null);
+        setDeleteDialogOpen(false);
       }
-      await deleteNode(nodeToDelete.id);
-      triggerStructureRefresh();
-      setNodeToDelete(null);
-      setDeleteDialogOpen(false);
     }
   };
 
@@ -97,8 +105,14 @@ const MainContent = () => {
       return; // Cannot move further
     }
 
-    await updateNode(parent.id, { children: newChildren });
-    triggerStructureRefresh();
+    try {
+      await updateNode(parent.id, { children: newChildren });
+      triggerStructureRefresh();
+      toast.success('节点顺序已更新。');
+    } catch (error) {
+      console.error("Failed to move node:", error);
+      toast.error('移动节点失败。');
+    }
   };
 
   // Pre-process lightweight nodes to add display numbers

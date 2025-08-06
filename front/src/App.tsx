@@ -8,6 +8,7 @@ import MainContent from "./components/layout/MainContent"
 import RightSidebar from "./components/layout/RightSidebar"
 import { useAppStore } from "./stores/useAppStore"
 import { useHotkeys } from "./hooks/useHotkeys"
+import { Toaster } from "@/components/ui/sonner"
 
 function App() {
   const structureVersion = useAppStore(state => state.structureVersion);
@@ -28,6 +29,7 @@ function App() {
           <RightSidebar />
         </ResizablePanel>
       </ResizablePanelGroup>
+      <Toaster />
     </div>
   )
 }

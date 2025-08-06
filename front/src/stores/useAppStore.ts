@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { toast } from 'sonner';
 import type { Node } from '../lib/types';
 import { getNode, getNodesByParent, addNode, updateNode, getAncestors } from '../lib/db';
 
@@ -54,10 +55,12 @@ export const useAppStore = create<AppState>((set, get) => ({
         parentId: null,
         children: [],
       });
+      toast.success(`分支 "${title}" 已成功创建。`);
       // Refresh the tree
       await get().fetchRootNodes();
     } catch (error) {
       console.error("Failed to add branch:", error);
+      toast.error('创建分支失败。');
     }
   },
   setSelectedNodeById: async (id: string | null) => {
@@ -92,29 +95,35 @@ export const useAppStore = create<AppState>((set, get) => ({
     set(state => ({ structureVersion: state.structureVersion + 1 }));
   },
   addNewNode: async (nodeData, parent, insertAfterNodeId) => {
-    const newNodeId = await addNode(nodeData);
+    try {
+      const newNodeId = await addNode(nodeData);
 
-    let newChildren: string[];
-    if (insertAfterNodeId) {
-      const index = parent.children.indexOf(insertAfterNodeId);
-      if (index !== -1) {
-        const childrenCopy = [...parent.children];
-        childrenCopy.splice(index + 1, 0, newNodeId);
-        newChildren = childrenCopy;
+      let newChildren: string[];
+      if (insertAfterNodeId) {
+        const index = parent.children.indexOf(insertAfterNodeId);
+        if (index !== -1) {
+          const childrenCopy = [...parent.children];
+          childrenCopy.splice(index + 1, 0, newNodeId);
+          newChildren = childrenCopy;
+        } else {
+          newChildren = [...parent.children, newNodeId];
+        }
       } else {
         newChildren = [...parent.children, newNodeId];
       }
-    } else {
-      newChildren = [...parent.children, newNodeId];
+      await updateNode(parent.id, { children: newChildren });
+
+      toast.success(`节点 "${nodeData.title}" 已成功添加。`);
+      get().triggerStructureRefresh();
+      set({ editingNodeId: newNodeId });
+
+      // Use a timeout to ensure the UI has re-rendered before scrolling
+      setTimeout(() => {
+        get().setSelectedNodeById(newNodeId);
+      }, 100);
+    } catch (error) {
+      console.error("Failed to add new node:", error);
+      toast.error('添加新节点失败。');
     }
-    await updateNode(parent.id, { children: newChildren });
-
-    get().triggerStructureRefresh();
-    set({ editingNodeId: newNodeId });
-
-    // Use a timeout to ensure the UI has re-rendered before scrolling
-    setTimeout(() => {
-      get().setSelectedNodeById(newNodeId);
-    }, 100);
   },
 }));
