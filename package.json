@@ -1,4 +1,9 @@
 {
+  "private": true,
+  "workspaces": [
+    "front",
+    "api"
+  ],
   "dependencies": {
     "@vercel/blob": "^1.1.1"
   }
