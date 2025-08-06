@@ -30,7 +30,7 @@ import { Upload, Download, Share2 } from 'lucide-react';
 
 const LeftSidebar = () => {
   const addBranch = useAppStore(state => state.addBranch);
-  const triggerStructureRefresh = useAppStore(state => state.triggerStructureRefresh);
+  const fetchRootNodes = useAppStore(state => state.fetchRootNodes);
   const [newBranchTitle, setNewBranchTitle] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isImportConfirmOpen, setIsImportConfirmOpen] = useState(false);
@@ -125,7 +125,7 @@ const LeftSidebar = () => {
           throw new Error('Invalid data format.');
         }
         await importData(data);
-        triggerStructureRefresh();
+        await fetchRootNodes(); // Manually refetch root nodes to update the tree view
         toast.success('数据已成功导入。');
       } catch (error) {
         console.error('Failed to import data:', error);
