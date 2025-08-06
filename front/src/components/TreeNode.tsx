@@ -68,17 +68,18 @@ const TreeNode: React.FC<TreeNodeProps> = ({ node, numberPrefix = '' }) => {
     node.type === '例题' ? 'text-orange-600 dark:text-orange-400' :
     node.type === '练习' ? 'text-purple-600 dark:text-purple-400' :
     node.type === '解题记录' ? 'text-red-600 dark:text-red-400' :
+    node.type === '笔记' ? 'text-yellow-600 dark:text-yellow-400' :
     '';
 
   return (
     <li className="ml-2">
-      <div className="flex items-center cursor-pointer" onClick={handleRowClick}>
+      <div className="flex items-center cursor-pointer rounded-md p-1 transition-colors duration-200 hover:bg-gray-100 dark:hover:bg-gray-800" onClick={handleRowClick}>
         {hasChildren && (
           <span className="mr-1 text-lg w-4 text-center">
             {isExpanded ? '▾' : '▸'}
           </span>
         )}
-        <span className={`my-2 ${!hasChildren ? 'ml-[22px]' : ''} ${colorClass}`}>{`${numberPrefix}${typePrefix}${node.title}`}</span>
+        <span className={`${!hasChildren ? 'ml-[22px]' : ''} ${colorClass}`}>{`${numberPrefix}${typePrefix}${node.title}`}</span>
       </div>
       {isExpanded && hasChildren && (
         <ul>

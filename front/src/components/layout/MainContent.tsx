@@ -1,84 +1,9 @@
-import { useEffect, useState, useRef, useMemo, memo } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { useAppStore } from '../../stores/useAppStore';
-import MDEditor from '@uiw/react-md-editor';
-import 'katex/dist/katex.css';
-import remarkMath from 'remark-math';
-import rehypeKatex from 'rehype-katex';
 import { getOrderedDescendants } from '../../lib/db';
-import type { Node } from '../../lib/types';
-import { useVirtualizer, type VirtualItem } from '@tanstack/react-virtual';
-import { useNodeData } from '../../hooks/useNodeData';
-
-type LightweightNode = Omit<Node, 'content' | 'solution'>;
-type ProcessedLightweightNode = LightweightNode & { displayNumber: string; isChapter: boolean };
-
-// =================================================================================
-// Node Renderer Component
-// =================================================================================
-interface NodeRendererProps {
-  node: ProcessedLightweightNode;
-  measureElement: (element: HTMLElement | null) => void;
-  virtualItem: VirtualItem;
-  onNodeClick: (id: string) => void;
-}
-
-const NodeRenderer = memo(({ node, measureElement, virtualItem, onNodeClick }: NodeRendererProps) => {
-  const { node: fullNode, loading } = useNodeData(node.id);
-
-  const displayContent = useMemo(() => {
-    if (loading || !fullNode) return '';
-    if (node.isChapter) return '&emsp;' + fullNode.content;
-    // Prepend the bolded number to the content for rendering
-    return `&emsp;&emsp;**${node.displayNumber}**&emsp;${fullNode.content}`;
-  }, [fullNode, loading, node.isChapter, node.displayNumber]);
-
-  const getTitleClassName = () => {
-    switch (node.type) {
-      case '主章节':
-        return 'text-3xl font-bold mt-4 mb-4 border-b pb-1';
-      case '子章节':
-        return 'text-2xl font-bold mt-1 mb-2 text-center';
-      default:
-        return 'text-xl font-bold mb-2 flex items-center';
-    }
-  };
-
-  return (
-    <div
-      ref={measureElement}
-      data-index={virtualItem.index}
-      style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        width: '100%',
-        transform: `translateY(${virtualItem.start}px)`,
-      }}
-      className="px-4 py-1.5 transition-colors duration-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
-      onClick={() => onNodeClick(node.id)}
-    >
-      <>
-        {node.isChapter && (
-          <h2 className={getTitleClassName()}>
-            <span className="font-bold mr-3">{node.displayNumber}</span>
-            &nbsp;&nbsp;
-            {node.title}
-          </h2>
-        )}
-        <div className="text-base">
-          <MDEditor.Markdown
-            source={displayContent}
-            style={{ whiteSpace: 'pre-wrap', backgroundColor: 'transparent' }}
-            remarkPlugins={[remarkMath]}
-            rehypePlugins={[[rehypeKatex, { throwOnError: false }]]}
-          />
-        </div>
-      </>
-    </div>
-  );
-});
-NodeRenderer.displayName = 'NodeRenderer';
-
+import type { LightweightNode, ProcessedLightweightNode } from '../../lib/types';
+import { useVirtualizer } from '@tanstack/react-virtual';
+import NodeRenderer from '../renderers/NodeRenderer';
 
 // =================================================================================
 // Main Content Component
@@ -178,13 +103,22 @@ const MainContent = () => {
         {rowVirtualizer.getVirtualItems().map(virtualItem => {
           const node = processedLightweightNodes[virtualItem.index];
           return (
-            <NodeRenderer
+            <div
               key={node.id}
-              node={node}
-              measureElement={rowVirtualizer.measureElement}
-              virtualItem={virtualItem}
-              onNodeClick={setSelectedNodeById}
-            />
+              ref={rowVirtualizer.measureElement}
+              data-index={virtualItem.index}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                transform: `translateY(${virtualItem.start}px)`,
+              }}
+              className="px-4 py-1.5 transition-colors duration-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+              onClick={() => setSelectedNodeById(node.id)}
+            >
+              <NodeRenderer node={node} />
+            </div>
           );
         })}
       </div>

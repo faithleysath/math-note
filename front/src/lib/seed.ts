@@ -69,8 +69,8 @@ async function seedDatabase() {
     const theorem1Id = await addNodeAndUpdateParent({
       type: '定理',
       title: '德摩根定律',
-      content: "集合的德摩根定律陈述了并集和交集的补集之间的关系：\n1. $$(A \\cup B)' = A' \\cap B'$$\n2. $$(A \\cap B)' = A' \\cup B'$$",
-      solution: '证明：以第一条为例，设 x ∈ (A ∪ B)\'，则 x ∉ A ∪ B，即 x ∉ A 且 x ∉ B。所以 x ∈ A\' 且 x ∈ B\'，即 x ∈ A\' ∩ B\'。反之亦然。',
+      content: `对于任意两个集合$A$ 和 $B$，有以下等式：\n$$\n(A \\cup B)' = A' \\cap B' \\\\\n(A \\cap B)' = A' \\cup B'\n$$`,
+      solution: `证明：\n1. 对于任意元素 $x$，如果 $x \\in (A \\cup B)'$，则 $x \\notin A \\cup B$，即 $x \\notin A$ 且 $x \\notin B$，因此 $x \\in A'$ 且 $x \\in B'$，所以 $x \\in A' \\cap B'$。\n2. 类似地，对于 $(A \\cap B)'$ 的证明。`,
       parentId: minorChapter1_1Id,
       children: [],
       tags: ['集合论', '逻辑'],
@@ -79,8 +79,8 @@ async function seedDatabase() {
     const example1Id = await addNodeAndUpdateParent({
       type: '例题',
       title: '德摩根定律应用',
-      content: '设全集 U = {1, 2, 3, 4, 5}，A = {1, 2}, B = {2, 3}。验证 (A ∪ B)\' = A\' ∩ B\'。',
-      solution: '左边：A ∪ B = {1, 2, 3}，所以 (A ∪ B)\' = {4, 5}。\n右边：A\' = {3, 4, 5}, B\' = {1, 4, 5}，所以 A\' ∩ B\' = {4, 5}。\n左右相等，得证。',
+      content: `设 $A = \\{1, 2, 3\\}$ 和 $B = \\{2, 3, 4\\}$，求 $(A \\cup B)'$ 和 $(A \\cap B)'$ 的结果。\n\n`,
+      solution: `解：\n1. $A \\cup B = \\{1, 2, 3, 4\\}$，因此 $(A \\cup B)' = \\{\\text{所有不在 } A \\cup B 的元素\\}$。\n2. $A \\cap B = \\{2, 3\\}$，因此 $(A \\cap B)' = \\{\\text{所有不在 } A \\cap B 的元素\\}$。`,
       parentId: theorem1Id, // 作为定理的例题
       children: [],
     }, []);
@@ -89,9 +89,9 @@ async function seedDatabase() {
         type: '笔记',
         title: '关于德摩根定律的思考',
         content: '德摩根定律不仅在集合论中重要，它在布尔代数和数字电路设计中也有完全相同的形式，是逻辑否定的基本规则。',
-        parentId: minorChapter1_1Id,
+        parentId: theorem1Id, // 挂载到定理下
         children: [],
-    }, [definition1Id, theorem1Id]);
+    }, [example1Id]);
 
     // --- 在子章节末尾创建“习题”笔记 ---
     const exercisesNoteId = await addNodeAndUpdateParent({
@@ -100,7 +100,7 @@ async function seedDatabase() {
       content: '本章节相关练习题。',
       parentId: minorChapter1_1Id,
       children: [],
-    }, [definition1Id, theorem1Id, note1Id]);
+    }, [definition1Id, theorem1Id]);
 
     // --- 将练习题挂载到“习题”笔记下 ---
     const exercise1Id = await addNodeAndUpdateParent({
@@ -112,14 +112,14 @@ async function seedDatabase() {
         children: [],
     }, []);
 
-    const solutionRecord1Id = await addNode({
+    const solutionRecord1Id = await addNodeAndUpdateParent({
         type: '解题记录',
         title: '我对“幂集大小”的解法',
         content: '我的初步想法是 n*n，因为感觉是两两组合。但这个思路很快就发现不对。',
         solution: '后来参考了答案，理解了每个元素都有“在”或“不在”子集中这两种状态，所以是 2^n。这个思路非常巧妙，需要记住。',
-        parentId: null,
+        parentId: example1Id, // 挂载到例题下
         children: [],
-    });
+    }, []);
 
     // =================================================================
     // --- 分支 2: 线性代数 ---

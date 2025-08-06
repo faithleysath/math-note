@@ -83,3 +83,14 @@ export interface Edge {
   /** 对该关系的额外描述，例如解释一个“引用”的具体原因。 */
   description?: string;
 }
+
+/**
+ * A lightweight version of the Node, without heavy content fields.
+ * Used for displaying lists of nodes efficiently.
+ */
+export type LightweightNode = Omit<Node, 'content' | 'solution'>;
+
+/**
+ * A processed lightweight node, with additional properties for display purposes.
+ */
+export type ProcessedLightweightNode = LightweightNode & { displayNumber: string; isChapter: boolean };
