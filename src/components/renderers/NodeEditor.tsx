@@ -22,6 +22,7 @@ const NodeEditor = ({ node }: NodeEditorProps) => {
   const setEditingNodeId = useAppStore(state => state.setEditingNodeId);
   const triggerContentRefresh = useAppStore(state => state.triggerContentRefresh);
   const triggerStructureRefresh = useAppStore(state => state.triggerStructureRefresh);
+  const setSelectedNodeById = useAppStore(state => state.setSelectedNodeById);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -64,6 +65,9 @@ const NodeEditor = ({ node }: NodeEditorProps) => {
         triggerStructureRefresh();
       }
       triggerContentRefresh(); // 内容刷新总是需要的
+
+      // 强制刷新全局的 selectedNode 状态，以同步右边栏
+      await setSelectedNodeById(node.id);
 
     } catch (error) {
       console.error("Failed to save node:", error);
