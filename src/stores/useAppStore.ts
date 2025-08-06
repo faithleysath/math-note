@@ -24,6 +24,7 @@ interface AppState {
   setSelectedNodeById: (id: string | null) => Promise<void>;
   setExpandedBranchId: (id: string | null) => void;
   setEditingNodeId: (id: string | null) => void; // Action to set the editing node
+  setIsLoadingTree: (isLoading: boolean) => void;
   triggerContentRefresh: () => void;
   triggerStructureRefresh: () => void;
   addNewNode: (
@@ -46,14 +47,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   contentVersion: 0,
   structureVersion: 0,
   fetchRootNodes: async () => {
-    set({ isLoadingTree: true });
     try {
       const nodes = await getNodesByParent(null);
       // 只显示“分支”类型的节点作为根节点
-      set({ rootNodes: nodes.filter(node => node.type === '分支'), isLoadingTree: false });
+      set({ rootNodes: nodes.filter(node => node.type === '分支') });
     } catch (error) {
       console.error("Failed to fetch root nodes:", error);
-      set({ isLoadingTree: false });
     }
   },
   addBranch: async (title: string) => {
@@ -97,6 +96,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   setEditingNodeId: (id: string | null) => {
     set({ editingNodeId: id });
+  },
+  setIsLoadingTree: (isLoading: boolean) => {
+    set({ isLoadingTree: isLoading });
   },
   triggerContentRefresh: () => {
     set(state => ({ contentVersion: state.contentVersion + 1 }));
@@ -153,13 +155,13 @@ export const useAppStore = create<AppState>((set, get) => ({
         throw new Error('Invalid data format.');
       }
       set({ remoteData: data, isReadOnly: true });
-      await get().fetchRootNodes(); // 直接在设置远程数据后获取根节点
-      get().triggerStructureRefresh(); // 触发UI刷新
+      await get().fetchRootNodes(); // This will now fetch remote nodes
+      get().triggerStructureRefresh(); // Ensure components depending on this refresh
       toast.success('只读笔记已加载。');
-      set({ isLoadingTree: false });
     } catch (error) {
       console.error('Failed to load remote data:', error);
       toast.error(`加载远程笔记失败: ${error instanceof Error ? error.message : '未知错误'}`);
+    } finally {
       set({ isLoadingTree: false });
     }
   },

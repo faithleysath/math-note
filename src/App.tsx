@@ -15,6 +15,8 @@ function App() {
   const structureVersion = useAppStore(state => state.structureVersion);
   const loadRemoteData = useAppStore(state => state.loadRemoteData);
   const fetchRootNodes = useAppStore(state => state.fetchRootNodes);
+  const setIsLoadingTree = useAppStore(state => state.setIsLoadingTree);
+
 
   useHotkeys();
 
@@ -29,16 +31,22 @@ function App() {
         } catch (error) {
           console.error("Invalid URL in hash, loading local data:", error);
           // 如果 hash 无效，则加载本地数据
+          setIsLoadingTree(true);
           await fetchRootNodes();
+          setIsLoadingTree(false);
         }
       } else {
         // 如果没有 hash，则加载本地数据
+        setIsLoadingTree(true);
         await fetchRootNodes();
+        setIsLoadingTree(false);
       }
     };
 
     initializeApp();
-  }, [loadRemoteData, fetchRootNodes]);
+    // The dependency array is intentionally left empty to run only once on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
 
   return (
