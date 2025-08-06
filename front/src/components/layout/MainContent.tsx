@@ -1,11 +1,11 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { useAppStore } from '../../stores/useAppStore';
-import { getOrderedDescendants, getNode, deleteNode } from '../../lib/db';
+import { getOrderedDescendants, getNode, deleteNode, updateNode } from '../../lib/db';
 import type { LightweightNode, ProcessedLightweightNode } from '../../lib/types';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import NodeRenderer from '../renderers/NodeRenderer';
 import { Button } from '../ui/button';
-import { Edit2, Plus, Trash2 } from 'lucide-react';
+import { Edit2, Plus, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
 import AddNodeDialog from '../AddNodeDialog';
 import ConfirmDeleteDialog from '../ConfirmDeleteDialog';
 import type { Node } from '../../lib/types';
@@ -25,15 +25,32 @@ const MainContent = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [parentNode, setParentNode] = useState<Node | null>(null);
   const [nodeToDelete, setNodeToDelete] = useState<Node | null>(null);
+  const [insertAfterNodeId, setInsertAfterNodeId] = useState<string | null>(null);
   const parentRef = useRef<HTMLDivElement>(null);
 
   const handleAddClick = async (nodeId: string) => {
     const fullParentNode = await getNode(nodeId);
     if (fullParentNode) {
       setParentNode(fullParentNode);
+      setInsertAfterNodeId(null); // This is for adding a child
       setAddDialogOpen(true);
     } else {
       console.error("Could not find parent node to add child to.");
+    }
+  };
+
+  const handleInsertSiblingClick = async (currentNode: LightweightNode) => {
+    if (!currentNode.parentId) {
+      console.error("Cannot add a sibling to a root node.");
+      return;
+    }
+    const fullParentNode = await getNode(currentNode.parentId);
+    if (fullParentNode) {
+      setParentNode(fullParentNode);
+      setInsertAfterNodeId(currentNode.id); // This is for adding a sibling
+      setAddDialogOpen(true);
+    } else {
+      console.error("Could not find parent node to insert sibling.");
     }
   };
 
@@ -58,6 +75,29 @@ const MainContent = () => {
       setNodeToDelete(null);
       setDeleteDialogOpen(false);
     }
+  };
+
+  const handleMove = async (nodeId: string, direction: 'up' | 'down') => {
+    const node = lightweightNodes.find(n => n.id === nodeId);
+    if (!node || !node.parentId) return;
+
+    const parent = await getNode(node.parentId);
+    if (!parent) return;
+
+    const index = parent.children.indexOf(nodeId);
+    if (index === -1) return;
+
+    const newChildren = [...parent.children];
+    if (direction === 'up' && index > 0) {
+      [newChildren[index - 1], newChildren[index]] = [newChildren[index], newChildren[index - 1]];
+    } else if (direction === 'down' && index < newChildren.length - 1) {
+      [newChildren[index], newChildren[index + 1]] = [newChildren[index + 1], newChildren[index]];
+    } else {
+      return; // Cannot move further
+    }
+
+    await updateNode(parent.id, { children: newChildren });
+    triggerStructureRefresh();
   };
 
   // Pre-process lightweight nodes to add display numbers
@@ -145,8 +185,11 @@ const MainContent = () => {
   return (
     <div ref={parentRef} className="h-full overflow-y-auto">
       <div style={{ height: `${rowVirtualizer.getTotalSize()}px`, width: '100%', position: 'relative' }}>
-        {rowVirtualizer.getVirtualItems().map(virtualItem => {
+        {rowVirtualizer.getVirtualItems().map((virtualItem) => {
           const node = processedLightweightNodes[virtualItem.index];
+          const siblings = lightweightNodes.filter(n => n.parentId === node.parentId);
+          const nodeIndexWithinSiblings = siblings.findIndex(n => n.id === node.id);
+
           return (
             <div
               key={node.id}
@@ -159,11 +202,43 @@ const MainContent = () => {
                 width: '100%',
                 transform: `translateY(${virtualItem.start}px)`,
               }}
-              className="group relative px-4 py-1.5 transition-colors duration-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+              className="group/item relative px-4 py-1.5 transition-colors duration-200 hover:bg-slate-100 dark:hover:bg-slate-800"
               onClick={() => setSelectedNodeById(node.id)}
             >
               <NodeRenderer node={node} />
-              <div className="absolute top-2 right-2 flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div
+                className="group/insert absolute -bottom-2 left-0 w-full h-4 flex items-center justify-center cursor-pointer"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleInsertSiblingClick(node);
+                }}
+              >
+                <div className="w-full h-full flex items-center justify-center relative">
+                  <div className="w-1/2 h-0.5 bg-primary rounded-full opacity-0 group-hover/insert:opacity-100 transition-opacity" />
+                  <div className="absolute flex items-center justify-center w-6 h-6 bg-background border rounded-full opacity-0 group-hover/insert:opacity-100 transition-opacity">
+                    <Plus className="h-4 w-4 text-primary" />
+                  </div>
+                </div>
+              </div>
+              <div className="absolute top-2 right-2 flex items-center space-x-1 opacity-0 group-hover/item:opacity-100 transition-opacity">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 cursor-pointer"
+                  onClick={(e) => { e.stopPropagation(); handleMove(node.id, 'up'); }}
+                  disabled={nodeIndexWithinSiblings === 0}
+                >
+                  <ArrowUp className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 cursor-pointer"
+                  onClick={(e) => { e.stopPropagation(); handleMove(node.id, 'down'); }}
+                  disabled={nodeIndexWithinSiblings === siblings.length - 1}
+                >
+                  <ArrowDown className="h-4 w-4" />
+                </Button>
                 <Button
                   variant="ghost"
                   size="icon"
@@ -207,6 +282,7 @@ const MainContent = () => {
           parent={parentNode}
           isOpen={addDialogOpen}
           onClose={() => setAddDialogOpen(false)}
+          insertAfterNodeId={insertAfterNodeId}
         />
       )}
       {deleteDialogOpen && nodeToDelete && (

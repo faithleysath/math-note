@@ -30,12 +30,14 @@ interface AddNodeDialogProps {
   parent: Node;
   isOpen: boolean;
   onClose: () => void;
+  insertAfterNodeId?: string | null;
 }
 
-const AddNodeDialog = ({ parent, isOpen, onClose }: AddNodeDialogProps) => {
+const AddNodeDialog = ({ parent, isOpen, onClose, insertAfterNodeId }: AddNodeDialogProps) => {
   const [title, setTitle] = useState('');
   const [selectedType, setSelectedType] = useState<Node['type'] | null>(null);
   const triggerStructureRefresh = useAppStore(state => state.triggerStructureRefresh);
+  const setEditingNodeId = useAppStore(state => state.setEditingNodeId);
 
   const possibleChildren = allowedChildren[parent.type] || [];
 
@@ -56,14 +58,27 @@ const AddNodeDialog = ({ parent, isOpen, onClose }: AddNodeDialogProps) => {
       });
 
       // 2. Update the parent's children array
-      const newChildren = [...parent.children, newNodeId];
+      let newChildren: string[];
+      if (insertAfterNodeId) {
+        const index = parent.children.indexOf(insertAfterNodeId);
+        if (index !== -1) {
+          const childrenCopy = [...parent.children];
+          childrenCopy.splice(index + 1, 0, newNodeId);
+          newChildren = childrenCopy;
+        } else {
+          newChildren = [...parent.children, newNodeId];
+        }
+      } else {
+        newChildren = [...parent.children, newNodeId];
+      }
       await updateNode(parent.id, { children: newChildren });
 
       // 3. Trigger a global refresh to update the UI
       triggerStructureRefresh();
       
-      // 4. Close the dialog and reset state
+      // 4. Close the dialog and set the new node to be edited
       handleClose();
+      setEditingNodeId(newNodeId);
     } catch (error) {
       console.error('Failed to create new node:', error);
     }
