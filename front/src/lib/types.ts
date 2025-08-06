@@ -85,12 +85,6 @@ export interface Edge {
 }
 
 /**
- * A lightweight version of the Node, without heavy content fields.
- * Used for displaying lists of nodes efficiently.
+ * A processed node, with additional properties for display purposes.
  */
-export type LightweightNode = Omit<Node, 'content' | 'solution'>;
-
-/**
- * A processed lightweight node, with additional properties for display purposes.
- */
-export type ProcessedLightweightNode = LightweightNode & { displayNumber: string; isChapter: boolean };
+export type ProcessedNode = Node & { displayNumber: string; isChapter: boolean };

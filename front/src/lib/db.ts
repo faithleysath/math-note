@@ -86,11 +86,10 @@ export async function getNodesByParent(parentId: string | null) {
 }
 
 /**
- * [DEPRECATED] Recursively retrieves all descendant nodes for a given node ID.
- * This is inefficient as it loads all nodes into memory.
+ * Recursively retrieves all descendant nodes for a given node ID, returning full node objects.
  * @param nodeId - The ID of the node to start from.
  */
-export async function getAllDescendants_DEPRECATED(nodeId: string): Promise<Node[]> {
+export async function getOrderedDescendants(nodeId: string): Promise<Node[]> {
     const result: Node[] = [];
     
     const allNodes = await db.nodes.toArray();
@@ -117,59 +116,6 @@ export async function getAllDescendants_DEPRECATED(nodeId: string): Promise<Node
     const startNode = nodesMap.get(nodeId);
     if (startNode) {
         const visit = (node: Node) => {
-            result.push(node);
-            const children = parentToChildrenMap.get(node.id) || [];
-            for (const child of children) {
-                visit(child);
-            }
-        };
-        visit(startNode);
-    }
-
-    return result;
-}
-
-/**
- * A lightweight version of `getAllDescendants` that retrieves an ordered list
- * of descendant nodes, but only fetches essential, lightweight fields.
- * This is used for building virtualized lists without loading all content into memory.
- * @param nodeId - The ID of the node to start from.
- */
-export async function getOrderedDescendants(nodeId: string): Promise<Omit<Node, 'content' | 'solution'>[]> {
-    const result: Omit<Node, 'content' | 'solution'>[] = [];
-
-    // Fetch all nodes but exclude the heavy 'content' and 'solution' fields.
-    const allNodes = await db.nodes.toCollection().toArray(nodes => {
-        return nodes.map(node => {
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            const { content, solution, ...rest } = node;
-            return rest;
-        });
-    });
-
-    const nodesMap = new Map(allNodes.map(node => [node.id, node]));
-    const parentToChildrenMap = new Map<string, Omit<Node, 'content' | 'solution'>[]>();
-
-    for (const node of nodesMap.values()) {
-        if (node.parentId) {
-            if (!parentToChildrenMap.has(node.parentId)) {
-                parentToChildrenMap.set(node.parentId, []);
-            }
-            parentToChildrenMap.get(node.parentId)!.push(node);
-        }
-    }
-
-    // Sort children based on the `children` array order
-    for (const [parentId, children] of parentToChildrenMap.entries()) {
-        const parentNode = nodesMap.get(parentId);
-        if (parentNode && parentNode.children.length > 0) {
-            children.sort((a, b) => parentNode.children.indexOf(a.id) - parentNode.children.indexOf(b.id));
-        }
-    }
-
-    const startNode = nodesMap.get(nodeId);
-    if (startNode) {
-        const visit = (node: Omit<Node, 'content' | 'solution'>) => {
             result.push(node);
             const children = parentToChildrenMap.get(node.id) || [];
             for (const child of children) {

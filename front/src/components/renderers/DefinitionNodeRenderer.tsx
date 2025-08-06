@@ -1,18 +1,17 @@
 import MDEditor from '@uiw/react-md-editor';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
-import type { Node, ProcessedLightweightNode } from '../../lib/types';
+import type { ProcessedNode } from '../../lib/types';
 import { useMemo } from 'react';
 
 interface DefinitionNodeRendererProps {
-  node: ProcessedLightweightNode;
-  fullNode: Node;
+  node: ProcessedNode;
 }
 
-const DefinitionNodeRenderer = ({ node, fullNode }: DefinitionNodeRendererProps) => {
+const DefinitionNodeRenderer = ({ node }: DefinitionNodeRendererProps) => {
   const displayContent = useMemo(() => {
-    return `&emsp;&emsp;**${node.displayNumber}**&emsp;${fullNode.content}`;
-  }, [fullNode.content, node.displayNumber]);
+    return `&emsp;&emsp;**${node.displayNumber}**&emsp;${node.content}`;
+  }, [node.content, node.displayNumber]);
 
   return (
     <div className="text-base">

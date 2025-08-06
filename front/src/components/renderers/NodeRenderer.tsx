@@ -1,8 +1,7 @@
 import { memo } from 'react';
-import type { ProcessedLightweightNode } from '../../lib/types';
-import { useNodeData } from '../../hooks/useNodeData';
+import type { ProcessedNode } from '../../lib/types';
 import { useAppStore } from '../../stores/useAppStore';
-import NodeEditor from './NodeEditor'; // We will create this component next
+import NodeEditor from './NodeEditor';
 import MainChapterNodeRenderer from './MainChapterNodeRenderer';
 import SubChapterNodeRenderer from './SubChapterNodeRenderer';
 import DefinitionNodeRenderer from './DefinitionNodeRenderer';
@@ -13,37 +12,31 @@ import ExerciseNodeRenderer from './ExerciseNodeRenderer';
 import DefaultNodeRenderer from './DefaultNodeRenderer';
 
 interface NodeRendererProps {
-  node: ProcessedLightweightNode;
+  node: ProcessedNode;
 }
 
 const NodeRenderer = memo(({ node }: NodeRendererProps) => {
-  const { node: fullNode, loading } = useNodeData(node.id);
   const editingNodeId = useAppStore(state => state.editingNodeId);
 
-  if (loading || !fullNode) {
-    // You might want to render a loading skeleton here
-    return <div>Loading...</div>;
-  }
-
   if (editingNodeId === node.id) {
-    return <NodeEditor node={fullNode} />;
+    return <NodeEditor node={node} />;
   }
 
   switch (node.type) {
     case '主章节':
-      return <MainChapterNodeRenderer node={node} fullNode={fullNode} />;
+      return <MainChapterNodeRenderer node={node} />;
     case '子章节':
-      return <SubChapterNodeRenderer node={node} fullNode={fullNode} />;
+      return <SubChapterNodeRenderer node={node} />;
     case '定义':
-      return <DefinitionNodeRenderer node={node} fullNode={fullNode} />;
+      return <DefinitionNodeRenderer node={node} />;
     case '定理':
-      return <TheoremNodeRenderer node={node} fullNode={fullNode} />;
+      return <TheoremNodeRenderer node={node} />;
     case '例题':
-      return <ExampleNodeRenderer node={node} fullNode={fullNode} />;
+      return <ExampleNodeRenderer node={node} />;
     case '笔记':
-      return <NoteNodeRenderer node={node} fullNode={fullNode} />;
+      return <NoteNodeRenderer node={node} />;
     case '练习':
-      return <ExerciseNodeRenderer node={node} fullNode={fullNode} />;
+      return <ExerciseNodeRenderer node={node} />;
     default:
       return <DefaultNodeRenderer node={node} />;
   }

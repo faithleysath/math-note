@@ -1,7 +1,7 @@
 import MDEditor from '@uiw/react-md-editor';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
-import type { Node, ProcessedLightweightNode } from '../../lib/types';
+import type { ProcessedNode } from '../../lib/types';
 import { useMemo } from 'react';
 import {
   Accordion,
@@ -11,18 +11,17 @@ import {
 } from '@/components/ui/accordion';
 
 interface ExerciseNodeRendererProps {
-  node: ProcessedLightweightNode;
-  fullNode: Node;
+  node: ProcessedNode;
 }
 
-const ExerciseNodeRenderer = ({ fullNode }: ExerciseNodeRendererProps) => {
+const ExerciseNodeRenderer = ({ node }: ExerciseNodeRendererProps) => {
   const displayContent = useMemo(() => {
-    return fullNode.content;
-  }, [fullNode.content]);
+    return node.content;
+  }, [node.content]);
 
   const solutionContent = useMemo(() => {
-    return fullNode.solution;
-  }, [fullNode.solution]);
+    return node.solution;
+  }, [node.solution]);
 
   return (
     <div className="text-base p-4 pb-0 border-l-4 border-blue-400 bg-blue-50 my-2">

@@ -1,7 +1,7 @@
-import type { ProcessedLightweightNode } from '../../lib/types';
+import type { ProcessedNode } from '../../lib/types';
 
 interface DefaultNodeRendererProps {
-  node: ProcessedLightweightNode;
+  node: ProcessedNode;
 }
 
 const DefaultNodeRenderer = ({ node }: DefaultNodeRendererProps) => {

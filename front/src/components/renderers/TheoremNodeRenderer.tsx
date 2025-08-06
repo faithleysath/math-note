@@ -1,26 +1,25 @@
 import MDEditor from '@uiw/react-md-editor';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
-import type { Node, ProcessedLightweightNode } from '../../lib/types';
+import type { ProcessedNode } from '../../lib/types';
 import { useMemo, useState } from 'react';
 
 interface TheoremNodeRendererProps {
-  node: ProcessedLightweightNode;
-  fullNode: Node;
+  node: ProcessedNode;
 }
 
-const TheoremNodeRenderer = ({ node, fullNode }: TheoremNodeRendererProps) => {
+const TheoremNodeRenderer = ({ node }: TheoremNodeRendererProps) => {
   const [showSolution, setShowSolution] = useState(false);
   const displayContent = useMemo(() => {
-    let content = `&emsp;&emsp;**${node.displayNumber}**&emsp;${fullNode.content}`;
-    if (showSolution && fullNode.solution) {
-      content += `\n\n&emsp;&emsp;${fullNode.solution}`;
+    let content = `&emsp;&emsp;**${node.displayNumber}**&emsp;${node.content}`;
+    if (showSolution && node.solution) {
+      content += `\n\n&emsp;&emsp;${node.solution}`;
     }
     return content;
-  }, [fullNode.content, fullNode.solution, node.displayNumber, showSolution]);
+  }, [node.content, node.solution, node.displayNumber, showSolution]);
 
   const handleClick = () => {
-    if (fullNode.solution) {
+    if (node.solution) {
       setShowSolution(prev => !prev);
     }
   };

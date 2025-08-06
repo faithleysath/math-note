@@ -1,16 +1,15 @@
 import MDEditor from '@uiw/react-md-editor';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
-import type { Node, ProcessedLightweightNode } from '../../lib/types';
+import type { ProcessedNode } from '../../lib/types';
 import { useMemo } from 'react';
 
 interface SubChapterNodeRendererProps {
-  node: ProcessedLightweightNode;
-  fullNode: Node;
+  node: ProcessedNode;
 }
 
-const SubChapterNodeRenderer = ({ node, fullNode }: SubChapterNodeRendererProps) => {
-  const displayContent = useMemo(() => '*' + fullNode.content + '*', [fullNode.content]);
+const SubChapterNodeRenderer = ({ node }: SubChapterNodeRendererProps) => {
+  const displayContent = useMemo(() => '*' + node.content + '*', [node.content]);
 
   return (
     <>

@@ -2,7 +2,7 @@ import { useEffect, useState, useRef, useMemo } from 'react';
 import { toast } from 'sonner';
 import { useAppStore } from '../../stores/useAppStore';
 import { getOrderedDescendants, getNode, deleteNode, updateNode } from '../../lib/db';
-import type { LightweightNode, ProcessedLightweightNode } from '../../lib/types';
+import type { ProcessedNode } from '../../lib/types';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import NodeRenderer from '../renderers/NodeRenderer';
 import { Button } from '../ui/button';
@@ -22,7 +22,7 @@ const MainContent = () => {
   const triggerStructureRefresh = useAppStore(state => state.triggerStructureRefresh);
   const structureVersion = useAppStore(state => state.structureVersion);
   const editingNodeId = useAppStore(state => state.editingNodeId);
-  const [lightweightNodes, setLightweightNodes] = useState<LightweightNode[]>([]);
+  const [nodes, setNodes] = useState<Node[]>([]);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [parentNode, setParentNode] = useState<Node | null>(null);
@@ -41,7 +41,7 @@ const MainContent = () => {
     }
   };
 
-  const handleInsertSiblingClick = async (currentNode: LightweightNode) => {
+  const handleInsertSiblingClick = async (currentNode: Node) => {
     if (!currentNode.parentId) {
       console.error("Cannot add a sibling to a root node.");
       return;
@@ -87,7 +87,7 @@ const MainContent = () => {
   };
 
   const handleMove = async (nodeId: string, direction: 'up' | 'down') => {
-    const node = lightweightNodes.find(n => n.id === nodeId);
+    const node = nodes.find(n => n.id === nodeId);
     if (!node || !node.parentId) return;
 
     const parent = await getNode(node.parentId);
@@ -115,9 +115,9 @@ const MainContent = () => {
     }
   };
 
-  // Pre-process lightweight nodes to add display numbers
-  const processedLightweightNodes = useMemo((): ProcessedLightweightNode[] => {
-    if (!lightweightNodes.length) return [];
+  // Pre-process nodes to add display numbers
+  const processedNodes = useMemo((): ProcessedNode[] => {
+    if (!nodes.length) return [];
 
     const majorCounters: { [key: string]: number } = {};
     const minorCounters: { [key: string]: number } = {};
@@ -126,7 +126,7 @@ const MainContent = () => {
     let currentMajorPrefix = '';
     let currentMinorPrefix = '';
 
-    return lightweightNodes.filter(node => !['解题记录'].includes(node.type)).map((node) => {
+    return nodes.filter(node => !['解题记录'].includes(node.type)).map((node) => {
       let displayNumber = '';
       const isChapter = ['主章节', '子章节'].includes(node.type);
 
@@ -156,7 +156,7 @@ const MainContent = () => {
       }
       return { ...node, displayNumber, isChapter };
     });
-  }, [lightweightNodes]);
+  }, [nodes]);
 
   // Hotkeys for navigation
   useEffect(() => {
@@ -165,17 +165,17 @@ const MainContent = () => {
 
       if (event.key === 'j' || event.key === 'k') {
         event.preventDefault();
-        const currentIndex = selectedNode ? processedLightweightNodes.findIndex(n => n.id === selectedNode.id) : -1;
+        const currentIndex = selectedNode ? processedNodes.findIndex(n => n.id === selectedNode.id) : -1;
         
         let nextIndex = -1;
         if (event.key === 'j') { // Move down
-          nextIndex = currentIndex === -1 ? 0 : Math.min(currentIndex + 1, processedLightweightNodes.length - 1);
+          nextIndex = currentIndex === -1 ? 0 : Math.min(currentIndex + 1, processedNodes.length - 1);
         } else { // Move up
           nextIndex = currentIndex === -1 ? 0 : Math.max(currentIndex - 1, 0);
         }
 
-        if (nextIndex !== -1 && processedLightweightNodes[nextIndex]) {
-          setSelectedNodeById(processedLightweightNodes[nextIndex].id);
+        if (nextIndex !== -1 && processedNodes[nextIndex]) {
+          setSelectedNodeById(processedNodes[nextIndex].id);
         }
       }
     };
@@ -184,24 +184,24 @@ const MainContent = () => {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [selectedNode, processedLightweightNodes, editingNodeId, setSelectedNodeById]);
+  }, [selectedNode, processedNodes, editingNodeId, setSelectedNodeById]);
 
-  // Fetch lightweight nodes when the expanded branch changes
+  // Fetch nodes when the expanded branch changes
   useEffect(() => {
     const fetchBranchContent = async () => {
       if (expandedBranchId) {
-        const nodes = await getOrderedDescendants(expandedBranchId);
+        const fetchedNodes = await getOrderedDescendants(expandedBranchId);
         // We remove the root node itself from the list to only show content
-        setLightweightNodes(nodes.slice(1));
+        setNodes(fetchedNodes.slice(1));
       } else {
-        setLightweightNodes([]); // Clear content if no branch is expanded
+        setNodes([]); // Clear content if no branch is expanded
       }
     };
     fetchBranchContent();
   }, [expandedBranchId, structureVersion]);
 
   const rowVirtualizer = useVirtualizer({
-    count: processedLightweightNodes.length,
+    count: processedNodes.length,
     getScrollElement: () => parentRef.current,
     estimateSize: () => 200,
     overscan: 5,
@@ -210,14 +210,14 @@ const MainContent = () => {
   // Scroll to the selected node
   useEffect(() => {
     if (selectedNode) {
-      const index = processedLightweightNodes.findIndex(node => node.id === selectedNode.id);
+      const index = processedNodes.findIndex(node => node.id === selectedNode.id);
       if (index !== -1) {
         rowVirtualizer.scrollToIndex(index, { align: 'center', behavior: 'smooth' });
       }
     }
-  }, [selectedNode, processedLightweightNodes, rowVirtualizer]);
+  }, [selectedNode, processedNodes, rowVirtualizer]);
 
-  if (!expandedBranchId || processedLightweightNodes.length === 0) {
+  if (!expandedBranchId || processedNodes.length === 0) {
     return (
       <div className="h-full p-4 flex items-center justify-center">
         <p className="text-muted-foreground">展开一个分支以查看其内容。</p>
@@ -229,8 +229,8 @@ const MainContent = () => {
     <div ref={parentRef} className="h-full overflow-y-auto">
       <div style={{ height: `${rowVirtualizer.getTotalSize()}px`, width: '100%', position: 'relative' }}>
         {rowVirtualizer.getVirtualItems().map((virtualItem) => {
-          const node = processedLightweightNodes[virtualItem.index];
-          const siblings = lightweightNodes.filter(n => n.parentId === node.parentId);
+          const node = processedNodes[virtualItem.index];
+          const siblings = nodes.filter(n => n.parentId === node.parentId);
           const nodeIndexWithinSiblings = siblings.findIndex(n => n.id === node.id);
 
           return (
