@@ -26,7 +26,7 @@ const MainContent = () => {
     let currentMajorPrefix = '';
     let currentMinorPrefix = '';
 
-    return lightweightNodes.map((node) => {
+    return lightweightNodes.filter(node => !['解题记录'].includes(node.type)).map((node) => {
       let displayNumber = '';
       const isChapter = ['主章节', '子章节'].includes(node.type);
 

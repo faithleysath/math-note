@@ -10,7 +10,7 @@ interface MainChapterNodeRendererProps {
 }
 
 const MainChapterNodeRenderer = ({ node, fullNode }: MainChapterNodeRendererProps) => {
-  const displayContent = useMemo(() => fullNode.content, [fullNode.content]);
+  const displayContent = useMemo(() => '&nbsp;' + fullNode.content, [fullNode.content]);
 
   return (
     <>

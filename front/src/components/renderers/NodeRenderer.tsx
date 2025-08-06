@@ -6,6 +6,8 @@ import SubChapterNodeRenderer from './SubChapterNodeRenderer';
 import DefinitionNodeRenderer from './DefinitionNodeRenderer';
 import TheoremNodeRenderer from './TheoremNodeRenderer';
 import ExampleNodeRenderer from './ExampleNodeRenderer';
+import NoteNodeRenderer from './NoteNodeRenderer';
+import ExerciseNodeRenderer from './ExerciseNodeRenderer';
 import DefaultNodeRenderer from './DefaultNodeRenderer';
 
 interface NodeRendererProps {
@@ -31,6 +33,10 @@ const NodeRenderer = memo(({ node }: NodeRendererProps) => {
       return <TheoremNodeRenderer node={node} fullNode={fullNode} />;
     case '例题':
       return <ExampleNodeRenderer node={node} fullNode={fullNode} />;
+    case '笔记':
+      return <NoteNodeRenderer node={node} fullNode={fullNode} />;
+    case '练习':
+      return <ExerciseNodeRenderer node={node} fullNode={fullNode} />;
     default:
       return <DefaultNodeRenderer node={node} />;
   }
