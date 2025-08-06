@@ -1,9 +1,9 @@
 import { put } from '@vercel/blob';
 import { v4 as uuidv4 } from 'uuid';
 
-export default async function handler(request) {
+export default async function handler(request, response) {
   if (request.method !== 'POST') {
-    return new Response('Method Not Allowed', { status: 405 });
+    return response.status(405).send('Method Not Allowed');
   }
 
   try {
@@ -11,7 +11,7 @@ export default async function handler(request) {
 
     // Strict validation
     if (!body || typeof body !== 'object' || !Array.isArray(body.nodes) || !Array.isArray(body.edges)) {
-      return new Response('Invalid JSON format: "nodes" and "edges" arrays are required.', { status: 400 });
+      return response.status(400).send('Invalid JSON format: "nodes" and "edges" arrays are required.');
     }
 
     const jsonString = JSON.stringify(body);
@@ -20,15 +20,12 @@ export default async function handler(request) {
       contentType: 'application/json',
     });
 
-    return new Response(JSON.stringify({ url: blob.url }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return response.status(200).json({ url: blob.url });
   } catch (error) {
     console.error('Upload failed:', error);
     if (error instanceof SyntaxError) {
-      return new Response('Invalid JSON body.', { status: 400 });
+      return response.status(400).send('Invalid JSON body.');
     }
-    return new Response('Internal Server Error', { status: 500 });
+    return response.status(500).send('Internal Server Error');
   }
 }
