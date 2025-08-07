@@ -242,9 +242,9 @@ const MainContent = () => {
 
   return (
     <>
-      <div ref={parentRef} className="h-full overflow-y-auto">
+      <div ref={parentRef} className="h-full overflow-y-auto p-4">
         {!expandedBranchId ? (
-          <div className="h-full p-4 flex items-center justify-center">
+          <div className="h-full flex items-center justify-center">
             <p className="text-muted-foreground">展开一个分支以查看其内容。</p>
           </div>
         ) : nodes.length === 0 ? (
@@ -274,10 +274,12 @@ const MainContent = () => {
                     width: '100%',
                     transform: `translateY(${virtualItem.start}px)`,
                   }}
-                  className="group/item relative px-4 py-1.5 transition-colors duration-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  className="group/item relative py-1.5 transition-colors duration-200 hover:bg-slate-100 dark:hover:bg-slate-800"
                   onClick={() => setSelectedNodeById(node.id)}
                 >
-                  <NodeRenderer node={node} />
+                  <div className="px-4">
+                    <NodeRenderer node={node} />
+                  </div>
                   <div
                     className="group/insert absolute -bottom-2 left-0 w-full h-4 flex items-center justify-center cursor-pointer"
                     onClick={(e) => {

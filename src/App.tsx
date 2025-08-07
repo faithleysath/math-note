@@ -109,7 +109,7 @@ function App() {
         className="h-svh w-screen bg-background text-foreground relative"
         onTouchStart={handleTouchStart}
       >
-        <div className={cn("h-full w-full", mobileView !== 'main' && "blur-sm")}>
+        <div className={cn("h-full w-full transition-filter duration-300", mobileView !== 'main' && "blur-sm")}>
           <MainContent />
         </div>
 
