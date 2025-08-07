@@ -200,10 +200,10 @@ const LeftSidebar = () => {
         <div className="mb-4">
           <Search />
         </div>
-        <div className="flex-grow overflow-y-auto">
+        <div className="flex-grow overflow-y-auto min-h-0">
           <TreeView />
         </div>
-        <div className="mt-4">
+        <div className="mt-4 flex-shrink-0">
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button className="w-full">
