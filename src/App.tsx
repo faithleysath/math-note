@@ -104,22 +104,26 @@ function App() {
 
         {/* Floating Action Buttons */}
         {mobileView === 'main' && (
-          <div className="absolute bottom-4 right-4 z-20 flex flex-col space-y-4">
-            <Button 
-              size="icon" 
-              onClick={() => setMobileView('left')}
-              className="bg-background/60 text-foreground/90 backdrop-blur-sm border border-border/30 shadow-lg hover:bg-background/80 transition-colors"
-            >
-              <PanelLeft />
-            </Button>
-            <Button 
-              size="icon" 
-              onClick={() => setMobileView('right')}
-              className="bg-background/60 text-foreground/90 backdrop-blur-sm border border-border/30 shadow-lg hover:bg-background/80 transition-colors"
-            >
-              <PanelRight />
-            </Button>
-          </div>
+          <>
+            <div className="absolute left-4 top-1/2 -translate-y-1/2 z-20">
+              <Button 
+                size="icon" 
+                onClick={() => setMobileView('left')}
+                className="bg-background/60 text-foreground/90 backdrop-blur-sm border border-border/30 shadow-lg hover:bg-background/80 transition-colors"
+              >
+                <PanelLeft />
+              </Button>
+            </div>
+            <div className="absolute right-4 top-1/2 -translate-y-1/2 z-20">
+              <Button 
+                size="icon" 
+                onClick={() => setMobileView('right')}
+                className="bg-background/60 text-foreground/90 backdrop-blur-sm border border-border/30 shadow-lg hover:bg-background/80 transition-colors"
+              >
+                <PanelRight />
+              </Button>
+            </div>
+          </>
         )}
         <Toaster />
       </div>
