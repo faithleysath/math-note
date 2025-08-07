@@ -26,9 +26,13 @@ import { useAppStore } from '../../stores/useAppStore';
 import { exportData, importData } from '../../lib/data-provider';
 import { toast } from 'sonner';
 import Search from '../Search';
-import { Upload, Download, Share2 } from 'lucide-react';
+import { Upload, Download, Share2, X } from 'lucide-react';
+import { useWindowSize } from '@/hooks/useWindowSize';
 
 const LeftSidebar = () => {
+  const setMobileView = useAppStore(state => state.setMobileView);
+  const { width } = useWindowSize();
+  const isMobile = width <= 768;
   const addBranch = useAppStore(state => state.addBranch);
   const fetchRootNodes = useAppStore(state => state.fetchRootNodes);
   const [newBranchTitle, setNewBranchTitle] = useState('');
@@ -149,6 +153,11 @@ const LeftSidebar = () => {
         <div className="flex justify-between items-center mb-2">
           <h2 className="text-lg font-semibold">目录</h2>
           <div className="flex items-center space-x-1">
+            {isMobile && (
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setMobileView('main')}>
+                <X className="h-4 w-4" />
+              </Button>
+            )}
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleShare} disabled={isSharing}>

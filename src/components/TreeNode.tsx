@@ -5,6 +5,7 @@ import { useAppStore } from '../stores/useAppStore';
 import { Button } from './ui/button';
 import { Trash2 } from 'lucide-react';
 import ConfirmDeleteDialog from './ConfirmDeleteDialog';
+import { useWindowSize } from '@/hooks/useWindowSize';
 
 interface TreeNodeProps {
   node: Node;
@@ -13,6 +14,9 @@ interface TreeNodeProps {
 
 const TreeNode: React.FC<TreeNodeProps> = ({ node, numberPrefix = '' }) => {
   const setSelectedNodeById = useAppStore(state => state.setSelectedNodeById);
+  const setMobileView = useAppStore(state => state.setMobileView);
+  const { width } = useWindowSize();
+  const isMobile = width <= 768;
   const expandedBranchId = useAppStore(state => state.expandedBranchId);
   const setExpandedBranchId = useAppStore(state => state.setExpandedBranchId);
   const expandedNodeIds = useAppStore(state => state.expandedNodeIds);
@@ -60,6 +64,9 @@ const TreeNode: React.FC<TreeNodeProps> = ({ node, numberPrefix = '' }) => {
 
   const handleRowClick = () => {
     setSelectedNodeById(node.id);
+    if (isMobile) {
+      setMobileView('main');
+    }
     if (isBranch) {
       // For branches, always toggle via global context for accordion effect,
       // even if it has no children. This allows showing the "add node" button.

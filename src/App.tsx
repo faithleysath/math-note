@@ -11,6 +11,9 @@ import { useAppStore } from "./stores/useAppStore"
 import { useHotkeys } from "./hooks/useHotkeys"
 import { Toaster } from "@/components/ui/sonner"
 import { Button } from "./components/ui/button"
+import { useWindowSize } from "./hooks/useWindowSize"
+import { PanelLeft, PanelRight } from "lucide-react"
+import { cn } from "./lib/utils"
 
 const NotFoundPage = () => (
   <div className="h-screen w-screen bg-background text-foreground flex flex-col items-center justify-center space-y-4">
@@ -27,6 +30,10 @@ function App() {
   const setIsLoadingTree = useAppStore(state => state.setIsLoadingTree);
   const loadError = useAppStore(state => state.loadError);
   const setLoadError = useAppStore(state => state.setLoadError);
+  const mobileView = useAppStore(state => state.mobileView);
+  const setMobileView = useAppStore(state => state.setMobileView);
+  const { width } = useWindowSize();
+  const isMobile = width <= 768;
 
   useHotkeys();
 
@@ -72,6 +79,43 @@ function App() {
 
   if (loadError) {
     return <NotFoundPage />;
+  }
+
+  if (isMobile) {
+    return (
+      <div className="h-screen w-screen bg-background text-foreground relative">
+        <div className={cn("h-full w-full", mobileView !== 'main' && "blur-sm")}>
+          <MainContent />
+        </div>
+
+        {/* Left Sidebar Overlay */}
+        {mobileView === 'left' && (
+          <div className="absolute inset-0 z-10 bg-background/80 backdrop-blur-sm">
+            <LeftSidebar />
+          </div>
+        )}
+
+        {/* Right Sidebar Overlay */}
+        {mobileView === 'right' && (
+          <div className="absolute inset-0 z-10 bg-background/80 backdrop-blur-sm">
+            <RightSidebar />
+          </div>
+        )}
+
+        {/* Floating Action Buttons */}
+        {mobileView === 'main' && (
+          <div className="absolute bottom-4 right-4 z-20 flex flex-col space-y-2">
+            <Button size="icon" onClick={() => setMobileView('left')}>
+              <PanelLeft />
+            </Button>
+            <Button size="icon" onClick={() => setMobileView('right')}>
+              <PanelRight />
+            </Button>
+          </div>
+        )}
+        <Toaster />
+      </div>
+    )
   }
 
   return (

@@ -22,10 +22,12 @@ interface AppState {
   contentVersion: number; // Triggers re-fetch of node content
   structureVersion: number; // Triggers re-fetch of lists and re-mount of components
   edgeVersion: number; // Triggers re-fetch of graph relationships
+  mobileView: 'main' | 'left' | 'right';
   fetchRootNodes: () => Promise<void>;
   addBranch: (title: string) => Promise<void>;
   setSelectedNodeById: (id: string | null) => Promise<void>;
   setExpandedBranchId: (id: string | null) => void;
+  setMobileView: (view: 'main' | 'left' | 'right') => void;
   setEditingNodeId: (id: string | null) => void; // Action to set the editing node
   setIsLoadingTree: (isLoading: boolean) => void;
   setLoadError: (error: boolean) => void;
@@ -53,6 +55,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   contentVersion: 0,
   structureVersion: 0,
   edgeVersion: 0,
+  mobileView: 'main',
   fetchRootNodes: async () => {
     try {
       const nodes = await getNodesByParent(null);
@@ -101,6 +104,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   setExpandedBranchId: (id: string | null) => {
     set({ expandedBranchId: id });
   },
+  setMobileView: (view) => set({ mobileView: view }),
   setEditingNodeId: (id: string | null) => {
     set({ editingNodeId: id });
   },

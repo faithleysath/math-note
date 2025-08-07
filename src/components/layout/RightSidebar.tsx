@@ -5,13 +5,17 @@ import RelationshipGraph from '../RelationshipGraph';
 import { useRelatedNodes } from '../../hooks/useRelatedNodes';
 import { Button } from '../ui/button';
 import AddEdgeDialog from '../AddEdgeDialog';
-import { Link, ChevronRight } from 'lucide-react';
+import { Link, ChevronRight, X } from 'lucide-react';
 import { getAncestors } from '../../lib/data-provider';
 import type { Node } from '../../lib/types';
+import { useWindowSize } from '@/hooks/useWindowSize';
 
 const RightSidebar = () => {
   const selectedNode = useAppStore(state => state.selectedNode);
   const setSelectedNodeById = useAppStore(state => state.setSelectedNodeById);
+  const setMobileView = useAppStore(state => state.setMobileView);
+  const { width } = useWindowSize();
+  const isMobile = width <= 768;
   const [isAddEdgeOpen, setIsAddEdgeOpen] = useState(false);
   const [ancestors, setAncestors] = useState<Node[]>([]);
   const { outgoing, incoming, loading } = useRelatedNodes(selectedNode?.id);
@@ -33,7 +37,16 @@ const RightSidebar = () => {
   }
 
   return (
-    <div className="h-full p-4">
+    <div className="h-full p-4 overflow-y-auto">
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-md font-semibold">详细信息</h2>
+        {isMobile && (
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setMobileView('main')}>
+            <X className="h-4 w-4" />
+          </Button>
+        )}
+      </div>
+
       {ancestors.length > 0 && (
         <div className="mb-4">
           <h3 className="text-md font-semibold mb-2">内容导航</h3>
@@ -53,7 +66,6 @@ const RightSidebar = () => {
         </div>
       )}
 
-      <h2 className="text-md font-semibold mb-4 border-b pb-2">详细信息</h2>
       <div className="space-y-2 text-sm mb-6">
         <div>
           <span className="font-semibold">标题:</span>
