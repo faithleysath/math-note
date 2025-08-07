@@ -293,7 +293,7 @@ const MainContent = () => {
                       </div>
                     </div>
                   </div>
-                  <div className="absolute top-2 right-2 flex items-center space-x-1 opacity-0 group-hover/item:opacity-100 transition-opacity">
+                  <div className="absolute top-0.5 right-2 flex items-center space-x-1 opacity-0 group-hover/item:opacity-100 transition-opacity">
                     <Button
                       variant="ghost"
                       size="icon"
