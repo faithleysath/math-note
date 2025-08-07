@@ -156,7 +156,7 @@ function App() {
             </div>
           </>
         )}
-        <Toaster />
+        <Toaster position="top-center" />
       </div>
     )
   }
@@ -176,7 +176,7 @@ function App() {
           <RightSidebar />
         </ResizablePanel>
       </ResizablePanelGroup>
-      <Toaster />
+      <Toaster position="top-center" />
     </div>
   )
 }
