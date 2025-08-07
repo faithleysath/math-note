@@ -21,6 +21,7 @@ const MainContent = () => {
   const setEditingNodeId = useAppStore(state => state.setEditingNodeId);
   const triggerStructureRefresh = useAppStore(state => state.triggerStructureRefresh);
   const structureVersion = useAppStore(state => state.structureVersion);
+  const contentVersion = useAppStore(state => state.contentVersion);
   const editingNodeId = useAppStore(state => state.editingNodeId);
   const [nodes, setNodes] = useState<Node[]>([]);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -221,7 +222,7 @@ const MainContent = () => {
       }
     };
     fetchBranchContent();
-  }, [expandedBranchId, structureVersion]);
+  }, [expandedBranchId, structureVersion, contentVersion]);
 
   const rowVirtualizer = useVirtualizer({
     count: processedNodes.length,
