@@ -114,23 +114,25 @@ function App() {
         </div>
 
         {/* Left Sidebar Overlay */}
-        {mobileView === 'left' && (
-          <div className="absolute inset-0 z-10 bg-background/80 backdrop-blur-sm">
-            <LeftSidebar />
-          </div>
-        )}
+        <div className={cn(
+          "absolute inset-0 z-10 bg-background/80 backdrop-blur-sm transition-transform duration-300 ease-in-out",
+          mobileView === 'left' ? 'translate-x-0' : '-translate-x-full'
+        )}>
+          <LeftSidebar />
+        </div>
 
         {/* Right Sidebar Overlay */}
-        {mobileView === 'right' && (
-          <div className="absolute inset-0 z-10 bg-background/80 backdrop-blur-sm">
-            <RightSidebar />
-          </div>
-        )}
+        <div className={cn(
+          "absolute inset-0 z-10 bg-background/80 backdrop-blur-sm transition-transform duration-300 ease-in-out",
+          mobileView === 'right' ? 'translate-x-0' : 'translate-x-full'
+        )}>
+          <RightSidebar />
+        </div>
 
         {/* Floating Action Buttons */}
         {mobileView === 'main' && showFabs && (
           <>
-            <div className="absolute left-4 top-1/2 -translate-y-1/2 z-20 animate-in fade-in duration-300 animate-out fade-out duration-300">
+            <div className="absolute left-4 top-1/2 -translate-y-1/2 z-20 animate-in fade-in duration-300">
               <Button 
                 size="icon" 
                 onClick={() => setMobileView('left')}
@@ -139,7 +141,7 @@ function App() {
                 <PanelLeft />
               </Button>
             </div>
-            <div className="absolute right-4 top-1/2 -translate-y-1/2 z-20 animate-in fade-in duration-300 animate-out fade-out duration-300">
+            <div className="absolute right-4 top-1/2 -translate-y-1/2 z-20 animate-in fade-in duration-300">
               <Button 
                 size="icon" 
                 onClick={() => setMobileView('right')}
