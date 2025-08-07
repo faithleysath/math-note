@@ -27,17 +27,6 @@ import { exportData, importData } from '../../lib/data-provider';
 import { toast } from 'sonner';
 import Search from '../Search';
 import { Upload, Download, Share2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
-
-const expirationOptions = [
-  { label: '30 分钟', value: 1800 },
-  { label: '1 小时', value: 3600 },
-  { label: '1 天', value: 86400 },
-  { label: '7 天', value: 604800 },
-  { label: '永久', value: 3153600000 }, // 100 year as "permanent"
-];
-
-type Unit = 'minutes' | 'hours' | 'days';
 
 const LeftSidebar = () => {
   const addBranch = useAppStore(state => state.addBranch);
@@ -47,14 +36,9 @@ const LeftSidebar = () => {
   const [isImportConfirmOpen, setIsImportConfirmOpen] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
-  const [isExpirationDialogOpen, setIsExpirationDialogOpen] = useState(false);
   const [shareUrl, setShareUrl] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const fileToImportRef = useRef<File | null>(null);
-
-  // State for custom expiration
-  const [customDuration, setCustomDuration] = useState<number | ''>('');
-  const [customUnit, setCustomUnit] = useState<Unit>('hours');
 
   const handleAddBranch = () => {
     if (newBranchTitle.trim()) {
@@ -81,13 +65,8 @@ const LeftSidebar = () => {
     }
   };
 
-  const handleShare = async (expirationInSeconds: number) => {
-    if (expirationInSeconds < 60) {
-      toast.warning('有效期最短为 1 分钟。');
-      return;
-    }
+  const handleShare = async () => {
     setIsSharing(true);
-    setIsExpirationDialogOpen(false); // Close the selection dialog
     try {
       const data = await exportData();
       const response = await fetch('/api/upload', {
@@ -95,7 +74,7 @@ const LeftSidebar = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ ...data, expirationInSeconds }),
+        body: JSON.stringify(data),
       });
 
       if (!response.ok) {
@@ -104,6 +83,7 @@ const LeftSidebar = () => {
       }
 
       const result = await response.json();
+      // Encode the URL in Base64 to make it cleaner
       const encodedUrl = btoa(result.url);
       const fullShareUrl = `${window.location.origin}?note_url=${encodedUrl}`;
       
@@ -116,26 +96,6 @@ const LeftSidebar = () => {
     } finally {
       setIsSharing(false);
     }
-  };
-
-  const handleCustomShare = () => {
-    if (typeof customDuration !== 'number' || customDuration <= 0) {
-      toast.warning('请输入一个有效的持续时间。');
-      return;
-    }
-    let seconds = 0;
-    switch (customUnit) {
-      case 'minutes':
-        seconds = customDuration * 60;
-        break;
-      case 'hours':
-        seconds = customDuration * 3600;
-        break;
-      case 'days':
-        seconds = customDuration * 86400;
-        break;
-    }
-    handleShare(seconds);
   };
 
   const handleImportClick = () => {
@@ -162,11 +122,12 @@ const LeftSidebar = () => {
           throw new Error('File content is not a string.');
         }
         const data = JSON.parse(text);
+        // Basic validation
         if (!data.nodes || !data.edges) {
           throw new Error('Invalid data format.');
         }
         await importData(data);
-        await fetchRootNodes();
+        await fetchRootNodes(); // Manually refetch root nodes to update the tree view
         toast.success('数据已成功导入。');
       } catch (error) {
         console.error('Failed to import data:', error);
@@ -190,7 +151,7 @@ const LeftSidebar = () => {
           <div className="flex items-center space-x-1">
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsExpirationDialogOpen(true)} disabled={isSharing}>
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleShare} disabled={isSharing}>
                   <Share2 className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
@@ -265,53 +226,6 @@ const LeftSidebar = () => {
             </DialogContent>
           </Dialog>
         </div>
-
-        {/* Expiration Selection Dialog */}
-        <Dialog open={isExpirationDialogOpen} onOpenChange={setIsExpirationDialogOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>选择分享有效期</DialogTitle>
-            </DialogHeader>
-            <div className="py-4 space-y-4">
-              <div className="flex justify-center flex-wrap gap-2">
-                {expirationOptions.map(option => (
-                  <Button key={option.value} onClick={() => handleShare(option.value)} disabled={isSharing}>
-                    {option.label}
-                  </Button>
-                ))}
-              </div>
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-background px-2 text-muted-foreground">
-                    或自定义
-                  </span>
-                </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Input
-                  type="number"
-                  placeholder="例如: 2"
-                  value={customDuration}
-                  onChange={(e) => setCustomDuration(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
-                  className="w-1/2"
-                />
-                <div className="flex items-center rounded-md border p-1">
-                  <Button variant="ghost" size="sm" onClick={() => setCustomUnit('minutes')} className={cn(customUnit === 'minutes' && 'bg-muted')}>分钟</Button>
-                  <Button variant="ghost" size="sm" onClick={() => setCustomUnit('hours')} className={cn(customUnit === 'hours' && 'bg-muted')}>小时</Button>
-                  <Button variant="ghost" size="sm" onClick={() => setCustomUnit('days')} className={cn(customUnit === 'days' && 'bg-muted')}>天</Button>
-                </div>
-              </div>
-               <Button onClick={handleCustomShare} disabled={isSharing} className="w-full">
-                确认并分享
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        {/* Share Link Dialog */}
         <Dialog open={isShareDialogOpen} onOpenChange={setIsShareDialogOpen}>
           <DialogContent>
             <DialogHeader>
@@ -335,7 +249,6 @@ const LeftSidebar = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-
         <AlertDialog open={isImportConfirmOpen} onOpenChange={setIsImportConfirmOpen}>
           <AlertDialogContent>
             <AlertDialogHeader>
