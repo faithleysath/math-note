@@ -164,16 +164,16 @@ function App() {
   return (
     <div className="h-screen w-screen bg-background text-foreground">
       <ResizablePanelGroup direction="horizontal">
-        <ResizablePanel defaultSize={20} minSize={15}>
+        <ResizablePanel defaultSize={20} minSize={15} order={1}>
           <LeftSidebar />
         </ResizablePanel>
         <ResizableHandle withHandle />
-        <ResizablePanel defaultSize={55} minSize={30} key={structureVersion}>
-          <MainContent />
+        <ResizablePanel defaultSize={25} minSize={15} order={3}>
+          <RightSidebar />
         </ResizablePanel>
         <ResizableHandle withHandle />
-        <ResizablePanel defaultSize={25} minSize={15}>
-          <RightSidebar />
+        <ResizablePanel defaultSize={55} minSize={30} key={structureVersion} order={2}>
+          <MainContent />
         </ResizablePanel>
       </ResizablePanelGroup>
       <Toaster />
