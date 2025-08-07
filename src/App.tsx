@@ -83,7 +83,7 @@ function App() {
 
   if (isMobile) {
     return (
-      <div className="h-screen w-screen bg-background text-foreground relative">
+      <div className="h-svh w-screen bg-background text-foreground relative">
         <div className={cn("h-full w-full", mobileView !== 'main' && "blur-sm")}>
           <MainContent />
         </div>
@@ -104,11 +104,19 @@ function App() {
 
         {/* Floating Action Buttons */}
         {mobileView === 'main' && (
-          <div className="absolute bottom-4 right-4 z-20 flex flex-col space-y-2">
-            <Button size="icon" onClick={() => setMobileView('left')}>
+          <div className="absolute bottom-4 right-4 z-20 flex flex-col space-y-4">
+            <Button 
+              size="icon" 
+              onClick={() => setMobileView('left')}
+              className="bg-background/50 backdrop-blur-sm border border-border/20 hover:bg-background/70 opacity-80 hover:opacity-100 transition-all"
+            >
               <PanelLeft />
             </Button>
-            <Button size="icon" onClick={() => setMobileView('right')}>
+            <Button 
+              size="icon" 
+              onClick={() => setMobileView('right')}
+              className="bg-background/50 backdrop-blur-sm border border-border/20 hover:bg-background/70 opacity-80 hover:opacity-100 transition-all"
+            >
               <PanelRight />
             </Button>
           </div>
