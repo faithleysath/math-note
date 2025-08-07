@@ -1,4 +1,4 @@
-import { useEffect } from "react"
+import { useEffect, useState, useRef } from "react"
 import {
   ResizableHandle,
   ResizablePanel,
@@ -34,8 +34,19 @@ function App() {
   const setMobileView = useAppStore(state => state.setMobileView);
   const { width } = useWindowSize();
   const isMobile = width <= 768;
+  const [showFabs, setShowFabs] = useState(false);
+  const fabTimer = useRef<NodeJS.Timeout | null>(null);
 
   useHotkeys();
+
+  useEffect(() => {
+    // Cleanup timer on component unmount
+    return () => {
+      if (fabTimer.current) {
+        clearTimeout(fabTimer.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const initializeApp = async () => {
@@ -81,9 +92,23 @@ function App() {
     return <NotFoundPage />;
   }
 
+  const handleTouchStart = () => {
+    if (!isMobile) return;
+    if (fabTimer.current) {
+      clearTimeout(fabTimer.current);
+    }
+    setShowFabs(true);
+    fabTimer.current = setTimeout(() => {
+      setShowFabs(false);
+    }, 3000); // Hide after 3 seconds
+  };
+
   if (isMobile) {
     return (
-      <div className="h-svh w-screen bg-background text-foreground relative">
+      <div 
+        className="h-svh w-screen bg-background text-foreground relative"
+        onTouchStart={handleTouchStart}
+      >
         <div className={cn("h-full w-full", mobileView !== 'main' && "blur-sm")}>
           <MainContent />
         </div>
@@ -103,9 +128,9 @@ function App() {
         )}
 
         {/* Floating Action Buttons */}
-        {mobileView === 'main' && (
+        {mobileView === 'main' && showFabs && (
           <>
-            <div className="absolute left-4 top-1/2 -translate-y-1/2 z-20">
+            <div className="absolute left-4 top-1/2 -translate-y-1/2 z-20 animate-in fade-in duration-300">
               <Button 
                 size="icon" 
                 onClick={() => setMobileView('left')}
@@ -114,7 +139,7 @@ function App() {
                 <PanelLeft />
               </Button>
             </div>
-            <div className="absolute right-4 top-1/2 -translate-y-1/2 z-20">
+            <div className="absolute right-4 top-1/2 -translate-y-1/2 z-20 animate-in fade-in duration-300">
               <Button 
                 size="icon" 
                 onClick={() => setMobileView('right')}
