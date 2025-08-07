@@ -59,8 +59,16 @@ export const useAppStore = create<AppState>((set, get) => ({
   fetchRootNodes: async () => {
     try {
       const nodes = await getNodesByParent(null);
-      // 只显示“分支”类型的节点作为根节点
-      set({ rootNodes: nodes.filter(node => node.type === '分支') });
+      const rootNodes = nodes.filter(node => node.type === '分支');
+      set({ rootNodes });
+
+      // If there are root nodes and no branch is currently expanded, select and expand the first one.
+      if (rootNodes.length > 0 && !get().expandedBranchId) {
+        const firstRootNode = rootNodes[0];
+        get().setExpandedBranchId(firstRootNode.id);
+        get().setSelectedNodeById(firstRootNode.id);
+      }
+
     } catch (error) {
       console.error("Failed to fetch root nodes:", error);
     }
@@ -183,6 +191,13 @@ export const useAppStore = create<AppState>((set, get) => ({
 
       get().triggerStructureRefresh();
       toast.success('只读笔记已加载。');
+
+      // Also select and expand the first root node for remote data, if nothing is expanded yet.
+      if (rootNodes.length > 0 && !get().expandedBranchId) {
+        const firstRootNode = rootNodes[0];
+        get().setExpandedBranchId(firstRootNode.id);
+        get().setSelectedNodeById(firstRootNode.id);
+      }
     } catch (error) {
       console.error('Failed to load remote data:', error);
       set({ isLoadingTree: false, loadError: true });
