@@ -108,14 +108,14 @@ function App() {
             <Button 
               size="icon" 
               onClick={() => setMobileView('left')}
-              className="bg-background/50 backdrop-blur-sm border border-border/20 hover:bg-background/70 opacity-80 hover:opacity-100 transition-all"
+              className="bg-background/60 text-foreground/90 backdrop-blur-sm border border-border/30 shadow-lg hover:bg-background/80 transition-colors"
             >
               <PanelLeft />
             </Button>
             <Button 
               size="icon" 
               onClick={() => setMobileView('right')}
-              className="bg-background/50 backdrop-blur-sm border border-border/20 hover:bg-background/70 opacity-80 hover:opacity-100 transition-all"
+              className="bg-background/60 text-foreground/90 backdrop-blur-sm border border-border/30 shadow-lg hover:bg-background/80 transition-colors"
             >
               <PanelRight />
             </Button>
