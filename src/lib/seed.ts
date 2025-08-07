@@ -192,6 +192,38 @@ async function seedDatabase() {
       description: '此概念将分析学中的“函数”与代数学中的“向量空间”联系起来。',
     });
 
+    // --- 演示逻辑关系 ---
+    const chapter2Id = await addNodeAndUpdateParent({
+      type: '主章节',
+      title: '极限与连续',
+      content: '本章介绍函数极限和连续性的概念。',
+      parentId: analysisBranchId,
+      children: [],
+    }, [chapter1Id]);
+
+    const continuityDefId = await addNodeAndUpdateParent({
+      type: '定义',
+      title: '函数连续性',
+      content: '函数 $f$ 在点 $x_0$ 连续，如果 $\\lim_{x \\to x_0} f(x) = f(x_0)$。',
+      parentId: chapter2Id,
+      children: [],
+    }, []);
+
+    const differentiabilityDefId = await addNodeAndUpdateParent({
+      type: '定义',
+      title: '函数可微性',
+      content: '函数 $f$ 在点 $x_0$ 可微，如果极限 $\\lim_{h \\to 0} \\frac{f(x_0+h) - f(x_0)}{h}$ 存在。',
+      parentId: chapter2Id,
+      children: [],
+    }, [continuityDefId]);
+
+    await addEdge({
+      source: differentiabilityDefId, // 可微性
+      target: continuityDefId,      // 连续性
+      label: '充分条件',
+      description: '一个函数在某点可微，则它在该点必然连续。反之不成立。',
+    });
+
 
     console.log('Database seeded successfully!');
   } catch (error) {

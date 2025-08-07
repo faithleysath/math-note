@@ -15,7 +15,8 @@ import { useAppStore } from '../stores/useAppStore';
 import Search from './Search';
 
 const allEdgeLabels: EdgeLabel[] = [
-  '是...的定义', '是...的定理', '引用', '依赖', '证明', '是...的例题', '是...的练习题', '是...的解法'
+  '是...的定义', '是...的定理', '引用', '依赖', '证明', '是...的例题', '是...的练习题', '是...的解法',
+  '充分条件', '必要条件', '充要条件'
 ];
 
 interface AddEdgeDialogProps {

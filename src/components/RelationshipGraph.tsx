@@ -30,16 +30,41 @@ const RelationshipGraph = ({ selectedNode, incoming, outgoing }: RelationshipGra
     graphDefinition += `  ${selectedNodeId}["<b>${selectedNode.title}</b>"];\n`;
     graphDefinition += `  style ${selectedNodeId} fill:#007bff,stroke:#333,stroke-width:2px,color:#fff;\n`;
 
+    const getLinkStyle = (label: string) => {
+      switch (label) {
+        case '充分条件':
+          return '==>';
+        case '充要条件':
+          return '<==>';
+        default:
+          return '-->';
+      }
+    };
+
     // Add incoming nodes and links
     incoming.forEach(({ edge, relatedNode }) => {
       const relatedNodeId = sanitizeId(relatedNode.id);
-      graphDefinition += `  ${relatedNodeId}["${relatedNode.title}"] -->|"${edge.label}"| ${selectedNodeId};\n`;
+      if (edge.label === '必要条件') {
+        // A is necessary for B (B => A), so draw arrow from selected to related
+        const link = getLinkStyle('充分条件'); // B is sufficient for A
+        graphDefinition += `  ${selectedNodeId} ${link}|"必要条件"| ${relatedNodeId}["${relatedNode.title}"];\n`;
+      } else {
+        const link = getLinkStyle(edge.label);
+        graphDefinition += `  ${relatedNodeId}["${relatedNode.title}"] ${link}|"${edge.label}"| ${selectedNodeId};\n`;
+      }
     });
 
     // Add outgoing nodes and links
     outgoing.forEach(({ edge, relatedNode }) => {
       const relatedNodeId = sanitizeId(relatedNode.id);
-      graphDefinition += `  ${selectedNodeId} -->|"${edge.label}"| ${relatedNodeId}["${relatedNode.title}"];\n`;
+      if (edge.label === '必要条件') {
+        // B is necessary for A (A => B), so draw arrow from related to selected
+        const link = getLinkStyle('充分条件'); // A is sufficient for B
+        graphDefinition += `  ${relatedNodeId}["${relatedNode.title}"] ${link}|"必要条件"| ${selectedNodeId};\n`;
+      } else {
+        const link = getLinkStyle(edge.label);
+        graphDefinition += `  ${selectedNodeId} ${link}|"${edge.label}"| ${relatedNodeId}["${relatedNode.title}"];\n`;
+      }
     });
 
     const renderGraph = async () => {
