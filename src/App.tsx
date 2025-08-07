@@ -100,7 +100,7 @@ function App() {
     setShowFabs(true);
     fabTimer.current = setTimeout(() => {
       setShowFabs(false);
-    }, 3000); // Hide after 3 seconds
+    }, 1500); // Hide after 1.5 seconds
   };
 
   if (isMobile) {
@@ -130,7 +130,7 @@ function App() {
         {/* Floating Action Buttons */}
         {mobileView === 'main' && showFabs && (
           <>
-            <div className="absolute left-4 top-1/2 -translate-y-1/2 z-20 animate-in fade-in duration-300">
+            <div className="absolute left-4 top-1/2 -translate-y-1/2 z-20 animate-in fade-in duration-300 animate-out fade-out duration-300">
               <Button 
                 size="icon" 
                 onClick={() => setMobileView('left')}
@@ -139,7 +139,7 @@ function App() {
                 <PanelLeft />
               </Button>
             </div>
-            <div className="absolute right-4 top-1/2 -translate-y-1/2 z-20 animate-in fade-in duration-300">
+            <div className="absolute right-4 top-1/2 -translate-y-1/2 z-20 animate-in fade-in duration-300 animate-out fade-out duration-300">
               <Button 
                 size="icon" 
                 onClick={() => setMobileView('right')}
