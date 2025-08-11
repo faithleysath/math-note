@@ -118,3 +118,11 @@
     @apply bg-background text-foreground;
   }
 }
+
+.wmde-markdown ul {
+  list-style: disc outside none; /* 无序列表显示原点 */
+}
+
+.wmde-markdown ol {
+  list-style: decimal outside none; /* 有序列表显示数字编号 */
+}
