@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { toast } from 'sonner';
-import type { Node, Edge } from '../lib/types';
-import { getNode, getNodesByParent, addNode, updateNode, getAncestors } from '../lib/data-provider';
+import type { Node, Edge, AiOperation, AddNodePayload, UpdateNodePayload, DeleteNodePayload, AddEdgePayload, DeleteEdgePayload, SelectNodePayload } from '../lib/types';
+import * as db from '../lib/data-provider';
 import { getNodesByParent as getRemoteNodesByParent } from '../lib/remoteDb';
 
 interface RemoteData {
@@ -40,6 +40,7 @@ interface AppState {
     insertAfterNodeId: string | null
   ) => Promise<void>;
   loadRemoteData: (url: string) => Promise<void>;
+  executeAiOperation: (operation: AiOperation) => Promise<{ success: boolean; message?: string }>;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -58,7 +59,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   mobileView: 'main',
   fetchRootNodes: async () => {
     try {
-      const nodes = await getNodesByParent(null);
+      const nodes = await db.getNodesByParent(null);
       const rootNodes = nodes.filter(node => node.type === '分支');
       set({ rootNodes });
 
@@ -75,7 +76,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   addBranch: async (title: string) => {
     try {
-      await addNode({
+      await db.addNode({
         title,
         type: '分支',
         content: '',
@@ -96,9 +97,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       return;
     }
     try {
-      const node = await getNode(id);
+      const node = await db.getNode(id);
       if (node) {
-        const ancestors = await getAncestors(node.id);
+        const ancestors = await db.getAncestors(node.id);
         const ancestorIds = new Set(ancestors.map(a => a.id));
         set({ selectedNode: node, expandedNodeIds: ancestorIds });
       } else {
@@ -133,7 +134,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   addNewNode: async (nodeData, parent, insertAfterNodeId) => {
     try {
-      const newNodeId = await addNode(nodeData);
+      const newNodeId = await db.addNode(nodeData);
 
       let newChildren: string[];
       if (insertAfterNodeId) {
@@ -148,7 +149,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       } else {
         newChildren = [...parent.children, newNodeId];
       }
-      await updateNode(parent.id, { children: newChildren });
+      await db.updateNode(parent.id, { children: newChildren });
 
       toast.success(`节点 "${nodeData.title}" 已成功添加。`);
       get().triggerStructureRefresh();
@@ -203,4 +204,77 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ isLoadingTree: false, loadError: true });
     }
   },
+  executeAiOperation: async (operation: AiOperation) => {
+    const { type, payload } = operation;
+    const { triggerStructureRefresh, triggerContentRefresh, triggerEdgeRefresh, setSelectedNodeById, addNewNode } = get();
+  
+    try {
+      switch (type) {
+        case 'add_node': {
+          const { nodeData, parentId, insertAfterNodeId } = payload as AddNodePayload;
+          const parentNode = await db.getNode(parentId);
+          if (!parentNode) {
+            throw new Error(`Parent node with id ${parentId} not found.`);
+          }
+          await addNewNode(nodeData, parentNode, insertAfterNodeId || null);
+          toast.success(`Node "${nodeData.title}" added successfully.`);
+          break;
+        }
+  
+        case 'update_node': {
+          const { nodeId, updates } = payload as UpdateNodePayload;
+          await db.updateNode(nodeId, updates);
+          triggerContentRefresh();
+          triggerStructureRefresh(); // In case title or other structural info changes
+          toast.success(`Node ${nodeId} updated successfully.`);
+          break;
+        }
+  
+        case 'delete_node': {
+          const { nodeId } = payload as DeleteNodePayload;
+          await db.deleteNode(nodeId);
+          triggerStructureRefresh();
+          toast.success(`Node ${nodeId} deleted successfully.`);
+          break;
+        }
+  
+        case 'add_edge': {
+          const { edgeData } = payload as AddEdgePayload;
+          await db.addEdge(edgeData);
+          triggerEdgeRefresh();
+          toast.success(`Edge created successfully.`);
+          break;
+        }
+  
+        case 'delete_edge': {
+          const { edgeId } = payload as DeleteEdgePayload;
+          await db.deleteEdge(edgeId);
+          triggerEdgeRefresh();
+          toast.success(`Edge ${edgeId} deleted successfully.`);
+          break;
+        }
+        
+        case 'select_node': {
+          const { nodeId } = payload as SelectNodePayload;
+          await setSelectedNodeById(nodeId);
+          toast.success(`Node ${nodeId} selected.`);
+          break;
+        }
+  
+        default: {
+          // This should not happen with TypeScript checking, but it's good practice
+          // to handle unexpected cases.
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const _exhaustiveCheck: never = type;
+          throw new Error(`Unsupported operation type: ${type}`);
+        }
+      }
+      return { success: true };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'An unknown error occurred.';
+      console.error(`Failed to execute AI operation:`, error);
+      toast.error(message);
+      return { success: false, message };
+    }
+  }
 }));

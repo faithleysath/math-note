@@ -28,6 +28,8 @@ import { toast } from 'sonner';
 import Search from '../Search';
 import { Upload, Download, Share2, X } from 'lucide-react';
 import { useWindowSize } from '@/hooks/useWindowSize';
+import { AiConfigSheet } from '../AiConfigSheet';
+import { AiHandwritingDialog } from '../AiHandwritingDialog';
 
 const LeftSidebar = () => {
   const setMobileView = useAppStore(state => state.setMobileView);
@@ -199,6 +201,10 @@ const LeftSidebar = () => {
         </div>
         <div className="mb-4">
           <Search />
+        </div>
+        <div className="flex items-center justify-between mb-4">
+          <AiHandwritingDialog />
+          <AiConfigSheet />
         </div>
         <div className="flex-grow overflow-y-auto min-h-0">
           <TreeView />

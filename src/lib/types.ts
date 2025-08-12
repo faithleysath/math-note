@@ -92,3 +92,58 @@ export interface Edge {
  * A processed node, with additional properties for display purposes.
  */
 export type ProcessedNode = Node & { displayNumber: string; isChapter: boolean };
+
+// --- AI Control Types ---
+
+/**
+ * Defines the structure for a single operation to be performed.
+ */
+export interface AiOperation {
+  type: 'add_node' | 'update_node' | 'delete_node' | 'add_edge' | 'delete_edge' | 'select_node';
+  payload: AddNodePayload | UpdateNodePayload | DeleteNodePayload | AddEdgePayload | DeleteEdgePayload | SelectNodePayload;
+}
+
+/**
+ * Defines the payload for adding a new node.
+ */
+export interface AddNodePayload {
+  nodeData: Omit<Node, 'id' | 'createdAt' | 'updatedAt'>;
+  parentId: string; // ID of the parent node
+  insertAfterNodeId?: string | null; // Optional: ID of the sibling node to insert after
+}
+
+/**
+ * Defines the payload for updating an existing node.
+ */
+export interface UpdateNodePayload {
+  nodeId: string;
+  updates: Partial<Omit<Node, 'id' | 'createdAt' | 'updatedAt'>>;
+}
+
+/**
+ * Defines the payload for deleting a node.
+ */
+export interface DeleteNodePayload {
+  nodeId: string;
+}
+
+/**
+ * Defines the payload for adding a new edge.
+ */
+export interface AddEdgePayload {
+  edgeData: Omit<Edge, 'id'>;
+}
+
+/**
+ * Defines the payload for deleting an edge.
+ */
+export interface DeleteEdgePayload {
+  edgeId: string;
+}
+
+/**
+ * Defines the payload for selecting a node.
+ */
+export interface SelectNodePayload {
+  nodeId: string;
+}
