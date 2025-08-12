@@ -8,7 +8,7 @@ import {
   DialogTrigger,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Button } from "./ui/button";
+import { Button } from "@/components/ui/button";
 import { useAppStore } from "@/stores/useAppStore";
 import { processHandwritingImage } from "@/lib/ai-service";
 import { toast } from "sonner";
@@ -86,16 +86,16 @@ export function AiHandwritingDialog() {
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline">
+        <Button variant="customBlue" className="w-full">
           <Upload className="mr-2 h-4 w-4" />
-          Process Handwriting
+          处理手写笔记
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[480px]">
         <DialogHeader>
-          <DialogTitle>Process Handwritten Note</DialogTitle>
+          <DialogTitle>处理手写笔记</DialogTitle>
           <DialogDescription>
-            Upload an image of your handwritten note. The AI will transcribe and structure it for you.
+            上传您的手写笔记图片，AI 将会为您转录并整理。
           </DialogDescription>
         </DialogHeader>
         <div className="py-4">
@@ -130,10 +130,10 @@ export function AiHandwritingDialog() {
               <div className="text-center">
                 <Upload className="mx-auto h-12 w-12 text-muted-foreground" />
                 <p className="mt-2 text-sm text-muted-foreground">
-                  Click to upload or drag and drop
+                  点击或拖拽以上传图片
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  PNG, JPG, or WEBP
+                  支持 PNG, JPG, 或 WEBP 格式
                 </p>
               </div>
             )}
@@ -141,7 +141,7 @@ export function AiHandwritingDialog() {
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={resetState} disabled={isProcessing}>
-            Cancel
+            取消
           </Button>
           <Button onClick={handleProcess} disabled={!file || isProcessing}>
             {isProcessing ? (
@@ -149,7 +149,7 @@ export function AiHandwritingDialog() {
             ) : (
               <CheckCircle className="mr-2 h-4 w-4" />
             )}
-            Process Note
+            开始处理
           </Button>
         </DialogFooter>
       </DialogContent>

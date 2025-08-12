@@ -26,9 +26,9 @@ import { useAppStore } from '../../stores/useAppStore';
 import { exportData, importData } from '../../lib/data-provider';
 import { toast } from 'sonner';
 import Search from '../Search';
-import { Upload, Download, Share2, X } from 'lucide-react';
+import { Upload, Download, Share2, X, Plus } from 'lucide-react';
 import { useWindowSize } from '@/hooks/useWindowSize';
-import { AiConfigSheet } from '../AiConfigSheet';
+import { AiConfigDialog } from '../AiConfigDialog';
 import { AiHandwritingDialog } from '../AiHandwritingDialog';
 
 const LeftSidebar = () => {
@@ -172,6 +172,14 @@ const LeftSidebar = () => {
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
+                <AiConfigDialog />
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>AI 设置</p>
+              </TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleImportClick}>
                   <Upload className="h-4 w-4" />
                 </Button>
@@ -202,17 +210,17 @@ const LeftSidebar = () => {
         <div className="mb-4">
           <Search />
         </div>
-        <div className="flex items-center justify-between mb-4">
-          <AiHandwritingDialog />
-          <AiConfigSheet />
-        </div>
         <div className="flex-grow overflow-y-auto min-h-0">
           <TreeView />
         </div>
         <div className="mt-4 flex-shrink-0">
+          <div className="mb-2">
+            <AiHandwritingDialog />
+          </div>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button className="w-full">
+                <Plus className="mr-2 h-4 w-4" />
                 添加分支
               </Button>
             </DialogTrigger>
