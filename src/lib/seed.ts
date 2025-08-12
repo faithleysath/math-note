@@ -1,18 +1,302 @@
-import { db, addNode, addEdge } from './db';
-import type { Node } from './types';
+import { db, importData } from './db';
+import type { Node, Edge } from './types';
 
-// 一个辅助函数，用于减少重复的父子关系更新代码
-async function addNodeAndUpdateParent(
-  nodeData: Omit<Node, 'id' | 'createdAt' | 'updatedAt'>,
-  parentChildren: string[]
-): Promise<string> {
-  const nodeId = await addNode(nodeData);
-  if (nodeData.parentId) {
-    await db.nodes.update(nodeData.parentId, { children: [...parentChildren, nodeId] });
-  }
-  return nodeId;
-}
-
+const data: { nodes: Node[]; edges: Edge[] } = {
+  "nodes": [
+    {
+      "id": "0223306b-fc82-4411-9240-2f308cbc97be",
+      "title": "初等函数",
+      "type": "笔记",
+      "content": "### 基本初等函数\n- 常数函数：$y=c$\n- 幂函数：$y=x^\\alpha(\\alpha\\in\\mathbf R)$\n- 指数函数：$y=a^x(a>0\\;\\text{且}\\;a\\neq1)$\n- 对数函数：$y=\\log_ax(a>0\\;\\text{且}\\;a\\neq1)$\n- 三角函数：如 $y=\\sin x,\\;y=\\cos x,\\; y=\\tan x,\\;y=\\cot x$ 等\n- 反三角函数：如 $y=\\arcsin x,\\;y=\\arccos x,\\;y=\\arctan x$等\n\n这 $6$ 类函数统称为**基本初等函数**.\n\n### 初等函数\n由基本初等函数经过有限次四则运算与复合运算产生的函数称为**初等函数.**",
+      "parentId": "2524c490-4e2d-4866-aa37-d33a2e716d29",
+      "children": [],
+      "createdAt": 1754876218782,
+      "updatedAt": 1754879099375,
+      "solution": "",
+      "tags": [],
+      "source": ""
+    },
+    {
+      "id": "1af81caa-20df-4374-b670-99e0cc19292f",
+      "title": "幂集",
+      "type": "定义",
+      "content": "设 $A$ 是一个集合，由 $A$ 的所有子集所组成的集合，称为 $A$ 的**幂集**，记作 $\\mathcal{P}(A)$ 或 $2^A$，$\\mathcal{P}(A)=\\{S \\mid S\\subseteq A\\}$.",
+      "parentId": "f2f85bb7-8e54-48bf-b860-a660089e25c2",
+      "children": [],
+      "createdAt": 1754872517088,
+      "updatedAt": 1754872798522,
+      "solution": "",
+      "tags": [],
+      "source": ""
+    },
+    {
+      "id": "2524c490-4e2d-4866-aa37-d33a2e716d29",
+      "title": "映射与函数",
+      "type": "子章节",
+      "content": "映射是两个集合之间的一种对应关系.",
+      "parentId": "bb29507c-18d4-4d8e-bf93-35d25f323e6c",
+      "children": [
+        "77b37a7c-b8da-41e0-a330-118de827fbef",
+        "98705c80-f543-4839-8ab9-707dda389dad",
+        "e42f3698-f5a6-41a2-82d1-d56f5a2fcd70",
+        "0223306b-fc82-4411-9240-2f308cbc97be",
+        "ed9e6c24-71fa-4f4c-be89-ea39ae45817f"
+      ],
+      "createdAt": 1754874554352,
+      "updatedAt": 1754878298107,
+      "solution": "",
+      "tags": [],
+      "source": ""
+    },
+    {
+      "id": "2627195f-b6ee-4d09-b53f-2512c26165af",
+      "title": "集合的差",
+      "type": "定义",
+      "content": "$S\\ \\backslash\\  T=\\{x \\mid x\\in S \\; \\text{并且}\\; x\\not\\in T\\}$.",
+      "parentId": "f2f85bb7-8e54-48bf-b860-a660089e25c2",
+      "children": [],
+      "createdAt": 1754874396302,
+      "updatedAt": 1754879044743,
+      "solution": "",
+      "tags": [],
+      "source": ""
+    },
+    {
+      "id": "2f2c5812-0fdf-4605-87f5-6e776677b892",
+      "title": "自然数集N",
+      "type": "定义",
+      "content": "$\\mathbf{N}=\\{0,1,2,\\cdots,n,\\cdots\\}$",
+      "parentId": "f2f85bb7-8e54-48bf-b860-a660089e25c2",
+      "children": [],
+      "createdAt": 1754533314563,
+      "updatedAt": 1754533359898,
+      "solution": "",
+      "tags": [
+        "集合",
+        "常用集合"
+      ],
+      "source": ""
+    },
+    {
+      "id": "654ae395-22c0-4872-972d-ec0e9ca79e3b",
+      "title": "子集",
+      "type": "定义",
+      "content": "设 $S$ , $T$ 是两个集合，如果$S$的所有元素都属于$T$，即\n$$\nx\\in S \\implies x\\in T\n$$\n&emsp;&emsp;则称 $S$ 是 $T $ 的**子集**，记为 $S\\subseteq T$，若 $S\\neq T$，则 $S\\subset T$，$S$ 是 $T$ 的**真子集**.",
+      "parentId": "f2f85bb7-8e54-48bf-b860-a660089e25c2",
+      "children": [],
+      "createdAt": 1754787218937,
+      "updatedAt": 1754872302052,
+      "solution": "",
+      "tags": [],
+      "source": ""
+    },
+    {
+      "id": "75ec5f9f-7533-4fc7-8d34-c96cdeadd796",
+      "title": "集合相等",
+      "type": "定理",
+      "content": "$S=T \\iff S\\subseteq T\\;\\;\\text{并且}\\;\\;T\\subseteq S$",
+      "parentId": "f2f85bb7-8e54-48bf-b860-a660089e25c2",
+      "children": [],
+      "createdAt": 1754873144044,
+      "updatedAt": 1754879001521,
+      "solution": "",
+      "tags": [],
+      "source": ""
+    },
+    {
+      "id": "77b37a7c-b8da-41e0-a330-118de827fbef",
+      "title": "映射",
+      "type": "定义",
+      "content": "设 $X,Y$ 是两个给定的集合，若按照某种规则 $f$ ，使得对集合 $X$ 中对每一个元素 $x$，都可以找到集合 $Y$ 中唯一确定的元素 $y$ 与之对应，则称这个对应规则 $f$ 是集合 $X$ 到集合 $Y$ 的一个**映射** ，记为\n$$\nf:X\\to Y.\n$$\n其中 $y$ 称为在映射 $f$ 之下 $x$ 的**像**，$x$ 称为在映射 $f$ 之下 $y$ 的一个**逆像**（也称为**原像**）. 集合 $X$ 称为映射 $f$ 的**定义域**，记为 $D_f$. 而在映射 $f$ 之下，$X$ 中元素 $x$ 的像 $y$ 的全体称为映射 $f$ 的**值域**，记为 $R_f$，即\n$$\nR_f = \\{y \\mid y\\in Y \\;\\text{并且}\\;y=f(x),\\; x\\in X\\}.\n$$",
+      "parentId": "2524c490-4e2d-4866-aa37-d33a2e716d29",
+      "children": [],
+      "createdAt": 1754874668705,
+      "updatedAt": 1754879069475,
+      "solution": "",
+      "tags": [],
+      "source": ""
+    },
+    {
+      "id": "80a13fb9-a74d-4966-a0b3-47bf5cac2855",
+      "title": "不是子集",
+      "type": "定义",
+      "content": "如果 $S$ 中至少存在一个元素 $x$ 不属于 $T$，即 $x\\in S$ 但 $x\\not\\in T$，那么 $S$ 不是 $T$ 的子集，记为 $S\\not \\subset T$.",
+      "parentId": "f2f85bb7-8e54-48bf-b860-a660089e25c2",
+      "children": [],
+      "createdAt": 1754872117368,
+      "updatedAt": 1754872222435,
+      "solution": "",
+      "tags": [],
+      "source": ""
+    },
+    {
+      "id": "98705c80-f543-4839-8ab9-707dda389dad",
+      "title": "映射的类型",
+      "type": "定义",
+      "content": "设 $f$ 是集合 $X$ 到集合 $Y$ 的一个映射，若 $f$ 的逆像也具有唯一性，即对 $X$ 中的任意两个不同元素 $x_1\\neq x_2$，它们的像 $y_1$ 与 $y_2$ 也满足 $y_1\\neq y_2$，则称 $f$ 为**单射**；如果映射 $f$ 满足 $R_f=Y$，则称 $f$ 为**满射**；如果映射 $f$ 既是单射，又是满射，则称 $f$ 是**双射**（又称**一一对应**）.",
+      "parentId": "2524c490-4e2d-4866-aa37-d33a2e716d29",
+      "children": [],
+      "createdAt": 1754875426774,
+      "updatedAt": 1754875766562,
+      "solution": "",
+      "tags": [
+        "单射",
+        "满射",
+        "双射",
+        "一一对应"
+      ],
+      "source": ""
+    },
+    {
+      "id": "9a885d97-abbe-48c9-87c7-a168b5b821d7",
+      "title": "幂集元素的数量",
+      "type": "定理",
+      "content": "由 $n$ 个元素组成的集合 $T$ 共有 $2^n$ 个子集.",
+      "parentId": "f2f85bb7-8e54-48bf-b860-a660089e25c2",
+      "children": [],
+      "createdAt": 1754872900173,
+      "updatedAt": 1754873095525,
+      "solution": "数学归纳法。或从 “每个元素是否被选入子集” 的角度分析。",
+      "tags": [
+        "幂集"
+      ],
+      "source": ""
+    },
+    {
+      "id": "ab892ec6-3a97-44bf-ab4a-d6f9ecde3849",
+      "title": "有理数集Q",
+      "type": "定义",
+      "content": "$\\mathbf{Q}=\\left\\{x\\left | x=\\dfrac qp,\\;\\text{其中}\\;p\\in\\mathbf{N}^+\\ \\text{并且}\\;q\\in\\mathbf{Z}\\right.\\right\\}$",
+      "parentId": "f2f85bb7-8e54-48bf-b860-a660089e25c2",
+      "children": [],
+      "createdAt": 1754532809494,
+      "updatedAt": 1754878965515,
+      "solution": "",
+      "tags": [
+        "集合",
+        "常用集合"
+      ],
+      "source": ""
+    },
+    {
+      "id": "b11529fc-0dfe-44fd-a8c5-7518a39ec398",
+      "title": "数学分析",
+      "type": "分支",
+      "content": "",
+      "parentId": null,
+      "children": [
+        "bb29507c-18d4-4d8e-bf93-35d25f323e6c"
+      ],
+      "createdAt": 1754531884240,
+      "updatedAt": 1754531905774
+    },
+    {
+      "id": "b9323d88-d258-45f2-9a9c-a667fa50a1f6",
+      "title": "集合的并",
+      "type": "定义",
+      "content": "$S\\cup T=\\{x \\mid x\\in S \\; \\text{或者} \\; x\\in T\\}$.",
+      "parentId": "f2f85bb7-8e54-48bf-b860-a660089e25c2",
+      "children": [],
+      "createdAt": 1754873639879,
+      "updatedAt": 1754879026861,
+      "solution": "",
+      "tags": [],
+      "source": ""
+    },
+    {
+      "id": "b9447785-e355-48e8-982a-3e37c7ae7af4",
+      "title": "集合的交",
+      "type": "定义",
+      "content": "$S\\cap T=\\{x \\mid x\\in S\\;\\text{并且}\\;x\\in T\\}$.",
+      "parentId": "f2f85bb7-8e54-48bf-b860-a660089e25c2",
+      "children": [],
+      "createdAt": 1754873744912,
+      "updatedAt": 1754879035460,
+      "solution": "",
+      "tags": [],
+      "source": ""
+    },
+    {
+      "id": "bb29507c-18d4-4d8e-bf93-35d25f323e6c",
+      "title": "集合与映射",
+      "type": "主章节",
+      "content": "集合与映射奠定了实数系的基础",
+      "parentId": "b11529fc-0dfe-44fd-a8c5-7518a39ec398",
+      "children": [
+        "4527aac5-ded5-41b0-ab8f-6771ba96a677",
+        "f2f85bb7-8e54-48bf-b860-a660089e25c2",
+        "2524c490-4e2d-4866-aa37-d33a2e716d29"
+      ],
+      "createdAt": 1754531905771,
+      "updatedAt": 1754874554356,
+      "solution": "",
+      "tags": [
+        "集合",
+        "映射",
+        "实数系"
+      ],
+      "source": "数学分析 第三版 陈纪修"
+    },
+    {
+      "id": "e42f3698-f5a6-41a2-82d1-d56f5a2fcd70",
+      "title": "一元实函数",
+      "type": "定义",
+      "content": "若将映射特殊地取集合 $X\\subseteq \\mathbf{R}$，集合 $Y=\\mathbf{R}$，则映射称为**一元实函数**，简称**函数**.",
+      "parentId": "2524c490-4e2d-4866-aa37-d33a2e716d29",
+      "children": [],
+      "createdAt": 1754875881062,
+      "updatedAt": 1754876020447,
+      "solution": "",
+      "tags": [
+        "函数",
+        "一元实函数"
+      ],
+      "source": ""
+    },
+    {
+      "id": "f2f85bb7-8e54-48bf-b860-a660089e25c2",
+      "title": "集合",
+      "type": "子章节",
+      "content": "具有某种特定性质的具体的或抽象的对象汇集成的总体",
+      "parentId": "bb29507c-18d4-4d8e-bf93-35d25f323e6c",
+      "children": [
+        "ab892ec6-3a97-44bf-ab4a-d6f9ecde3849",
+        "955f3e2b-203a-46c6-b887-c4032fbed42b",
+        "2f2c5812-0fdf-4605-87f5-6e776677b892",
+        "654ae395-22c0-4872-972d-ec0e9ca79e3b",
+        "80a13fb9-a74d-4966-a0b3-47bf5cac2855",
+        "1af81caa-20df-4374-b670-99e0cc19292f",
+        "9a885d97-abbe-48c9-87c7-a168b5b821d7",
+        "75ec5f9f-7533-4fc7-8d34-c96cdeadd796",
+        "b9323d88-d258-45f2-9a9c-a667fa50a1f6",
+        "b9447785-e355-48e8-982a-3e37c7ae7af4",
+        "2627195f-b6ee-4d09-b53f-2512c26165af",
+        "1a8002ac-5ee0-49a2-9352-f6db9f5d52bb"
+      ],
+      "createdAt": 1754532600759,
+      "updatedAt": 1754874396306,
+      "solution": "",
+      "tags": [
+        "集合"
+      ],
+      "source": "数学分析 第三版 陈纪修"
+    }
+  ],
+  "edges": [
+    {
+      "id": "c66958e2-f49e-4d50-b484-9e9913c881ab",
+      "source": "e42f3698-f5a6-41a2-82d1-d56f5a2fcd70",
+      "target": "77b37a7c-b8da-41e0-a330-118de827fbef",
+      "label": "依赖"
+    },
+    {
+      "id": "f13803b7-cbaa-4697-bfbd-2e037e36bc3f",
+      "source": "98705c80-f543-4839-8ab9-707dda389dad",
+      "target": "f2f85bb7-8e54-48bf-b860-a660089e25c2",
+      "label": "依赖"
+    }
+  ]
+};
 
 async function seedDatabase() {
   const count = await db.nodes.count();
@@ -24,207 +308,7 @@ async function seedDatabase() {
   console.log('Seeding database...');
 
   try {
-    // =================================================================
-    // --- 分支 1: 数学分析 ---
-    // =================================================================
-    const analysisBranchId = await addNode({
-      type: '分支',
-      title: '数学分析',
-      content: '研究极限及相关理论，如微分、积分、测度、无穷级数和解析函数。',
-      parentId: null,
-      children: [],
-      tags: ['核心数学'],
-    });
-
-    // --- 主章节 1.1: 集合与映射 ---
-    const chapter1Id = await addNodeAndUpdateParent({
-      type: '主章节',
-      title: '集合与映射',
-      content: '本章介绍集合与映射的基本概念，它们是构建整个数学分析大厦的基础。',
-      parentId: analysisBranchId,
-      children: [],
-    }, []); // analysisBranch 还没有子节点，所以是空数组
-
-    // --- 子章节 1.1.1: 集合 ---
-    const minorChapter1_1Id = await addNodeAndUpdateParent({
-      type: '子章节',
-      title: '集合',
-      content: '集合的基本概念、运算和性质。',
-      parentId: chapter1Id,
-      children: [],
-    }, []);
-
-    // --- 子章节 1.1.1 下的内容 ---
-    const definition1Id = await addNodeAndUpdateParent({
-      type: '定义',
-      title: '集合的定义',
-      content: '集合是明确定义的不同对象的集合，其本身被视为一个对象。元素具有无序性和互异性。',
-      parentId: minorChapter1_1Id,
-      children: [],
-      tags: ['基础概念', '集合论'],
-      aliases: ['Set'],
-      source: '《陶哲轩实分析》第一章',
-    }, []);
-
-    const theorem1Id = await addNodeAndUpdateParent({
-      type: '定理',
-      title: '德摩根定律',
-      content: `对于任意两个集合$A$ 和 $B$，有以下等式：\n$$\n(A \\cup B)' = A' \\cap B'\n$$\n$$\n(A \\cap B)' = A' \\cup B'\n$$`,
-      solution: `**证** &emsp;1. 对于任意元素 $x$，如果 $x \\in (A \\cup B)'$，则 $x \\notin A \\cup B$，即 $x \\notin A$ 且 $x \\notin B$，因此 $x \\in A'$ 且 $x \\in B'$，所以 $x \\in A' \\cap B'$。\n2. 类似地，对于 $(A \\cap B)'$ 的证明。`,
-      parentId: minorChapter1_1Id,
-      children: [],
-      tags: ['集合论', '逻辑'],
-    }, [definition1Id]);
-
-    const example1Id = await addNodeAndUpdateParent({
-      type: '例题',
-      title: '德摩根定律应用',
-      content: `设 $A = \\{1, 2, 3\\}$ 和 $B = \\{2, 3, 4\\}$，求 $(A \\cup B)'$ 和 $(A \\cap B)'$ 的结果。`,
-      solution: `**解** &emsp;$A \\cup B = \\{1, 2, 3, 4\\}$，因此 $(A \\cup B)' = \\{\\text{所有不在 } A \\cup B 的元素\\}$。\n$A \\cap B = \\{2, 3\\}$，因此 $(A \\cap B)' = \\{\\text{所有不在 } A \\cap B 的元素\\}$。`,
-      parentId: theorem1Id, // 作为定理的例题
-      children: [],
-    }, []);
-
-    const note1Id = await addNodeAndUpdateParent({
-        type: '笔记',
-        title: '关于德摩根定律的思考',
-        content: '德摩根定律不仅在集合论中重要，它在布尔代数和数字电路设计中也有完全相同的形式，是逻辑否定的基本规则。',
-        parentId: theorem1Id, // 挂载到定理下
-        children: [],
-    }, [example1Id]);
-
-    // --- 在子章节末尾创建“习题”笔记 ---
-    const exercisesNoteId = await addNodeAndUpdateParent({
-      type: '笔记',
-      title: '习题',
-      content: '本章节相关练习题。',
-      parentId: minorChapter1_1Id,
-      children: [],
-    }, [definition1Id, theorem1Id]);
-
-    // --- 将练习题挂载到“习题”笔记下 ---
-    const exercise1Id = await addNodeAndUpdateParent({
-        type: '练习',
-        title: '幂集大小',
-        content: '一个有 n 个元素的有限集合，其幂集（所有子集构成的集合）有多少个元素？',
-        solution: '$$2^n$$。因为对于每个元素，我们都可以选择“包含”或“不包含”在子集中，两种选择，总共有 n 个元素，因此是 2 的 n 次方。',
-        parentId: exercisesNoteId, // 挂载到“习题”笔记下
-        children: [],
-    }, []);
-
-    const solutionRecord1Id = await addNodeAndUpdateParent({
-        type: '解题记录',
-        title: '我对“幂集大小”的解法',
-        content: '我的初步想法是 n*n，因为感觉是两两组合。但这个思路很快就发现不对。',
-        solution: '后来参考了答案，理解了每个元素都有“在”或“不在”子集中这两种状态，所以是 2^n。这个思路非常巧妙，需要记住。',
-        parentId: example1Id, // 挂载到例题下
-        children: [],
-    }, []);
-
-    // =================================================================
-    // --- 分支 2: 线性代数 ---
-    // =================================================================
-    const linalgBranchId = await addNode({
-      type: '分支',
-      title: '线性代数',
-      content: '研究向量空间、线性变换和有限维线性方程组。',
-      parentId: null,
-      children: [],
-      tags: ['核心数学', '代数'],
-    });
-
-    const linalgChapter1Id = await addNodeAndUpdateParent({
-      type: '主章节',
-      title: '向量空间',
-      content: '向量空间的定义、子空间、基与维数。',
-      parentId: linalgBranchId,
-      children: [],
-    }, []);
-
-    const vectorSpaceDefId = await addNodeAndUpdateParent({
-      type: '定义',
-      title: '向量空间',
-      content: '一个向量空间（或线性空间）是一个由称为向量的元素组成的集合，其中定义了两种运算：向量加法和标量乘法，并满足八条公理。',
-      parentId: linalgChapter1Id,
-      children: [],
-      tags: ['核心概念', '抽象代数'],
-      source: '《Linear Algebra Done Right》 by Sheldon Axler',
-    }, []);
-
-    // =================================================================
-    // --- 建立边（Edges），构建知识图谱 ---
-    // =================================================================
-    console.log('Adding edges...');
-
-    // 德摩根定律“引用”了集合的定义
-    await addEdge({
-      source: theorem1Id,
-      target: definition1Id,
-      label: '引用',
-      description: '德摩根定律是关于集合运算的，因此其证明和理解依赖于集合的基本定义。',
-    });
-
-    // 例题是定理的例题
-    await addEdge({ source: example1Id, target: theorem1Id, label: '是...的例题' });
-    
-    // 练习题是定义的练习题
-    await addEdge({ source: exercise1Id, target: definition1Id, label: '是...的练习题' });
-
-    // 解题记录是例题的解题记录
-    await addEdge({ source: solutionRecord1Id, target: example1Id, label: '是...的解法' });
-
-    // 笔记引用了德摩根定律
-    await addEdge({ source: note1Id, target: theorem1Id, label: '引用' });
-
-    // --- 跨学科的引用！---
-    const crossDisciplineNoteId = await addNodeAndUpdateParent({
-        type: '笔记',
-        title: '函数的向量空间',
-        content: '所有从实数域 R 到 R 的连续函数集合，在函数加法和标量乘法下，可以构成一个无穷维的向量空间。这是泛函分析的起点。',
-        parentId: chapter1Id, // 放在数学分析的“集合与映射”章节下
-        children: [],
-    }, [minorChapter1_1Id]); // 假设放在子章节1.1之后
-
-    await addEdge({
-      source: crossDisciplineNoteId,
-      target: vectorSpaceDefId, // 目标是线性代数中的“向量空间”定义
-      label: '引用',
-      description: '此概念将分析学中的“函数”与代数学中的“向量空间”联系起来。',
-    });
-
-    // --- 演示逻辑关系 ---
-    const chapter2Id = await addNodeAndUpdateParent({
-      type: '主章节',
-      title: '极限与连续',
-      content: '本章介绍函数极限和连续性的概念。',
-      parentId: analysisBranchId,
-      children: [],
-    }, [chapter1Id]);
-
-    const continuityDefId = await addNodeAndUpdateParent({
-      type: '定义',
-      title: '函数连续性',
-      content: '函数 $f$ 在点 $x_0$ 连续，如果 $\\lim_{x \\to x_0} f(x) = f(x_0)$。',
-      parentId: chapter2Id,
-      children: [],
-    }, []);
-
-    const differentiabilityDefId = await addNodeAndUpdateParent({
-      type: '定义',
-      title: '函数可微性',
-      content: '函数 $f$ 在点 $x_0$ 可微，如果极限 $\\lim_{h \\to 0} \\frac{f(x_0+h) - f(x_0)}{h}$ 存在。',
-      parentId: chapter2Id,
-      children: [],
-    }, [continuityDefId]);
-
-    await addEdge({
-      source: differentiabilityDefId, // 可微性
-      target: continuityDefId,      // 连续性
-      label: '充分条件',
-      description: '一个函数在某点可微，则它在该点必然连续。反之不成立。',
-    });
-
-
+    await importData(data);
     console.log('Database seeded successfully!');
   } catch (error) {
     console.error('Error seeding database:', error);
