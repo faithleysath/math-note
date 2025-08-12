@@ -264,8 +264,6 @@ export const useAppStore = create<AppState>((set, get) => ({
         default: {
           // This should not happen with TypeScript checking, but it's good practice
           // to handle unexpected cases.
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          const _exhaustiveCheck: never = type;
           throw new Error(`Unsupported operation type: ${type}`);
         }
       }
