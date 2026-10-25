@@ -1,87 +1,141 @@
-# 数学笔记：一个基于图的数学笔记应用
+# 数学笔记
 
-数学笔记是一款专为数学学生和爱好者设计的纯前端应用。它提供了一种结构化且灵活的方式来记录笔记、组织概念和练习题目，同时将所有数据安全地保存在您自己的浏览器中。
+一个纯前端的数学知识图谱：按教科书的层级记笔记，用带语义的关系把定义、定理、例题、练习连成网，数据存在自己的浏览器里。
 
-## 核心概念
+线上示例：<https://math-note-delta.vercel.app>
 
-本应用围绕一个基于图的数据模型构建，该模型优雅地处理了数学学科的层级结构以及概念之间复杂的相互联系。这种方法将每一条信息——从一个宽泛的数学分支到一个具体的定义或练习题——都视为图中的一个“节点”。
+## 它和普通笔记软件有什么不同
 
-该模型由两个基本元素组成：
+**1. 节点类型就是数学教科书的结构**
 
-1.  **节点 (Node)**：内容的基本单元。一个节点可以是一个数学分支、一个主章节、一个子章节、一个定义、一个定理、一个例题、一条个人笔记或一道练习题。
-2.  **边 (Edge)**：节点之间的连接。边代表关系，例如一个定理*引用*一个定义，或者一道练习题*关联于*一个章节。
+| 类型 | 编号 | 用途 |
+|---|---|---|
+| 分支 | — | 数学分析、高等代数… |
+| 主章节 / 子章节 | `第 1 章` / `§ 1.1` | 目录层级 |
+| 定义 / 定理 / 引理 / 推论 / 例题 / 练习 | `定理 1.1.2` | 正文单元 |
+| 笔记 | — | 评注、易错点 |
+| 解题记录 | — | 挂在例题或练习下的尝试历史 |
 
-### 数据结构可视化
+编号不是手写的，是按节点在树里的位置算出来的：挪动、插入、删除之后，后面所有编号自动重排。
 
-下图说明了应用的核心数据模型，展示了一个节点包含的主要字段。
+**2. 一个节点 = 两层内容**
 
-```mermaid
-graph TD
-    subgraph "核心数据模型"
-        direction LR
-        Node("Node (节点)<br><br><b>字段:</b><br>- id: string (UUID)<br>- type: NodeType<br>- title: string<br>- content: string (Markdown)<br>- solution?: string (Markdown)<br>- parentId: string | null<br>- children: string[]<br>- tags?: string[]<br>- aliases?: string[]<br>- source?: string") -- "Edge (边)" --> Node
-    end
+`content` 是命题陈述或题干，`solution` 是教科书式证明或标准答案，默认折叠。例题和练习下面还能挂多次「解题记录」，记对错、用时、方法——「第一次做错、第二次换方法做对」是刷题笔记里最值钱的信息。
 
-    subgraph "应用示例"
-        %% 节点定义
-        SubChapter1["<b>子章节</b><br>集合"]
-        Exercise1["<b>习题</b><br>求两个集合的并集<br><i>content: 题干...</i><br><i>solution: 标准答案...</i>"]
-        MySolution1["<b>解题记录</b><br>我的首次尝试<br><i>content: 我的解法...</i>"]
+**3. 关系有语义，而且能推理**
 
-        %% 关系
-        SubChapter1 -- "包含 (层级)" --> Exercise1
-        MySolution1 -- "关联 (非层级)" --- Exercise1
-    end
+存储的谓词只有 7 个，方向永远是「主语 → 宾语」：
 
-    %% 样式
-    style SubChapter1 fill:#bcf2d3,stroke:#333,stroke-width:2px
-    style Exercise1 fill:#f2bcc9,stroke:#333,stroke-width:1px
-    style MySolution1 fill:#f2e2bc,stroke:#333,stroke-width:1px,stroke-dasharray: 5 5
-```
+| 谓词 | 读法 | 性质 |
+|---|---|---|
+| `depends-on` | A 依赖 B | 可传递，禁止成环 |
+| `cites` | A 提及 B | 不传递 |
+| `proves` | A 证明了 B | — |
+| `refutes` | A 是 B 的反例 | — |
+| `implies` | A ⇒ B | 可传递 |
+| `iff` | A ⇔ B | 对称，构成等价类 |
+| `generalizes` | A 推广了 B | 可传递 |
 
-## 功能特性
+「充分条件 / 必要条件」是同一个 `implies` 的两个视图；「是…的定义 / 定理 / 例题」由类型 + 层级派生，都不单独存储。所以不会出现「同一件事存了两份、然后互相打架」。
 
-*   **层级与网络化笔记**: 在传统的树状结构（分支 -> 章节 -> 小节）中组织笔记，同时通过“相关节点”功能，在任意两个条目之间创建丰富的非线性链接。
-*   **完整的笔记操作**:
-    *   **创建**: 在任意位置创建子节点或同级节点。
-    *   **编辑**: 全功能的 Markdown 编辑器，支持 LaTeX 公式。
-    *   **排序**: 通过“上移/下移”按钮调整节点在同级中的顺序。
-    *   **删除**: 安全地删除节点及其所有关联。
-*   **全局搜索**: 通过 `Cmd/Ctrl + F` 快速搜索所有节点的标题、内容、标签和别名。
-*   **快捷键支持**: 提供了一套丰富的快捷键，以提升内容创作和浏览效率。
-*   **本地优先**: 所有数据都使用 `IndexedDB` 存储在您的本地浏览器中，确保隐私和离线访问。
-*   **导入/导出**: 通过导出和导入简单的 JSON 文件，轻松备份您的知识图谱或在设备之间移动它。
+数学蕴含可以带前提条件（`condition` 字段），每条边还能标「确定 / 猜想 / 已推翻」和出处。
+
+由此得到的查询：
+
+- 间接依赖（传递闭包）
+- 前置知识顺序（依赖关系的拓扑排序 = 学习顺序）
+- 等价命题组（`iff` 的连通分量）
+- 循环依赖检测
+- 「A 蕴含 B 但 A 是 B 的反例」这类矛盾的提示
+
+**4. 身份只有一个**
+
+层级只用 `parentId + order` 表达，不存 `children` 数组。任何一次写操作只动一个节点，删除时递归删子树并清掉所有牵连的边。编号、子节点列表、祖先链全部是内存里的派生数据，每次图变更整体重建——不会出现「父子两边不一致」。
+
+**5. 手写笔记直接进图谱**
+
+上传手写笔记照片，模型把它拆成结构化的操作序列（`create-node` / `create-edge` …），**先在对话框里预览，确认后才写入**，写入前还要过一遍数据层的不变式。
 
 ## 快捷键
 
-| 快捷键 | 功能 | 作用域 |
-| :--- | :--- | :--- |
-| `Cmd/Ctrl + F` | 聚焦搜索框 | 全局 |
-| `J` | 选中下一个节点 | 主内容区 |
-| `K` | 选中上一个节点 | 主内容区 |
-| `E` | 编辑选中的节点 | 主内容区 |
-| `Cmd/Ctrl + S` | 保存更改 | 编辑模式 |
-| `Esc` | 取消编辑 | 编辑模式 |
+| 快捷键 | 功能 |
+|---|---|
+| `Cmd/Ctrl + F` | 聚焦搜索 |
+| `j` / `k` | 在当前分支里上下移动选中项 |
+| `e` 或 `Cmd/Ctrl + E` | 编辑选中项 |
+| `Cmd/Ctrl + S` | 保存（编辑中） |
+| `Esc` | 取消编辑 |
 
-## 技术栈
+## 数据
 
-这是一个使用现代 Web 技术构建的纯前端项目：
+- 全部存在浏览器 IndexedDB（数据库 `math-note-graph`），不联网、不登录。
+- 「导出」下载一份 JSON，「导入」会覆盖当前数据（会二次确认）。
+- 「分享」把快照传到 Vercel Blob，生成只读链接 `?note_url=…`，打开后所有写操作被禁用。
 
-*   **框架**: [React](https://react.dev/) 与 [Vite](https://vitejs.dev/)
-*   **语言**: [TypeScript](https://www.typescriptlang.org/)
-*   **包管理器**: [Bun](https://bun.sh/)
-*   **UI**: [shadcn/ui](https://ui.shadcn.com/) & [Tailwind CSS](https://tailwindcss.com/)
-*   **状态管理**: [Zustand](https://zustand-demo.pmnd.rs/)
-*   **本地数据库**: [Dexie.js](https://dexie.org/) (IndexedDB 包装器)
+数据格式：
 
-## 开始使用
+```jsonc
+{
+  "schemaVersion": 2,
+  "nodes": [
+    {
+      "id": "uuid",
+      "type": "theorem",
+      "title": "夹逼定理",
+      "content": "若 $a_n \\le b_n \\le c_n$ …",
+      "solution": "对任意 $\\varepsilon>0$ …",
+      "parentId": "uuid-of-section",
+      "order": 3072,
+      "key": "squeeze-theorem",
+      "aliases": ["夹逼准则"],
+      "tags": [],
+      "citation": { "book": "数学分析", "page": "35", "theoremNo": "2.3.1" },
+      "createdAt": 0,
+      "updatedAt": 0
+    }
+  ],
+  "edges": [
+    {
+      "id": "uuid",
+      "from": "uuid-of-theorem",
+      "to": "uuid-of-definition",
+      "predicate": "depends-on",
+      "condition": "$a_n \\le b_n \\le c_n$",
+      "status": "asserted",
+      "assertedBy": "manual",
+      "createdAt": 0,
+      "updatedAt": 0
+    }
+  ]
+}
+```
 
-1.  **安装依赖**:
-    ```bash
-    bun install
-    ```
-2.  **运行开发服务器**:
-    ```bash
-    bun dev
-    ```
-3.  在浏览器中打开 `http://localhost:5173` (或终端中显示的地址)。
+## 开发
+
+```bash
+bun install
+bun dev          # http://localhost:5173
+bun test         # 编号、图算法、不变式的单元测试
+bun run lint
+bun run build
+```
+
+技术栈：React 19 + TypeScript + Vite 7 + Tailwind 4 + shadcn/ui + Zustand 5 + Dexie 4 + zod + KaTeX。
+
+```
+src/lib/schema.ts      节点 / 边 / 谓词的类型与 zod 校验
+src/lib/predicates.ts  谓词注册表（方向、传递性、允许的类型、显示文案）
+src/lib/graph.ts       纯函数：索引、编号、遍历、闭包、拓扑排序、搜索
+src/lib/validate.ts    不变式（类型白名单、防环、唯一性、防镜像层级）
+src/lib/db.ts          Dexie 持久化
+src/stores/useGraphStore.ts  内存图 + 写穿
+```
+
+## 部署
+
+推到 Vercel 即可。可选环境变量：
+
+| 变量 | 作用 |
+|---|---|
+| `GEMINI_API_KEY` | 让 `/api/geminiProxy` 透传 Gemini 请求时不暴露 key |
+| `SHARE_TOKEN` | 设置后，`/api/upload` 要求请求头 `x-share-token` 匹配才允许上传 |
