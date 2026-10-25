@@ -6,9 +6,11 @@ import type { Node, NodeType, Predicate } from './schema';
 // 这张表是关系的唯一真相来源：UI 按钮、方向判断、校验规则、显示文案、
 // 图谱箭头、推理规则全部从这里生成，不再散落在各个组件里。
 
-export type PredicateFamily = 'epistemic' | 'evidential' | 'logical';
+export type PredicateFamily = 'semantic' | 'epistemic' | 'evidential' | 'logical';
 
 export interface PredicateSpec {
+  /** 这条关系是否参与数学推理（implies / iff） */
+  logical: boolean;
   family: PredicateFamily;
   /** from 侧看这条边叫什么 */
   fromLabel: string;
@@ -16,13 +18,22 @@ export interface PredicateSpec {
   inverseLabel: string;
   /** 拼句子用的动词 */
   verb: string;
-  /** 可传递：A→B→C 蕴含 A→C */
+  /**
+   * 可传递：A→B→C 蕴含 A→C。
+   * 注意这只对「结构/学习」查询有意义；数学推理必须走 logicalDerivation，
+   * 因为传递性要额外检查条件与语境（需求书 P0-2）。
+   */
   transitive: boolean;
   /** 对称：A↔B 与 B↔A 是同一事实 */
   symmetric: boolean;
   /** 构成等价类（只对 symmetric + transitive 有意义） */
   equivalence: boolean;
-  /** 传递关系禁止成环（成环意味着逻辑上自洽但无信息量，且闭包会爆炸） */
+  /**
+   * 是否禁止成环。
+   * 只有 depends-on（学习前置）禁止：它要求 DAG。
+   * implies / iff / generalizes 允许成环：A⇒B 与 B⇒A 同时成立是合法的，
+   * A⇔B⇔C⇔A 也是合法的等价类（需求书 P0-1）。
+   */
   forbidCycle: boolean;
   /** 允许出现的 from / to 节点类型 */
   from: NodeType[];
@@ -42,22 +53,44 @@ const CONTENT: NodeType[] = [
   'exercise',
   'note',
   'attempt',
+  'proof',
+  'concept',
+  'context',
+  'counterexample',
 ];
 
-const CLAIMS: NodeType[] = ['definition', 'theorem', 'lemma', 'corollary'];
+/** 可以被称为「命题」、参与蕴含关系的类型 */
+const CLAIMS: NodeType[] = ['definition', 'theorem', 'lemma', 'corollary', 'note'];
 
 export const PREDICATE_SPECS: Record<Predicate, PredicateSpec> = {
+  'defines': {
+    family: 'semantic',
+    fromLabel: '定义了',
+    inverseLabel: '被定义',
+    verb: '定义了',
+    logical: false,
+    transitive: false,
+    symmetric: false,
+    equivalence: false,
+    forbidCycle: false,
+    from: ['definition'],
+    to: ['concept'],
+    swappable: false,
+  },
   'depends-on': {
     family: 'epistemic',
     fromLabel: '依赖',
     inverseLabel: '被依赖',
     verb: '依赖',
+    logical: false,
     transitive: true,
     symmetric: false,
     equivalence: false,
+    // 学习前置关系必须是 DAG：A 依赖 B、B 依赖 A 会让人无法排出学习顺序。
+    // 这不是数学矛盾，提示语也要这么说。
     forbidCycle: true,
     from: CONTENT,
-    to: CLAIMS,
+    to: ['definition', 'theorem', 'lemma', 'corollary', 'concept'],
     swappable: false,
   },
   cites: {
@@ -65,6 +98,7 @@ export const PREDICATE_SPECS: Record<Predicate, PredicateSpec> = {
     fromLabel: '提及',
     inverseLabel: '被提及',
     verb: '提及',
+    logical: false,
     transitive: false,
     symmetric: false,
     equivalence: false,
@@ -78,11 +112,13 @@ export const PREDICATE_SPECS: Record<Predicate, PredicateSpec> = {
     fromLabel: '证明',
     inverseLabel: '被证明',
     verb: '证明了',
+    logical: false,
     transitive: false,
     symmetric: false,
     equivalence: false,
     forbidCycle: false,
-    from: ['note', 'example', 'attempt', 'theorem'],
+    // 正式证明必须是 proof 节点：命题之间的笼统「证明」不算证明
+    from: ['proof'],
     to: ['theorem', 'lemma', 'corollary'],
     swappable: false,
   },
@@ -91,11 +127,13 @@ export const PREDICATE_SPECS: Record<Predicate, PredicateSpec> = {
     fromLabel: '反例',
     inverseLabel: '被反驳',
     verb: '反驳了',
+    logical: false,
     transitive: false,
     symmetric: false,
     equivalence: false,
     forbidCycle: false,
-    from: ['note', 'example', 'exercise', 'attempt'],
+    // 反例反驳的是「明确的命题」，不是某条边
+    from: ['counterexample'],
     to: ['theorem', 'lemma', 'corollary', 'note'],
     swappable: false,
   },
@@ -104,12 +142,14 @@ export const PREDICATE_SPECS: Record<Predicate, PredicateSpec> = {
     fromLabel: '充分条件',
     inverseLabel: '必要条件',
     verb: '⇒',
+    logical: true,
     transitive: true,
     symmetric: false,
     equivalence: false,
-    forbidCycle: true,
-    from: [...CLAIMS, 'note'],
-    to: [...CLAIMS, 'note'],
+    // A⇒B 与 B⇒A 可以同时成立；不再禁环
+    forbidCycle: false,
+    from: CLAIMS,
+    to: CLAIMS,
     swappable: true,
   },
   iff: {
@@ -117,12 +157,14 @@ export const PREDICATE_SPECS: Record<Predicate, PredicateSpec> = {
     fromLabel: '等价于',
     inverseLabel: '等价于',
     verb: '⇔',
+    logical: true,
     transitive: true,
     symmetric: true,
     equivalence: true,
-    forbidCycle: true,
-    from: [...CLAIMS, 'note'],
-    to: [...CLAIMS, 'note'],
+    // A⇔B⇔C⇔A 是合法的；重复边只提示冗余，不拒绝
+    forbidCycle: false,
+    from: CLAIMS,
+    to: CLAIMS,
     swappable: false,
   },
   generalizes: {
@@ -130,23 +172,35 @@ export const PREDICATE_SPECS: Record<Predicate, PredicateSpec> = {
     fromLabel: '推广',
     inverseLabel: '特例',
     verb: '推广了',
-    transitive: true,
+    logical: false,
+    // 只作为已记录的语义关联，不做自动的跨语境传递推理
+    transitive: false,
     symmetric: false,
     equivalence: false,
-    forbidCycle: true,
-    from: [...CLAIMS, 'note'],
-    to: [...CLAIMS, 'note'],
+    forbidCycle: false,
+    from: CLAIMS,
+    to: CLAIMS,
     swappable: true,
   },
 };
 
 export const FAMILY_META: Record<PredicateFamily, { label: string; order: number }> = {
-  epistemic: { label: '引用与依赖', order: 1 },
-  evidential: { label: '论证', order: 2 },
-  logical: { label: '逻辑关系', order: 3 },
+  semantic: { label: '概念定义', order: 1 },
+  epistemic: { label: '引用与依赖', order: 2 },
+  evidential: { label: '论证', order: 3 },
+  logical: { label: '逻辑关系', order: 4 },
 };
 
+export function isLogicalPredicate(predicate: Predicate): boolean {
+  return PREDICATE_SPECS[predicate].logical;
+}
+
 export const PREDICATE_LIST = Object.keys(PREDICATE_SPECS) as Predicate[];
+
+/** 参与数学推理的谓词 */
+export const LOGICAL_PREDICATES: Predicate[] = PREDICATE_LIST.filter(
+  (predicate) => PREDICATE_SPECS[predicate].logical,
+);
 
 export function predicatesByFamily(): { family: PredicateFamily; label: string; predicates: Predicate[] }[] {
   return (Object.keys(FAMILY_META) as PredicateFamily[])

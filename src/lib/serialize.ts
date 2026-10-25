@@ -1,7 +1,8 @@
 import { graphJSONSchema, type Edge, type GraphJSON, type Node } from './schema';
-import { ValidationError } from './validate';
+import { ValidationError, validateGraphInvariants, type ValidationIssue } from './validate';
+import { migrateV2ToV3 } from './migrate';
 
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 function messageOf(error: unknown): string {
   if (error && typeof error === 'object' && 'issues' in error) {
@@ -20,11 +21,21 @@ export function serializeGraph(nodes: Node[], edges: Edge[]): GraphJSON {
   };
 }
 
+export interface ParsedGraph {
+  nodes: Node[];
+  edges: Edge[];
+  /** v2 数据被迁移时给出的说明，用于 UI 提示 / 日志 */
+  migration: { from: 2; proofsCreated: number } | null;
+  warnings: ValidationIssue[];
+}
+
 /**
- * 解析一份快照 / 备份，并检查引用完整性。
- * 结构不对、父节点不存在、边指向空气，都会抛出一句人话。
+ * 解析一份快照 / 备份：
+ * 1. JSON 结构校验
+ * 2. v2 → v3 迁移（solution 复制成证明节点）
+ * 3. 全图不变式校验，有错误就抛，绝不覆盖现有数据
  */
-export function parseGraph(json: unknown): { nodes: Node[]; edges: Edge[] } {
+export function parseGraph(json: unknown): ParsedGraph {
   let parsed: GraphJSON;
   try {
     parsed = graphJSONSchema.parse(json);
@@ -32,30 +43,32 @@ export function parseGraph(json: unknown): { nodes: Node[]; edges: Edge[] } {
     throw new ValidationError('schema', `数据结构不对：${messageOf(error)}`);
   }
 
-  const nodeIds = new Set<string>();
-  for (const node of parsed.nodes) {
-    if (nodeIds.has(node.id)) {
-      throw new ValidationError('id', `节点 id 重复：${node.id}`);
-    }
-    nodeIds.add(node.id);
+  let nodes = parsed.nodes;
+  let edges = parsed.edges;
+  let migration: ParsedGraph['migration'] = null;
+
+  if (parsed.schemaVersion === 2) {
+    const migrated = migrateV2ToV3({ nodes, edges });
+    nodes = migrated.graph.nodes;
+    edges = migrated.graph.edges;
+    migration = { from: 2, proofsCreated: migrated.report.proofsCreated };
   }
 
-  for (const node of parsed.nodes) {
-    if (node.parentId !== null && !nodeIds.has(node.parentId)) {
-      throw new ValidationError('parentId', `节点「${node.title}」的父节点不存在。`);
-    }
+  const issues = validateGraphInvariants({ nodes, edges });
+  const errors = issues.filter((issue) => issue.severity === 'error');
+  if (errors.length > 0) {
+    const head = errors.slice(0, 3).map((issue) => issue.message).join('；');
+    throw new ValidationError(
+      'graph',
+      `导入的数据没通过校验：${head}${errors.length > 3 ? `（还有 ${errors.length - 3} 个问题）` : ''}`,
+      errors,
+    );
   }
 
-  const edgeIds = new Set<string>();
-  for (const edge of parsed.edges) {
-    if (edgeIds.has(edge.id)) {
-      throw new ValidationError('id', `关系 id 重复：${edge.id}`);
-    }
-    edgeIds.add(edge.id);
-    if (!nodeIds.has(edge.from) || !nodeIds.has(edge.to)) {
-      throw new ValidationError('edge', '存在指向不存在节点的关系。');
-    }
-  }
-
-  return { nodes: parsed.nodes, edges: parsed.edges };
+  return {
+    nodes,
+    edges,
+    migration,
+    warnings: issues.filter((issue) => issue.severity === 'warning'),
+  };
 }

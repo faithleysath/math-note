@@ -9,7 +9,11 @@ interface SubChapterNodeRendererProps {
 }
 
 const SubChapterNodeRenderer = ({ node }: SubChapterNodeRendererProps) => {
-  const displayContent = useMemo(() => '*' + node.content + '*', [node.content]);
+  const displayContent = useMemo(() => {
+    // 空内容时不加斜体标记，否则会渲染出两个孤零零的 *
+    if (!node.content.trim()) return '';
+    return '*' + node.content + '*';
+  }, [node.content]);
 
   return (
     <>

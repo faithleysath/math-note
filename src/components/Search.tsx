@@ -22,6 +22,10 @@ const nodeTypeColors: Record<NodeType, string> = {
   exercise: 'bg-purple-100 text-purple-800',
   attempt: 'bg-red-100 text-red-800',
   note: 'bg-yellow-100 text-yellow-800',
+  proof: 'bg-red-100 text-red-800',
+  concept: 'bg-indigo-100 text-indigo-800',
+  context: 'bg-zinc-100 text-zinc-800',
+  counterexample: 'bg-rose-100 text-rose-800',
 };
 
 const Search = ({ onSelectNode }: SearchProps) => {

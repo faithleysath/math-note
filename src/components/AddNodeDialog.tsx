@@ -26,6 +26,10 @@ const nodeTypeButtonColors: Record<NodeType, string> = {
   exercise: 'border-purple-500 text-purple-500 hover:bg-purple-50',
   attempt: 'border-red-500 text-red-500 hover:bg-red-50',
   note: 'border-yellow-500 text-yellow-500 hover:bg-yellow-50',
+  proof: 'border-red-500 text-red-500 hover:bg-red-50',
+  concept: 'border-indigo-500 text-indigo-500 hover:bg-indigo-50',
+  context: 'border-zinc-500 text-zinc-500 hover:bg-zinc-50',
+  counterexample: 'border-rose-500 text-rose-500 hover:bg-rose-50',
 };
 
 interface AddNodeDialogProps {

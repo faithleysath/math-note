@@ -4,10 +4,14 @@ import {
   buildIndex,
   collectSubtree,
   computeInsertOrder,
+  cycleNodes,
   dumpTree,
   equivalenceClasses,
+  findImplicationPaths,
+  inferLogicalRelations,
   ORDER_GAP,
   reachable,
+  reachableStructural,
   searchNodes,
   topoSort,
 } from './graph';
@@ -35,16 +39,22 @@ function node(
   };
 }
 
-function edge(from: string, to: string, predicate: Edge['predicate'], id = `${from}-${to}`): Edge {
+function edge(
+  from: string,
+  to: string,
+  predicate: Edge['predicate'],
+  extra: Partial<Edge> = {},
+): Edge {
   seq += 1;
   return {
-    id: `${id}-${seq}`,
+    id: `e${seq}`,
     from,
     to,
     predicate,
     assertedBy: 'manual',
     createdAt: 0,
     updatedAt: 0,
+    ...extra,
   };
 }
 
@@ -168,7 +178,7 @@ describe('排序', () => {
   });
 });
 
-describe('图推理', () => {
+describe('结构遍历', () => {
   const nodes = [
     node('def', 'definition', null, 1024),
     node('thmA', 'theorem', null, 2048),
@@ -186,31 +196,171 @@ describe('图推理', () => {
     expect([...reachable(index, 'thmC', 'depends-on')].sort()).toEqual(['def', 'thmA', 'thmB']);
   });
 
-  it('拓扑排序给出学习顺序', () => {
-    const index = buildIndex(nodes, edges);
-    const { order, cyclic } = topoSort(index, 'depends-on', 'to-first');
-    expect(cyclic).toEqual([]);
-    expect(order.indexOf('def')).toBeLessThan(order.indexOf('thmA'));
-    expect(order.indexOf('thmA')).toBeLessThan(order.indexOf('thmB'));
-    expect(order.indexOf('thmB')).toBeLessThan(order.indexOf('thmC'));
+  it('结构查询默认保留已推翻的边，作为历史记录', () => {
+    const index = buildIndex(nodes, [
+      edge('thmA', 'def', 'depends-on', { status: 'disproven' }),
+    ]);
+    expect(reachable(index, 'thmA', 'depends-on').has('def')).toBe(true);
+    expect(
+      reachableStructural(index, 'thmA', 'depends-on', { includeDisproven: false }).has('def'),
+    ).toBe(false);
   });
 
-  it('成环时返回环上的节点', () => {
-    const cyclicEdges = [...edges, edge('thmA', 'thmC', 'depends-on')];
-    const index = buildIndex(nodes, cyclicEdges);
-    const { cyclic } = topoSort(index, 'depends-on');
-    expect(cyclic.length).toBeGreaterThan(0);
+  it('iff 在结构上双向可达（即使只存一条）', () => {
+    const index = buildIndex(nodes, [edge('thmA', 'thmB', 'iff')]);
+    expect(reachable(index, 'thmA', 'iff').has('thmB')).toBe(true);
+    expect(reachable(index, 'thmB', 'iff').has('thmA')).toBe(true);
+  });
+});
+
+describe('数学推理', () => {
+  const nodes = [
+    node('a', 'theorem', null, 1024, { title: 'x²=1' }),
+    node('b', 'theorem', null, 2048, { title: 'x=1' }),
+    node('c', 'theorem', null, 3072, { title: 'x>0' }),
+    node('ctx', 'context', null, 4096, { title: '实数域' }),
+  ];
+
+  it('带前提的路径不能变成无条件结论', () => {
+    const index = buildIndex(nodes, [
+      edge('a', 'b', 'implies', { condition: 'x>0' }),
+      edge('b', 'c', 'implies'),
+    ]);
+    const derived = findImplicationPaths(index, 'a', 'c');
+    expect(derived.length).toBeGreaterThan(0);
+    expect(derived[0].unconditional).toBe(false);
+    expect(derived[0].unresolvedConditions).toEqual(['x>0']);
   });
 
-  it('iff 聚成等价类', () => {
-    const iffs = [
-      edge('thmA', 'thmB', 'iff'),
-      edge('thmB', 'thmC', 'iff'),
-    ];
-    const index = buildIndex(nodes, iffs);
-    const classes = equivalenceClasses(index, 'iff');
+  it('语境明确、无前提、已审核才算无条件', () => {
+    const index = buildIndex(nodes, [
+      edge('a', 'b', 'implies', { contextId: 'ctx', reviewState: 'human-reviewed' }),
+      edge('b', 'c', 'implies', { contextId: 'ctx', reviewState: 'human-reviewed' }),
+    ]);
+    const derived = findImplicationPaths(index, 'a', 'c');
+    expect(derived[0].unconditional).toBe(true);
+    expect(derived[0].contextId).toBe('ctx');
+    expect(derived[0].verification).toBe('human-reviewed');
+  });
+
+  it('语境不同时不能合并', () => {
+    const index = buildIndex(nodes, [
+      edge('a', 'b', 'implies', { contextId: 'ctx' }),
+      edge('b', 'c', 'implies', { contextId: 'other' }),
+    ]);
+    const derived = findImplicationPaths(index, 'a', 'c');
+    expect(derived[0].contextId).toBeUndefined();
+    expect(derived[0].unconditional).toBe(false);
+  });
+
+  it('已推翻的边不参与推理', () => {
+    const index = buildIndex(nodes, [
+      edge('a', 'b', 'implies', { status: 'disproven' }),
+      edge('b', 'c', 'implies'),
+    ]);
+    expect(inferLogicalRelations(index, 'a').map((rel) => rel.to)).not.toContain('c');
+  });
+
+  it('猜想默认不参与，显式要求时才参与', () => {
+    const index = buildIndex(nodes, [edge('a', 'b', 'implies', { status: 'conjecture' })]);
+    expect(inferLogicalRelations(index, 'a')).toHaveLength(0);
+    expect(inferLogicalRelations(index, 'a', { includeConjectures: true })).toHaveLength(1);
+  });
+
+  it('reviewed-only 过滤掉未审核的边', () => {
+    const index = buildIndex(nodes, [
+      edge('a', 'b', 'implies', { reviewState: 'human-reviewed' }),
+      edge('b', 'c', 'implies', { reviewState: 'unreviewed' }),
+    ]);
+    expect(inferLogicalRelations(index, 'a', { mode: 'reviewed-only' }).map((r) => r.to)).toEqual(['b']);
+    expect(inferLogicalRelations(index, 'a').map((r) => r.to)).toContain('c');
+  });
+
+  it('反例反驳的是命题，不会被当成「蕴含错误」', () => {
+    const index = buildIndex(nodes, [
+      edge('a', 'b', 'implies'),
+      edge('cex', 'a', 'refutes'),
+    ]);
+    // refutes 的起点必须是 counterexample 类型；这里只验证推理链不受影响
+    expect(inferLogicalRelations(index, 'a').map((rel) => rel.to)).toEqual(['b']);
+  });
+});
+
+describe('等价类', () => {
+  const nodes = [
+    node('a', 'theorem', null, 1024),
+    node('b', 'theorem', null, 2048),
+    node('c', 'theorem', null, 3072),
+    node('ctx1', 'context', null, 4096),
+    node('ctx2', 'context', null, 5120),
+  ];
+
+  it('同语境下的三方等价合成一类', () => {
+    const index = buildIndex(nodes, [
+      edge('a', 'b', 'iff', { contextId: 'ctx1' }),
+      edge('b', 'c', 'iff', { contextId: 'ctx1' }),
+      edge('c', 'a', 'iff', { contextId: 'ctx1' }),
+    ]);
+    const classes = equivalenceClasses(index);
     expect(classes).toHaveLength(1);
-    expect([...classes[0]].sort()).toEqual(['thmA', 'thmB', 'thmC']);
+    expect([...classes[0].members].sort()).toEqual(['a', 'b', 'c']);
+  });
+
+  it('不同语境的等价关系不并在一起', () => {
+    const index = buildIndex(nodes, [
+      edge('a', 'b', 'iff', { contextId: 'ctx1' }),
+      edge('b', 'c', 'iff', { contextId: 'ctx2' }),
+    ]);
+    const classes = equivalenceClasses(index);
+    expect(classes).toHaveLength(2);
+    expect(classes.map((item) => item.contextId).sort()).toEqual(['ctx1', 'ctx2']);
+  });
+
+  it('已推翻的等价关系不进入已证等价类', () => {
+    const index = buildIndex(nodes, [
+      edge('a', 'b', 'iff', { status: 'disproven' }),
+    ]);
+    expect(equivalenceClasses(index)).toHaveLength(0);
+  });
+});
+
+describe('拓扑排序与环诊断', () => {
+  const nodes = [
+    node('a', 'theorem', null, 1024),
+    node('b', 'theorem', null, 2048),
+    node('c', 'theorem', null, 3072),
+    node('isolated', 'theorem', null, 4096),
+  ];
+
+  it('学习顺序把前置放在前面', () => {
+    const index = buildIndex(nodes, [
+      edge('c', 'b', 'depends-on'),
+      edge('b', 'a', 'depends-on'),
+    ]);
+    const { order } = topoSort(index, 'depends-on', 'to-first');
+    expect(order.indexOf('a')).toBeLessThan(order.indexOf('b'));
+    expect(order.indexOf('b')).toBeLessThan(order.indexOf('c'));
+  });
+
+  it('孤立节点也能排进候选', () => {
+    const index = buildIndex(nodes, [edge('b', 'a', 'depends-on')]);
+    const { order } = topoSort(index, 'depends-on', 'to-first', {
+      candidateIds: ['a', 'b', 'isolated'],
+    });
+    expect(order).toContain('isolated');
+    expect(order).toHaveLength(3);
+  });
+
+  it('区分环上节点和被环阻塞的节点', () => {
+    const index = buildIndex(nodes, [
+      edge('a', 'b', 'depends-on'),
+      edge('b', 'a', 'depends-on'),
+      edge('c', 'a', 'depends-on'),
+    ]);
+    const { cyclic, blocked } = topoSort(index, 'depends-on', 'to-first');
+    expect(cyclic.sort()).toEqual(['a', 'b']);
+    expect(blocked).toEqual(['c']);
+    expect([...cycleNodes(index, 'depends-on')].sort()).toEqual(['a', 'b']);
   });
 });
 

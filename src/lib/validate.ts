@@ -1,6 +1,6 @@
 import type { GraphIndex } from './graph';
 import { ancestorIds, collectSubtree, findPath } from './graph';
-import { PREDICATE_SPECS } from './predicates';
+import { PREDICATE_SPECS, canonicalizePair } from './predicates';
 import {
   NODE_TYPE_META,
   allowedChildTypes,
@@ -10,16 +10,47 @@ import {
   type Node,
   type NodeType,
   type Predicate,
+  type ReviewState,
 } from './schema';
+
+// =============================================================================
+// 校验结果
+// =============================================================================
+// 一律返回「问题 + 位置 + 建议」，而不是抛一句看不懂的话。
+// 错误 = 不能保存；警告 = 可以保存，但让人复核。
+
+export type IssueSeverity = 'error' | 'warning';
+
+export interface ValidationIssue {
+  severity: IssueSeverity;
+  code: string;
+  message: string;
+  nodeId?: string;
+  edgeId?: string;
+  field?: string;
+  suggestion?: string;
+}
 
 export class ValidationError extends Error {
   field: string;
+  issues: ValidationIssue[];
 
-  constructor(field: string, message: string) {
+  constructor(field: string, message: string, issues: ValidationIssue[] = []) {
     super(message);
     this.name = 'ValidationError';
     this.field = field;
+    this.issues = issues.length > 0 ? issues : [{ severity: 'error', code: 'invalid', message, field }];
   }
+}
+
+function errorOf(field: string, code: string, message: string, extra: Partial<ValidationIssue> = {}): ValidationError {
+  return new ValidationError(field, message, [{ severity: 'error', code, message, field, ...extra }]);
+}
+
+function issuesMessage(issues: ValidationIssue[]): string {
+  const head = issues.slice(0, 3).map((issue) => issue.message).join('；');
+  const rest = issues.length > 3 ? `（还有 ${issues.length - 3} 个问题）` : '';
+  return `${head}${rest}`;
 }
 
 export interface NewNodeInput {
@@ -55,6 +86,9 @@ export interface NewEdgeInput {
   condition?: string;
   note?: string;
   status?: Edge['status'];
+  reviewState?: ReviewState;
+  contextId?: string;
+  assumptionIds?: string[];
   assertedBy?: Edge['assertedBy'];
   model?: string;
 }
@@ -65,14 +99,17 @@ export interface NewEdgeInput {
 
 function assertTitle(title: string) {
   if (!title.trim()) {
-    throw new ValidationError('title', '标题不能为空。');
+    throw errorOf('title', 'empty-title', '标题不能为空。');
   }
 }
 
 function assertKeyUnique(index: GraphIndex, key: string, ignoreId?: string) {
   for (const node of index.nodes.values()) {
     if (node.key === key && node.id !== ignoreId) {
-      throw new ValidationError('key', `术语键 "${key}" 已被「${node.title}」占用。`);
+      throw errorOf('key', 'duplicate-key', `术语键 "${key}" 已被「${node.title}」占用。`, {
+        nodeId: node.id,
+        suggestion: '换一个术语键，或先修改占用它的节点。',
+      });
     }
   }
 }
@@ -80,19 +117,24 @@ function assertKeyUnique(index: GraphIndex, key: string, ignoreId?: string) {
 function assertParentUsable(index: GraphIndex, parentId: string | null, type: NodeType) {
   if (parentId === null) {
     if (!allowedChildTypes(null).includes(type)) {
-      throw new ValidationError('parentId', '只有「分支」可以作为根节点。');
+      throw errorOf('parentId', 'invalid-root-type', '只有「分支」可以作为根节点。');
     }
     return;
   }
   const parent = index.nodes.get(parentId);
   if (!parent) {
-    throw new ValidationError('parentId', '父节点不存在。');
+    throw errorOf('parentId', 'missing-parent', '父节点不存在。', { nodeId: parentId });
   }
   const allowed = allowedChildTypes(parent.type);
   if (!allowed.includes(type)) {
-    throw new ValidationError(
+    throw errorOf(
       'parentId',
+      'invalid-child-type',
       `「${NODE_TYPE_META[parent.type].label}」下不能放「${NODE_TYPE_META[type].label}」。`,
+      {
+        nodeId: parent.id,
+        suggestion: `可选的类型：${allowed.map((item) => NODE_TYPE_META[item].label).join('、')}`,
+      },
     );
   }
 }
@@ -103,7 +145,14 @@ export function validateNewNode(index: GraphIndex, input: NewNodeInput): void {
   if (input.type === 'attempt') {
     const parent = input.parentId ? index.nodes.get(input.parentId) : undefined;
     if (!parent || (parent.type !== 'exercise' && parent.type !== 'example')) {
-      throw new ValidationError('parentId', '「解题记录」只能挂在例题或练习下面。');
+      throw errorOf('parentId', 'invalid-attempt-parent', '「解题记录」只能挂在例题或练习下面。');
+    }
+  }
+
+  if (input.type === 'proof') {
+    const parent = input.parentId ? index.nodes.get(input.parentId) : undefined;
+    if (!parent || !['theorem', 'lemma', 'corollary'].includes(parent.type)) {
+      throw errorOf('parentId', 'invalid-proof-parent', '「证明」只能挂在定理、引理或推论下面。');
     }
   }
 
@@ -111,7 +160,7 @@ export function validateNewNode(index: GraphIndex, input: NewNodeInput): void {
 
   if (input.key) {
     if (!/^[a-z0-9][a-z0-9-]*$/.test(input.key)) {
-      throw new ValidationError('key', '术语键只能用小写字母、数字和连字符。');
+      throw errorOf('key', 'invalid-key', '术语键只能用小写字母、数字和连字符。');
     }
     assertKeyUnique(index, input.key);
   }
@@ -120,7 +169,7 @@ export function validateNewNode(index: GraphIndex, input: NewNodeInput): void {
     // 分支之间不重名，避免树上出现两个同名字段
     for (const node of index.nodes.values()) {
       if (node.type === 'branch' && node.title.trim() === input.title.trim()) {
-        throw new ValidationError('title', `已存在同名分支「${input.title}」。`);
+        throw errorOf('title', 'duplicate-branch-title', `已存在同名分支「${input.title}」。`);
       }
     }
   }
@@ -128,13 +177,13 @@ export function validateNewNode(index: GraphIndex, input: NewNodeInput): void {
 
 export function validateNodePatch(index: GraphIndex, id: string, patch: NodePatch): void {
   const node = index.nodes.get(id);
-  if (!node) throw new ValidationError('id', '节点不存在。');
+  if (!node) throw errorOf('id', 'missing-node', '节点不存在。');
 
   if (patch.title !== undefined) assertTitle(patch.title);
 
   if (patch.key) {
     if (!/^[a-z0-9][a-z0-9-]*$/.test(patch.key)) {
-      throw new ValidationError('key', '术语键只能用小写字母、数字和连字符。');
+      throw errorOf('key', 'invalid-key', '术语键只能用小写字母、数字和连字符。');
     }
     assertKeyUnique(index, patch.key, id);
   }
@@ -146,31 +195,24 @@ export function validateNodePatch(index: GraphIndex, id: string, patch: NodePatc
 
 export function validateCanReparent(index: GraphIndex, id: string, newParentId: string | null): void {
   const node = index.nodes.get(id);
-  if (!node) throw new ValidationError('id', '节点不存在。');
+  if (!node) throw errorOf('id', 'missing-node', '节点不存在。');
 
   if (newParentId === null) {
     if (node.type !== 'branch') {
-      throw new ValidationError('parentId', '只有「分支」可以移动到根节点。');
+      throw errorOf('parentId', 'invalid-root-type', '只有「分支」可以移动到根节点。');
     }
     return;
   }
 
   if (newParentId === id) {
-    throw new ValidationError('parentId', '不能把节点移动到它自己下面。');
+    throw errorOf('parentId', 'self-parent', '不能把节点移动到它自己下面。');
   }
 
   if (collectSubtree(index, id).includes(newParentId)) {
-    throw new ValidationError('parentId', '不能把节点移动到它自己的子孙下面。');
+    throw errorOf('parentId', 'cyclic-parent', '不能把节点移动到它自己的子孙下面。');
   }
 
   assertParentUsable(index, newParentId, node.type);
-
-  if (node.type === 'attempt') {
-    const target = index.nodes.get(newParentId);
-    if (!target || (target.type !== 'exercise' && target.type !== 'example')) {
-      throw new ValidationError('parentId', '「解题记录」只能挂在例题或练习下面。');
-    }
-  }
 }
 
 // =============================================================================
@@ -185,98 +227,531 @@ const PREDICATE_HINT: Record<Predicate, string> = {
   implies: '充分条件 / 必要条件',
   iff: '等价',
   generalizes: '推广 / 特例',
+  defines: '定义了',
 };
 
 function typeNames(types: NodeType[]): string {
   return types.map((type) => NODE_TYPE_META[type].label).join('、');
 }
 
-export function validateNewEdge(index: GraphIndex, input: NewEdgeInput): void {
+function normalizeCondition(condition?: string): string {
+  return (condition ?? '').replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * 两条边是否算「同一条记录」。
+ * 只有谓词、端点、语境、前提全都相同才算重复；
+ * 相同端点但前提不同是两条不同的数学断言，必须都保留。
+ */
+export function sameRelationKey(
+  a: Pick<Edge, 'predicate' | 'from' | 'to' | 'contextId' | 'condition'>,
+  b: Pick<Edge, 'predicate' | 'from' | 'to' | 'contextId' | 'condition'>,
+): boolean {
+  if (a.predicate !== b.predicate) return false;
+  if (normalizeCondition(a.condition) !== normalizeCondition(b.condition)) return false;
+  if ((a.contextId ?? '') !== (b.contextId ?? '')) return false;
+
+  const spec = PREDICATE_SPECS[a.predicate];
+  if (spec.symmetric) {
+    return (
+      (a.from === b.from && a.to === b.to) || (a.from === b.to && a.to === b.from)
+    );
+  }
+  return a.from === b.from && a.to === b.to;
+}
+
+export interface EdgeCheckResult {
+  warnings: ValidationIssue[];
+}
+
+/**
+ * 校验一条新边。不合法直接抛 ValidationError；
+ * 合法但可疑（互推、冗余等价、反向蕴含）返回警告，由调用方决定是否提示。
+ */
+export function validateNewEdge(index: GraphIndex, input: NewEdgeInput): EdgeCheckResult {
   const { from, to, predicate } = input;
 
   if (from === to) {
-    throw new ValidationError('to', '不能把节点连到它自己。');
+    throw errorOf('to', 'self-loop', '不能把节点连到它自己。');
   }
 
   const fromNode = index.nodes.get(from);
   const toNode = index.nodes.get(to);
-  if (!fromNode) throw new ValidationError('from', '起点节点不存在。');
-  if (!toNode) throw new ValidationError('to', '终点节点不存在。');
+  if (!fromNode) throw errorOf('from', 'missing-endpoint', '起点节点不存在。', { nodeId: from });
+  if (!toNode) throw errorOf('to', 'missing-endpoint', '终点节点不存在。', { nodeId: to });
 
   const spec = PREDICATE_SPECS[predicate];
 
   if (!spec.from.includes(fromNode.type) || !spec.to.includes(toNode.type)) {
-    throw new ValidationError(
+    throw errorOf(
       'predicate',
+      'invalid-endpoint-type',
       `「${PREDICATE_HINT[predicate]}」不能用在「${NODE_TYPE_META[fromNode.type].label} → ${
         NODE_TYPE_META[toNode.type].label
       }」之间。起点须为 ${typeNames(spec.from)}，终点须为 ${typeNames(spec.to)}。`,
+      {
+        nodeId: from,
+        suggestion:
+          predicate === 'proves'
+            ? '先把证明写成「证明」节点，再让它 proves 目标命题。'
+            : predicate === 'refutes'
+              ? '反例要用「反例」节点，并反驳一个明确的命题。'
+              : undefined,
+      },
     );
   }
 
-  const duplicate = index.edges.find(
-    (edge) => edge.from === from && edge.to === to && edge.predicate === predicate,
-  );
-  if (duplicate) {
-    throw new ValidationError('predicate', '这条关系已经存在了。');
-  }
-
-  if (spec.symmetric) {
-    const reverse = index.edges.find(
-      (edge) => edge.from === to && edge.to === from && edge.predicate === predicate,
-    );
-    if (reverse) {
-      throw new ValidationError('predicate', '这条关系已经存在了（等价关系只存一条）。');
+  if (input.contextId) {
+    const context = index.nodes.get(input.contextId);
+    if (!context || context.type !== 'context') {
+      throw errorOf('contextId', 'invalid-context', '语境必须指向一个「语境」节点。', {
+        field: 'contextId',
+      });
     }
   }
 
-  if (spec.transitive && spec.forbidCycle) {
+  for (const assumptionId of input.assumptionIds ?? []) {
+    if (!index.nodes.has(assumptionId)) {
+      throw errorOf('assumptionIds', 'missing-assumption', `前提节点 ${assumptionId} 不存在。`);
+    }
+  }
+
+  const duplicate = index.edges.find((edge) => sameRelationKey(edge, input));
+  if (duplicate) {
+    throw errorOf('predicate', 'duplicate-edge', '这条关系已经存在了（谓词、端点、语境与前提都相同）。', {
+      edgeId: duplicate.id,
+    });
+  }
+
+  // 对称谓词仍然按规范化端点避免正反重复，但不同语境/前提可以是两条
+  if (spec.symmetric) {
+    const reverse = index.edges.find(
+      (edge) =>
+        edge.predicate === predicate &&
+        edge.from === to &&
+        edge.to === from &&
+        normalizeCondition(edge.condition) === normalizeCondition(input.condition) &&
+        (edge.contextId ?? '') === (input.contextId ?? ''),
+    );
+    if (reverse) {
+      throw errorOf('predicate', 'duplicate-edge', '这条关系已经存在了（等价关系正反只存一条）。', {
+        edgeId: reverse.id,
+      });
+    }
+  }
+
+  const warnings: ValidationIssue[] = [];
+
+  // 只有学习前置关系要求 DAG；逻辑蕴含与等价允许成环
+  if (spec.forbidCycle) {
     const path = findPath(index, to, from, predicate);
     if (path) {
       const titles = path.map((pathId) => index.nodes.get(pathId)?.title ?? pathId);
-      throw new ValidationError(
+      throw errorOf(
         'predicate',
-        `会形成循环依赖：${[fromNode.title, ...titles].join(' → ')}。`,
+        'prerequisite-cycle',
+        `前置学习关系成环：${[fromNode.title, ...titles].join(' → ')}。`,
+        { suggestion: '删除其中一条，或改成一个汇总节点。注意这只影响学习顺序，不代表数学矛盾。' },
       );
     }
   }
+
+  if (predicate === 'implies') {
+    const reverse = index.edges.find(
+      (edge) => edge.predicate === 'implies' && edge.from === to && edge.to === from,
+    );
+    if (reverse) {
+      warnings.push({
+        severity: 'warning',
+        code: 'mutual-implication',
+        message: `已存在反向蕴含（${toNode.title} ⇒ ${fromNode.title}）。两者同时成立通常意味着等价，可以保留，也可以改用「等价于」。`,
+        edgeId: reverse.id,
+      });
+    }
+  }
+
+  if (predicate === 'iff') {
+    // iff 三方环是合法的，只提示冗余
+    const path = findPath(index, to, from, 'iff');
+    if (path) {
+      warnings.push({
+        severity: 'warning',
+        code: 'redundant-equivalence',
+        message: '已经存在一条等价路径，这条边是冗余的，但允许保留。',
+      });
+    }
+  }
+
+  if (predicate === 'generalizes') {
+    const reverse = index.edges.find(
+      (edge) => edge.predicate === 'generalizes' && edge.from === to && edge.to === from,
+    );
+    if (reverse) {
+      warnings.push({
+        severity: 'warning',
+        code: 'mutual-generalization',
+        message: `${fromNode.title} 与 ${toNode.title} 互为推广，可能其实是同一个结论的不同说法，请人工核查。`,
+        edgeId: reverse.id,
+      });
+    }
+  }
+
+  return { warnings };
+}
+
+// =============================================================================
+// 全图不变式
+// =============================================================================
+
+function parentChainHasCycle(nodes: Map<string, Node>): string[] {
+  const cyclic: string[] = [];
+  for (const node of nodes.values()) {
+    const seen = new Set<string>([node.id]);
+    let cursor = node.parentId;
+    while (cursor) {
+      if (seen.has(cursor)) {
+        cyclic.push(node.id);
+        break;
+      }
+      seen.add(cursor);
+      cursor = nodes.get(cursor)?.parentId ?? null;
+    }
+  }
+  return cyclic;
 }
 
 /**
- * 被蕴含的冗余边：加了 iff 就删掉同向的 implies；
- * 加了 depends-on 就删掉同向的 cites。
+ * 全图校验：导入、快照加载、迁移、AI 批量提交前都要跑。
+ * 纯函数，不修改数据。
  */
-export function subsumedEdgeIds(index: GraphIndex, edge: Edge): string[] {
-  const removed: string[] = [];
-  for (const existing of index.edges) {
-    if (existing.id === edge.id) continue;
+export function validateGraphInvariants(graph: { nodes: Node[]; edges: Edge[] }): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  const nodes = new Map<string, Node>();
 
-    if (edge.predicate === 'iff' && existing.predicate === 'implies') {
-      const same = existing.from === edge.from && existing.to === edge.to;
-      const reverse = existing.from === edge.to && existing.to === edge.from;
-      if (same || reverse) removed.push(existing.id);
+  for (const node of graph.nodes) {
+    if (nodes.has(node.id)) {
+      issues.push({
+        severity: 'error',
+        code: 'duplicate-node-id',
+        message: `节点 id 重复：${node.id}`,
+        nodeId: node.id,
+      });
+      continue;
     }
+    nodes.set(node.id, node);
 
-    if (edge.predicate === 'depends-on' && existing.predicate === 'cites') {
-      if (existing.from === edge.from && existing.to === edge.to) removed.push(existing.id);
+    if (!node.title.trim()) {
+      issues.push({
+        severity: 'error',
+        code: 'empty-title',
+        message: `节点 ${node.id} 的标题为空。`,
+        nodeId: node.id,
+        field: 'title',
+      });
+    }
+    if (!Number.isFinite(node.order)) {
+      issues.push({
+        severity: 'error',
+        code: 'invalid-order',
+        message: `节点「${node.title}」的排序值不是数字。`,
+        nodeId: node.id,
+        field: 'order',
+      });
     }
   }
-  return removed;
-}
 
-/** 依赖关系里出现「A 蕴含 B，但 A 是 B 的反例」这种自相矛盾时给出提示 */
-export function findContradictions(index: GraphIndex): { implies: Edge; refutes: Edge }[] {
-  const conflicts: { implies: Edge; refutes: Edge }[] = [];
-  for (const implies of index.edges) {
-    if (implies.predicate !== 'implies') continue;
-    for (const refutes of index.edges) {
-      if (refutes.predicate !== 'refutes') continue;
-      if (refutes.from === implies.from && refutes.to === implies.to) {
-        conflicts.push({ implies, refutes });
+  const keys = new Map<string, string>();
+  for (const node of nodes.values()) {
+    if (!node.key) continue;
+    if (!/^[a-z0-9][a-z0-9-]*$/.test(node.key)) {
+      issues.push({
+        severity: 'error',
+        code: 'invalid-key',
+        message: `节点「${node.title}」的术语键格式不合法：${node.key}`,
+        nodeId: node.id,
+        field: 'key',
+      });
+    }
+    const owner = keys.get(node.key);
+    if (owner) {
+      issues.push({
+        severity: 'error',
+        code: 'duplicate-key',
+        message: `术语键 ${node.key} 被多个节点占用（${owner} 与 ${node.id}）。`,
+        nodeId: node.id,
+        field: 'key',
+      });
+    } else {
+      keys.set(node.key, node.id);
+    }
+  }
+
+  for (const node of nodes.values()) {
+    if (node.parentId === null) {
+      if (node.type !== 'branch') {
+        issues.push({
+          severity: 'error',
+          code: 'invalid-root-type',
+          message: `根节点「${node.title}」只能是分支。`,
+          nodeId: node.id,
+          field: 'parentId',
+        });
+      }
+      continue;
+    }
+    const parent = nodes.get(node.parentId);
+    if (!parent) {
+      issues.push({
+        severity: 'error',
+        code: 'missing-parent',
+        message: `节点「${node.title}」的父节点 ${node.parentId} 不存在。`,
+        nodeId: node.id,
+        field: 'parentId',
+      });
+      continue;
+    }
+    if (!allowedChildTypes(parent.type).includes(node.type)) {
+      issues.push({
+        severity: 'error',
+        code: 'invalid-child-type',
+        message: `「${NODE_TYPE_META[parent.type].label}」下不能放「${NODE_TYPE_META[node.type].label}」（${node.title}）。`,
+        nodeId: node.id,
+        field: 'parentId',
+      });
+    }
+  }
+
+  for (const nodeId of parentChainHasCycle(nodes)) {
+    issues.push({
+      severity: 'error',
+      code: 'cyclic-parent',
+      message: `节点 ${nodeId} 的父链成环。`,
+      nodeId,
+      field: 'parentId',
+    });
+  }
+
+  const edgeIds = new Set<string>();
+  const edges = graph.edges;
+
+  for (const edge of edges) {
+    if (edgeIds.has(edge.id)) {
+      issues.push({
+        severity: 'error',
+        code: 'duplicate-edge-id',
+        message: `关系 id 重复：${edge.id}`,
+        edgeId: edge.id,
+      });
+      continue;
+    }
+    edgeIds.add(edge.id);
+
+    const fromNode = nodes.get(edge.from);
+    const toNode = nodes.get(edge.to);
+    if (!fromNode || !toNode) {
+      issues.push({
+        severity: 'error',
+        code: 'missing-endpoint',
+        message: `关系 ${edge.id} 指向不存在的节点。`,
+        edgeId: edge.id,
+      });
+      continue;
+    }
+
+    if (edge.from === edge.to) {
+      issues.push({
+        severity: 'error',
+        code: 'self-loop',
+        message: `关系 ${edge.id} 把「${fromNode.title}」连到了它自己。`,
+        edgeId: edge.id,
+      });
+    }
+
+    const spec = PREDICATE_SPECS[edge.predicate];
+    if (!spec.from.includes(fromNode.type) || !spec.to.includes(toNode.type)) {
+      issues.push({
+        severity: 'error',
+        code: 'invalid-endpoint-type',
+        message: `关系 ${edge.id}（${PREDICATE_HINT[edge.predicate]}）不能用在「${NODE_TYPE_META[fromNode.type].label} → ${NODE_TYPE_META[toNode.type].label}」之间。`,
+        edgeId: edge.id,
+      });
+    }
+
+    if (edge.contextId && nodes.get(edge.contextId)?.type !== 'context') {
+      issues.push({
+        severity: 'error',
+        code: 'invalid-context',
+        message: `关系 ${edge.id} 的语境 ${edge.contextId} 不是语境节点。`,
+        edgeId: edge.id,
+        field: 'contextId',
+      });
+    }
+
+    for (const assumptionId of edge.assumptionIds ?? []) {
+      if (!nodes.has(assumptionId)) {
+        issues.push({
+          severity: 'error',
+          code: 'missing-assumption',
+          message: `关系 ${edge.id} 引用了不存在的前提 ${assumptionId}。`,
+          edgeId: edge.id,
+          field: 'assumptionIds',
+        });
+      }
+    }
+
+    if (spec.symmetric) {
+      const canonical = canonicalizePair(edge.predicate, edge.from, edge.to);
+      if (canonical.from !== edge.from) {
+        issues.push({
+          severity: 'warning',
+          code: 'non-canonical-symmetric',
+          message: `对称关系 ${edge.id} 没有按规范方向存储，读写仍然正确，但建议整理。`,
+          edgeId: edge.id,
+        });
       }
     }
   }
-  return conflicts;
+
+  // 重复关系（同谓词 + 同端点 + 同语境 + 同前提）
+  const seen = new Map<string, Edge>();
+  for (const edge of edges) {
+    for (const other of seen.values()) {
+      if (sameRelationKey(edge, other)) {
+        issues.push({
+          severity: 'error',
+          code: 'duplicate-edge',
+          message: `关系 ${edge.id} 与 ${other.id} 完全相同。`,
+          edgeId: edge.id,
+        });
+        break;
+      }
+    }
+    seen.set(edge.id, edge);
+  }
+
+  // 只有学习前置关系要求无环
+  const dependsEdges = edges.filter((edge) => edge.predicate === 'depends-on');
+  if (dependsEdges.length > 0) {
+    const adjacency = new Map<string, string[]>();
+    for (const edge of dependsEdges) {
+      const list = adjacency.get(edge.from);
+      if (list) list.push(edge.to);
+      else adjacency.set(edge.from, [edge.to]);
+    }
+    const state = new Map<string, 0 | 1 | 2>();
+    const reported = new Set<string>();
+
+    const visit = (start: string) => {
+      const stack: { id: string; i: number }[] = [{ id: start, i: 0 }];
+      state.set(start, 1);
+      while (stack.length > 0) {
+        const frame = stack[stack.length - 1];
+        const next = adjacency.get(frame.id)?.[frame.i];
+        frame.i += 1;
+        if (next === undefined) {
+          state.set(frame.id, 2);
+          stack.pop();
+          continue;
+        }
+        const nextState = state.get(next);
+        if (nextState === 1) {
+          if (!reported.has(next)) {
+            reported.add(next);
+            issues.push({
+              severity: 'error',
+              code: 'prerequisite-cycle',
+              message: `前置学习关系成环（涉及 ${next}）。`,
+              nodeId: next,
+              suggestion: '删除环上的一条依赖，这不代表数学矛盾。',
+            });
+          }
+        } else if (nextState === undefined) {
+          state.set(next, 1);
+          stack.push({ id: next, i: 0 });
+        }
+      }
+    };
+
+    for (const id of adjacency.keys()) {
+      if (state.get(id) === undefined) visit(id);
+    }
+  }
+
+  return issues;
+}
+
+// =============================================================================
+// 冲突提示（不是数学判定）
+// =============================================================================
+
+export interface ConflictHint {
+  code: string;
+  message: string;
+  edgeIds: string[];
+}
+
+/**
+ * 「需要人工核查的线索」，不是严格的矛盾判定。
+ * 反例反驳的是明确的命题，不能因为同端点就宣布某条蕴含错了。
+ */
+export function findConflictHints(index: GraphIndex): ConflictHint[] {
+  const hints: ConflictHint[] = [];
+
+  for (const edge of index.edges) {
+    if (edge.predicate === 'implies' && edge.status === 'disproven') {
+      hints.push({
+        code: 'disproven-implication',
+        message: '这条蕴含已被标记为不成立，但它仍然出现在图里，注意别把它当成结论。',
+        edgeIds: [edge.id],
+      });
+    }
+  }
+
+  for (const a of index.edges) {
+    if (a.predicate !== 'generalizes') continue;
+    for (const b of index.edges) {
+      if (b.predicate !== 'generalizes') continue;
+      if (a.id >= b.id) continue;
+      if (a.from === b.to && a.to === b.from) {
+        hints.push({
+          code: 'mutual-generalization',
+          message: '两个结论互为推广，可能只是同一件事的不同说法，请人工核查。',
+          edgeIds: [a.id, b.id],
+        });
+      }
+    }
+  }
+
+  for (const a of index.edges) {
+    if (a.predicate !== 'implies') continue;
+    for (const b of index.edges) {
+      if (b.predicate !== 'implies') continue;
+      if (a.id >= b.id) continue;
+      if (a.from === b.to && a.to === b.from) {
+        const conditions = [normalizeCondition(a.condition), normalizeCondition(b.condition)];
+        if (conditions[0] !== conditions[1]) {
+          hints.push({
+            code: 'mutual-implication-different-conditions',
+            message: '两个方向的蕴含前提不同，不能直接当成无条件等价。',
+            edgeIds: [a.id, b.id],
+          });
+        }
+      }
+    }
+  }
+
+  for (const edge of index.edges) {
+    if (edge.predicate !== 'refutes') continue;
+    const target = index.nodes.get(edge.to);
+    if (!target) continue;
+    hints.push({
+      code: 'counterexample-target',
+      message: `反例反驳的是命题「${target.title}」本身；如果要反驳某条蕴含，请在对应关系上标注状态。`,
+      edgeIds: [edge.id],
+    });
+  }
+
+  return hints;
 }
 
 export function subtreeSize(index: GraphIndex, id: string): number {
@@ -290,3 +765,5 @@ export function isAncestor(index: GraphIndex, ancestorId: string, descendantId: 
 export function nodeLabel(node: Node | undefined, fallback = '未知节点'): string {
   return node ? node.title || NODE_TYPE_META[node.type].label : fallback;
 }
+
+export { issuesMessage };

@@ -63,6 +63,10 @@ const TreeNode: React.FC<TreeNodeProps> = ({ node, numberPrefix = '' }) => {
     node.type === 'exercise' ? 'Ex: ' :
     node.type === 'attempt' ? 'Sol: ' :
     node.type === 'note' ? 'Note: ' :
+    node.type === 'proof' ? 'Pf: ' :
+    node.type === 'concept' ? 'Con: ' :
+    node.type === 'context' ? 'Ctx: ' :
+    node.type === 'counterexample' ? 'Cex: ' :
     '';
 
   const colorClass =
@@ -74,6 +78,10 @@ const TreeNode: React.FC<TreeNodeProps> = ({ node, numberPrefix = '' }) => {
     node.type === 'exercise' ? 'text-purple-600 dark:text-purple-400' :
     node.type === 'attempt' ? 'text-red-600 dark:text-red-400' :
     node.type === 'note' ? 'text-yellow-600 dark:text-yellow-400' :
+    node.type === 'proof' ? 'text-red-600 dark:text-red-400' :
+    node.type === 'concept' ? 'text-indigo-600 dark:text-indigo-400' :
+    node.type === 'context' ? 'text-zinc-600 dark:text-zinc-400' :
+    node.type === 'counterexample' ? 'text-rose-600 dark:text-rose-400' :
     '';
 
   return (

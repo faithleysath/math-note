@@ -65,6 +65,26 @@ export async function deleteNodesCascade(ids: string[], edgeIds: string[]): Prom
   });
 }
 
+export interface GraphBatch {
+  putNodes?: Node[];
+  deleteNodeIds?: string[];
+  putEdges?: Edge[];
+  deleteEdgeIds?: string[];
+}
+
+/**
+ * 一批变更要么全部落盘，要么全部不落盘。
+ * AI 批量写入 / 迁移 / 级联删除都走这里。
+ */
+export async function applyBatch(batch: GraphBatch): Promise<void> {
+  await db.transaction('rw', db.nodes, db.edges, async () => {
+    if (batch.putNodes?.length) await db.nodes.bulkPut(batch.putNodes);
+    if (batch.deleteNodeIds?.length) await db.nodes.bulkDelete(batch.deleteNodeIds);
+    if (batch.putEdges?.length) await db.edges.bulkPut(batch.putEdges);
+    if (batch.deleteEdgeIds?.length) await db.edges.bulkDelete(batch.deleteEdgeIds);
+  });
+}
+
 export async function replaceAll(data: { nodes: Node[]; edges: Edge[] }): Promise<void> {
   await db.transaction('rw', db.nodes, db.edges, async () => {
     await db.nodes.clear();

@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { buildIndex } from './graph';
-import { findContradictions, subtreeSize, validateCanReparent, validateNewEdge, validateNewNode, ValidationError } from './validate';
+import {
+  findConflictHints,
+  sameRelationKey,
+  subtreeSize,
+  validateCanReparent,
+  validateGraphInvariants,
+  validateNewEdge,
+  validateNewNode,
+  ValidationError,
+} from './validate';
 import type { Edge, Node, NodeType } from './schema';
 
 function node(
@@ -23,7 +32,7 @@ function node(
   };
 }
 
-function edge(id: string, from: string, to: string, predicate: Edge['predicate']): Edge {
+function edge(id: string, from: string, to: string, predicate: Edge['predicate'], extra: Partial<Edge> = {}): Edge {
   return {
     id,
     from,
@@ -32,6 +41,7 @@ function edge(id: string, from: string, to: string, predicate: Edge['predicate']
     assertedBy: 'manual',
     createdAt: 0,
     updatedAt: 0,
+    ...extra,
   };
 }
 
@@ -43,6 +53,10 @@ const base = [
   node('t1', 'theorem', 's11', 2048, { title: '定理甲' }),
   node('t2', 'theorem', 's11', 3072, { title: '定理乙' }),
   node('ex1', 'exercise', 's11', 4096, { title: '练习甲' }),
+  node('pf1', 'proof', 't1', 1024, { title: '证明甲' }),
+  node('cex1', 'counterexample', 't1', 2048, { title: '反例甲' }),
+  node('con1', 'concept', 'b1', 2048, { title: '幂集概念', key: 'concept-power-set' }),
+  node('ctx1', 'context', 'b1', 3072, { title: '实数域' }),
 ];
 
 describe('节点校验', () => {
@@ -87,6 +101,16 @@ describe('节点校验', () => {
     ).not.toThrow();
   });
 
+  it('证明只能挂在命题下', () => {
+    const index = buildIndex(base, []);
+    expect(() =>
+      validateNewNode(index, { type: 'proof', title: '证', parentId: 's11' }),
+    ).toThrowError(/只能挂在定理/);
+    expect(() =>
+      validateNewNode(index, { type: 'proof', title: '证', parentId: 't2' }),
+    ).not.toThrow();
+  });
+
   it('不能把节点移动到自己的子孙下', () => {
     const index = buildIndex(base, []);
     expect(() => validateCanReparent(index, 'c1', 's11')).toThrowError(/自己的子孙/);
@@ -95,8 +119,8 @@ describe('节点校验', () => {
 
   it('子树大小算得对', () => {
     const index = buildIndex(base, []);
-    expect(subtreeSize(index, 's11')).toBe(5);
-    expect(subtreeSize(index, 'b1')).toBe(7);
+    expect(subtreeSize(index, 's11')).toBe(7);
+    expect(subtreeSize(index, 'b1')).toBe(11);
   });
 });
 
@@ -108,14 +132,27 @@ describe('边校验', () => {
     ).toThrowError(/不能把节点连到它自己/);
   });
 
-  it('检查类型白名单', () => {
+  it('proves 的起点必须是证明节点', () => {
     const index = buildIndex(base, []);
     expect(() =>
       validateNewEdge(index, { from: 'd1', to: 't1', predicate: 'proves' }),
     ).toThrowError(/不能用在/);
+    expect(() =>
+      validateNewEdge(index, { from: 'pf1', to: 't1', predicate: 'proves' }),
+    ).not.toThrow();
   });
 
-  it('拒绝重复关系', () => {
+  it('refutes 的起点必须是反例节点', () => {
+    const index = buildIndex(base, []);
+    expect(() =>
+      validateNewEdge(index, { from: 'ex1', to: 't1', predicate: 'refutes' }),
+    ).toThrowError(/不能用在/);
+    expect(() =>
+      validateNewEdge(index, { from: 'cex1', to: 't1', predicate: 'refutes' }),
+    ).not.toThrow();
+  });
+
+  it('拒绝完全相同的重复关系', () => {
     const edges = [edge('e1', 't1', 'd1', 'depends-on')];
     const index = buildIndex(base, edges);
     expect(() =>
@@ -123,39 +160,225 @@ describe('边校验', () => {
     ).toThrowError(/已经存在/);
   });
 
-  it('等价关系拒绝反向重复', () => {
+  it('端点相同但前提不同是两条不同断言，允许共存', () => {
+    const edges = [edge('e1', 't1', 't2', 'implies', { condition: 'x>0' })];
+    const index = buildIndex(base, edges);
+    expect(() =>
+      validateNewEdge(index, { from: 't1', to: 't2', predicate: 'implies', condition: 'x<0' }),
+    ).not.toThrow();
+  });
+
+  it('端点相同但语境不同也允许共存', () => {
+    const edges = [edge('e1', 't1', 't2', 'implies', { contextId: 'ctx1' })];
+    const index = buildIndex(base, edges);
+    expect(() =>
+      validateNewEdge(index, { from: 't1', to: 't2', predicate: 'implies' }),
+    ).not.toThrow();
+  });
+
+  it('等价关系正反只存一条', () => {
     const edges = [edge('e1', 't1', 't2', 'iff')];
     const index = buildIndex(base, edges);
     expect(() =>
       validateNewEdge(index, { from: 't2', to: 't1', predicate: 'iff' }),
-    ).toThrowError(/只存一条/);
+    ).toThrowError(/已经存在/);
   });
 
-  it('拒绝会成环的依赖', () => {
+  it('A⇒B 与 B⇒A 可以共存，只给警告', () => {
+    const edges = [edge('e1', 't1', 't2', 'implies')];
+    const index = buildIndex(base, edges);
+    const result = validateNewEdge(index, { from: 't2', to: 't1', predicate: 'implies' });
+    expect(result.warnings.map((w) => w.code)).toContain('mutual-implication');
+  });
+
+  it('A⇔B⇔C⇔A 合法，只提示冗余', () => {
+    const edges = [
+      edge('e1', 't1', 't2', 'iff'),
+      edge('e2', 't2', 'd1', 'iff'),
+    ];
+    const index = buildIndex(base, edges);
+    const result = validateNewEdge(index, { from: 'd1', to: 't1', predicate: 'iff' });
+    expect(result.warnings.map((w) => w.code)).toContain('redundant-equivalence');
+  });
+
+  it('依赖成环被拒绝，且提示语说明是学习顺序问题', () => {
     const edges = [
       edge('e1', 't1', 't2', 'depends-on'),
       edge('e2', 't2', 'd1', 'depends-on'),
     ];
     const index = buildIndex(base, edges);
     let message = '';
+    let suggestion = '';
     try {
       validateNewEdge(index, { from: 'd1', to: 't1', predicate: 'depends-on' });
     } catch (error) {
       message = error instanceof ValidationError ? error.message : String(error);
+      suggestion = error instanceof ValidationError ? (error.issues[0]?.suggestion ?? '') : '';
     }
-    expect(message).toMatch(/循环依赖/);
+    expect(message).toMatch(/前置学习关系成环/);
     expect(message).toMatch(/幂集 → 定理甲 → 定理乙 → 幂集/);
+    expect(suggestion).toMatch(/不代表数学矛盾/);
   });
 
-  it('能发现「同一对命题既蕴含又是反例」的矛盾', () => {
-    const edges = [edge('e1', 't1', 't2', 'implies'), edge('e2', 'ex1', 't2', 'refutes')];
-    const index = buildIndex(base, edges);
-    expect(findContradictions(index)).toHaveLength(0);
+  it('语境必须指向语境节点', () => {
+    const index = buildIndex(base, []);
+    expect(() =>
+      validateNewEdge(index, { from: 't1', to: 't2', predicate: 'implies', contextId: 'd1' }),
+    ).toThrowError(/语境必须指向/);
+    expect(() =>
+      validateNewEdge(index, { from: 't1', to: 't2', predicate: 'implies', contextId: 'ctx1' }),
+    ).not.toThrow();
+  });
+});
 
-    const conflicting = buildIndex(base, [
-      edge('e1', 't1', 't2', 'implies'),
-      edge('e3', 't1', 't2', 'refutes'),
+describe('关系去重键', () => {
+  it('条件或语境不同就不是同一条', () => {
+    const a = { predicate: 'implies' as const, from: 't1', to: 't2', condition: 'x>0', contextId: 'ctx1' };
+    expect(sameRelationKey(a, { ...a })).toBe(true);
+    expect(sameRelationKey(a, { ...a, condition: 'x>0 ' })).toBe(true);
+    expect(sameRelationKey(a, { ...a, condition: 'x<0' })).toBe(false);
+    expect(sameRelationKey(a, { ...a, contextId: undefined })).toBe(false);
+  });
+
+  it('对称谓词忽略方向', () => {
+    const a = { predicate: 'iff' as const, from: 't1', to: 't2' };
+    const b = { predicate: 'iff' as const, from: 't2', to: 't1' };
+    expect(sameRelationKey(a, b)).toBe(true);
+  });
+});
+
+describe('全图不变式', () => {
+  it('合法图没有任何错误', () => {
+    const issues = validateGraphInvariants({ nodes: base, edges: [] });
+    expect(issues.filter((issue) => issue.severity === 'error')).toEqual([]);
+  });
+
+  it('父链成环会被发现', () => {
+    const nodes = [
+      node('b1', 'branch', null, 1024),
+      node('c1', 'chapter', 'c2', 1024),
+      node('c2', 'chapter', 'c1', 2048),
+    ];
+    const issues = validateGraphInvariants({ nodes, edges: [] });
+    expect(issues.some((issue) => issue.code === 'cyclic-parent')).toBe(true);
+  });
+
+  it('非法的父子类型会被发现', () => {
+    const nodes = [node('b1', 'branch', null, 1024), node('t1', 'theorem', 'b1', 1024)];
+    const issues = validateGraphInvariants({ nodes, edges: [] });
+    expect(issues.some((issue) => issue.code === 'invalid-child-type')).toBe(true);
+  });
+
+  it('重复术语键会被发现', () => {
+    const nodes = [
+      node('b1', 'branch', null, 1024),
+      node('c1', 'chapter', 'b1', 1024),
+      node('s1', 'section', 'c1', 1024),
+      node('d1', 'definition', 's1', 1024, { key: 'x' }),
+      node('d2', 'definition', 's1', 2048, { key: 'x' }),
+    ];
+    const issues = validateGraphInvariants({ nodes, edges: [] });
+    expect(issues.some((issue) => issue.code === 'duplicate-key')).toBe(true);
+  });
+
+  it('非法边类型会被发现', () => {
+    const issues = validateGraphInvariants({
+      nodes: base,
+      edges: [edge('e1', 'd1', 't1', 'proves')],
+    });
+    expect(issues.some((issue) => issue.code === 'invalid-endpoint-type')).toBe(true);
+  });
+
+  it('依赖成环会被发现，逻辑成环不会', () => {
+    const depends = validateGraphInvariants({
+      nodes: base,
+      edges: [
+        edge('e1', 't1', 't2', 'depends-on'),
+        edge('e2', 't2', 't1', 'depends-on'),
+      ],
+    });
+    expect(depends.some((issue) => issue.code === 'prerequisite-cycle')).toBe(true);
+
+    const logical = validateGraphInvariants({
+      nodes: base,
+      edges: [
+        edge('e1', 't1', 't2', 'implies'),
+        edge('e2', 't2', 't1', 'implies'),
+        edge('e3', 't1', 't2', 'iff'),
+      ],
+    });
+    expect(logical.filter((issue) => issue.severity === 'error')).toEqual([]);
+  });
+
+  it('语境引用不存在会被发现', () => {
+    const issues = validateGraphInvariants({
+      nodes: base,
+      edges: [edge('e1', 't1', 't2', 'implies', { contextId: 'missing' })],
+    });
+    expect(issues.some((issue) => issue.code === 'invalid-context')).toBe(true);
+  });
+});
+
+describe('多证明与反例', () => {
+  it('一个命题可以挂两个独立证明，删掉一个不影响另一个', () => {
+    const nodes = [
+      node('b1', 'branch', null, 1024),
+      node('c1', 'chapter', 'b1', 1024),
+      node('s1', 'section', 'c1', 1024),
+      node('t1', 'theorem', 's1', 1024, { title: '定理甲' }),
+      node('p1', 'proof', 't1', 1024, { title: '证明一' }),
+      node('p2', 'proof', 't1', 2048, { title: '证明二' }),
+    ];
+    const edges = [
+      edge('e1', 'p1', 't1', 'proves'),
+      edge('e2', 'p2', 't1', 'proves'),
+      edge('e3', 'p1', 't1', 'depends-on'),
+    ];
+    const issues = validateGraphInvariants({ nodes, edges });
+    expect(issues.filter((issue) => issue.severity === 'error')).toEqual([]);
+
+    const index = buildIndex(nodes, edges);
+    expect(index.edgesTo.get('t1')?.filter((item) => item.predicate === 'proves')).toHaveLength(2);
+
+    // 删掉证明一：定理和证明二都还在
+    const remaining = nodes.filter((item) => item.id !== 'p1');
+    const remainingEdges = edges.filter((item) => item.from !== 'p1' && item.to !== 'p1');
+    const after = buildIndex(remaining, remainingEdges);
+    expect(after.nodes.has('t1')).toBe(true);
+    expect(after.nodes.has('p2')).toBe(true);
+    expect(after.edgesTo.get('t1')?.filter((item) => item.predicate === 'proves')).toHaveLength(1);
+  });
+
+  it('反例只能反驳明确的命题', () => {
+    const index = buildIndex(base, []);
+    expect(() =>
+      validateNewEdge(index, { from: 'cex1', to: 'con1', predicate: 'refutes' }),
+    ).toThrowError(/不能用在/);
+  });
+
+  it('反例线索指向被反驳的命题，而不是「某条边错了」', () => {
+    const index = buildIndex(base, [edge('e1', 'cex1', 't1', 'refutes')]);
+    const hint = findConflictHints(index).find((item) => item.code === 'counterexample-target');
+    expect(hint?.message).toMatch(/定理甲/);
+  });
+});
+
+describe('冲突提示', () => {
+  it('互补推广给出核查线索', () => {
+    const index = buildIndex(base, [
+      edge('e1', 't1', 't2', 'generalizes'),
+      edge('e2', 't2', 't1', 'generalizes'),
     ]);
-    expect(findContradictions(conflicting).length).toBeGreaterThan(0);
+    expect(findConflictHints(index).some((hint) => hint.code === 'mutual-generalization')).toBe(true);
+  });
+
+  it('不同前提的双向蕴含不会被当成无条件等价', () => {
+    const index = buildIndex(base, [
+      edge('e1', 't1', 't2', 'implies', { condition: 'x>0' }),
+      edge('e2', 't2', 't1', 'implies', { condition: 'x<0' }),
+    ]);
+    expect(
+      findConflictHints(index).some((hint) => hint.code === 'mutual-implication-different-conditions'),
+    ).toBe(true);
   });
 });

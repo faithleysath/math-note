@@ -23,12 +23,21 @@ export function AiHandwritingDialog() {
   const [preview, setPreview] = useState<string | null>(null);
   const [base64, setBase64] = useState<string | null>(null);
   const [operations, setOperations] = useState<AiOperation[]>([]);
+  const [planErrors, setPlanErrors] = useState<string[]>([]);
+  const [plan, setPlan] = useState<{
+    createdNodes: number;
+    updatedNodes: number;
+    deletedNodes: number;
+    createdEdges: number;
+    deletedEdges: number;
+  } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const index = useGraphStore((state) => state.index);
   const selectedId = useGraphStore((state) => state.selectedId);
   const expandedBranchId = useGraphStore((state) => state.expandedBranchId);
   const applyAiOperations = useGraphStore((state) => state.applyAiOperations);
+  const previewAiOperations = useGraphStore((state) => state.previewAiOperations);
 
   const resolveParent = (): Node | null => {
     const candidates: (Node | undefined)[] = [
@@ -83,7 +92,26 @@ export function AiHandwritingDialog() {
       setOperations(result.operations);
       if (result.operations.length === 0) {
         toast.warning('模型没有给出任何操作。');
+        setPlan(null);
+        setPlanErrors([]);
+        return;
       }
+
+      // 整批预演：任何一步不合法都不会应用
+      const preview = previewAiOperations(result.operations);
+      if (preview.errors.length > 0 || !preview.diff) {
+        setPlanErrors(preview.errors);
+        setPlan(null);
+        return;
+      }
+      setPlanErrors([]);
+      setPlan({
+        createdNodes: preview.diff.createdNodes.length,
+        updatedNodes: preview.diff.updatedNodes.length,
+        deletedNodes: preview.diff.deletedNodeIds.length,
+        createdEdges: preview.diff.createdEdges.length,
+        deletedEdges: preview.diff.deletedEdgeIds.length,
+      });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '识别失败。');
     } finally {
@@ -153,6 +181,8 @@ export function AiHandwritingDialog() {
                     setPreview(null);
                     setBase64(null);
                     setOperations([]);
+                    setPlan(null);
+                    setPlanErrors([]);
                   }}
                 >
                   <X className="h-4 w-4" />
@@ -181,6 +211,25 @@ export function AiHandwritingDialog() {
                   <li key={`${op.op}-${position}`}>{describeOperation(op, index.nodes)}</li>
                 ))}
               </ol>
+              {planErrors.length > 0 && (
+                <ul className="mt-2 space-y-0.5 text-xs text-destructive">
+                  {planErrors.slice(0, 3).map((message) => (
+                    <li key={message}>{message}</li>
+                  ))}
+                </ul>
+              )}
+              {plan && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  新增 {plan.createdNodes} 个节点、{plan.createdEdges} 条关系；修改 {plan.updatedNodes} 个；
+                  {plan.deletedNodes + plan.deletedEdges > 0 ? (
+                    <span className="text-destructive">
+                      删除 {plan.deletedNodes} 个节点、{plan.deletedEdges} 条关系
+                    </span>
+                  ) : (
+                    '不删除任何内容'
+                  )}
+                </p>
+              )}
             </div>
           )}
         </div>
@@ -198,7 +247,7 @@ export function AiHandwritingDialog() {
               开始处理
             </Button>
           ) : (
-            <Button onClick={handleApply} disabled={isProcessing}>
+            <Button onClick={handleApply} disabled={isProcessing || planErrors.length > 0 || !plan}>
               {isProcessing ? (
                 <Loader className="mr-2 h-4 w-4 animate-spin" />
               ) : (

@@ -14,12 +14,15 @@ import {
 import { canonicalizePair } from '../lib/predicates';
 import type { AiOperation, Edge, GraphJSON, Node } from '../lib/schema';
 import { parseGraph, serializeGraph } from '../lib/serialize';
+import { simulateOperations, type DraftDiff } from '../lib/draft';
 import {
   ValidationError,
   validateNewEdge,
   validateNewNode,
   validateNodePatch,
-  subsumedEdgeIds,
+  validateGraphInvariants,
+  sameRelationKey,
+  findConflictHints,
   type NewEdgeInput,
   type NewNodeInput,
   type NodePatch,
@@ -52,7 +55,10 @@ export interface GraphState {
   moveSibling: (id: string, direction: 'up' | 'down') => Promise<void>;
 
   createEdge: (input: NewEdgeInput) => Promise<Edge>;
-  updateEdge: (id: string, patch: Partial<Pick<Edge, 'condition' | 'note' | 'status'>>) => Promise<void>;
+  updateEdge: (
+    id: string,
+    patch: Partial<Pick<Edge, 'condition' | 'note' | 'status' | 'reviewState' | 'contextId' | 'assumptionIds'>>,
+  ) => Promise<void>;
   deleteEdge: (id: string) => Promise<void>;
 
   exportGraph: () => GraphJSON;
@@ -60,6 +66,12 @@ export interface GraphState {
   loadSnapshot: (json: unknown, label: string) => Promise<void>;
   clearAll: () => Promise<void>;
   applyAiOperations: (ops: AiOperation[]) => Promise<{ applied: number; errors: string[] }>;
+  previewAiOperations: (ops: AiOperation[]) => {
+    errors: string[];
+    warnings: string[];
+    diff: DraftDiff | null;
+  };
+  diagnose: () => { errors: string[]; warnings: string[] };
 }
 
 const emptyIndex = (): GraphIndex => buildIndex([], []);
@@ -326,7 +338,8 @@ export const useGraphStore = create<GraphState>()((set, get) => {
       assertWritable(state);
 
       const canonical = canonicalizePair(input.predicate, input.from, input.to);
-      validateNewEdge(state.index, { ...input, ...canonical });
+      // 不再自动删除任何旧关系：不同前提/语境的断言必须共存
+      const { warnings } = validateNewEdge(state.index, { ...input, ...canonical });
 
       const now = Date.now();
       const edge: Edge = {
@@ -336,19 +349,23 @@ export const useGraphStore = create<GraphState>()((set, get) => {
         predicate: input.predicate,
         condition: input.condition || undefined,
         note: input.note || undefined,
-        status: input.status,
+        status: input.status ?? 'asserted',
+        // 人工录入也只是「未审核」，不能自动升级成已检查
+        reviewState: input.reviewState ?? 'unreviewed',
+        contextId: input.contextId || undefined,
+        assumptionIds: input.assumptionIds?.length ? input.assumptionIds : undefined,
         assertedBy: input.assertedBy ?? 'manual',
         model: input.model,
         createdAt: now,
         updatedAt: now,
       };
 
-      const removeIds = subsumedEdgeIds(state.index, edge);
       await db.putEdges([edge]);
-      if (removeIds.length > 0) await db.removeEdges(removeIds);
+      set({ index: buildIndex(state.index.nodes.values(), [...state.index.edges, edge]) });
 
-      const edges = [...state.index.edges.filter((item) => !removeIds.includes(item.id)), edge];
-      set({ index: buildIndex(state.index.nodes.values(), edges) });
+      if (warnings.length > 0) {
+        toast.warning(warnings[0].message);
+      }
       return edge;
     },
 
@@ -359,6 +376,15 @@ export const useGraphStore = create<GraphState>()((set, get) => {
       if (!existing) throw new ValidationError('id', '关系不存在。');
 
       const next: Edge = { ...existing, ...patch, updatedAt: Date.now() };
+
+      // 改了前提/语境之后不能和别的边变成同一条
+      const duplicate = state.index.edges.find(
+        (edge) => edge.id !== id && sameRelationKey(edge, next),
+      );
+      if (duplicate) {
+        throw new ValidationError('predicate', '这个条件下已经有一条相同的关系了。');
+      }
+
       await db.putEdges([next]);
       const edges = state.index.edges.map((edge) => (edge.id === id ? next : edge));
       set({ index: buildIndex(state.index.nodes.values(), edges) });
@@ -379,7 +405,7 @@ export const useGraphStore = create<GraphState>()((set, get) => {
 
     importGraph: async (json) => {
       const parsed = parseGraph(json);
-      await db.replaceAll(parsed);
+      await db.replaceAll({ nodes: parsed.nodes, edges: parsed.edges });
       const index = buildIndex(parsed.nodes, parsed.edges);
       set({
         index,
@@ -392,6 +418,11 @@ export const useGraphStore = create<GraphState>()((set, get) => {
         expandedIds: new Set(index.roots.slice(0, 1)),
         editingId: null,
       });
+      if (parsed.migration) {
+        toast.success(
+          `已从旧格式迁移：生成 ${parsed.migration.proofsCreated} 个证明节点（原有 solution 内容保留）。`,
+        );
+      }
     },
 
     loadSnapshot: async (json, label) => {
@@ -424,74 +455,95 @@ export const useGraphStore = create<GraphState>()((set, get) => {
     // -------------------------------------------------------------------------
     // AI 批量操作
     // -------------------------------------------------------------------------
-    applyAiOperations: async (ops) => {
-      const errors: string[] = [];
-      let applied = 0;
-      // 同一批操作里的临时引用："ref:n1" → 真实 id
-      const refs = new Map<string, string>();
-      const resolve = (value: string): string => {
-        if (!value.startsWith('ref:')) return value;
-        const resolved = refs.get(value.slice(4));
-        if (!resolved) throw new ValidationError('ref', `找不到临时引用 ${value}。`);
-        return resolved;
+    // -------------------------------------------------------------------------
+    // AI 批量操作：先整批模拟，再一次性事务提交
+    // -------------------------------------------------------------------------
+    previewAiOperations: (ops) => {
+      const state = get();
+      const simulation = simulateOperations(state.index, ops);
+      if (simulation.errors.length > 0) {
+        return { errors: simulation.errors, warnings: [], diff: null };
+      }
+      const issues = validateGraphInvariants({
+        nodes: [...simulation.nodes.values()],
+        edges: simulation.edges,
+      });
+      const errors = issues.filter((issue) => issue.severity === 'error').map((issue) => issue.message);
+      const warnings = issues
+        .filter((issue) => issue.severity === 'warning')
+        .map((issue) => issue.message);
+      return {
+        errors,
+        warnings,
+        diff: errors.length > 0 ? null : simulation.diff,
       };
+    },
 
-      for (const [position, op] of ops.entries()) {
-        try {
-          switch (op.op) {
-            case 'create-node': {
-              const node = await get().createNode({
-                type: op.type,
-                title: op.title,
-                content: op.content,
-                solution: op.solution,
-                parentId: resolve(op.parentId),
-                afterId: op.after ? resolve(op.after) : null,
-                aliases: op.aliases,
-                tags: op.tags,
-              });
-              if (op.ref) refs.set(op.ref, node.id);
-              break;
-            }
-            case 'update-node':
-              await get().updateNode(resolve(op.id), {
-                title: op.title,
-                content: op.content,
-                solution: op.solution,
-                aliases: op.aliases,
-                tags: op.tags,
-              });
-              break;
-            case 'delete-node':
-              await get().deleteSubtree(resolve(op.id));
-              break;
-            case 'create-edge':
-              await get().createEdge({
-                from: resolve(op.from),
-                to: resolve(op.to),
-                predicate: op.predicate,
-                condition: op.condition,
-                note: op.note,
-                assertedBy: 'ai',
-              });
-              break;
-            case 'delete-edge':
-              await get().deleteEdge(op.id);
-              break;
-            case 'select':
-              get().select(resolve(op.id));
-              break;
-          }
-          applied += 1;
-        } catch (error) {
-          errors.push(`第 ${position + 1} 个操作失败：${describeError(error)}`);
-        }
+    applyAiOperations: async (ops) => {
+      const state = get();
+      try {
+        assertWritable(state);
+      } catch (error) {
+        return { applied: 0, errors: [describeError(error)] };
       }
 
-      if (errors.length === 0) toast.success(`AI 的 ${applied} 个操作已全部执行。`);
-      else toast.warning(`${applied} 个操作成功，${errors.length} 个失败。`);
+      const simulation = simulateOperations(state.index, ops);
+      if (simulation.errors.length > 0) {
+        toast.error(simulation.errors[0]);
+        return { applied: 0, errors: simulation.errors };
+      }
 
-      return { applied, errors };
+      const issues = validateGraphInvariants({
+        nodes: [...simulation.nodes.values()],
+        edges: simulation.edges,
+      });
+      const errors = issues.filter((issue) => issue.severity === 'error');
+      if (errors.length > 0) {
+        toast.error(errors[0].message);
+        return { applied: 0, errors: errors.map((issue) => issue.message) };
+      }
+
+      const { diff } = simulation;
+      try {
+        // 单事务：任何一步失败都整体回滚，不留半成品
+        await db.applyBatch({
+          putNodes: [...diff.createdNodes, ...diff.updatedNodes],
+          deleteNodeIds: diff.deletedNodeIds,
+          putEdges: diff.createdEdges,
+          deleteEdgeIds: diff.deletedEdgeIds,
+        });
+      } catch (error) {
+        const message = describeError(error);
+        toast.error(`写入失败，未做任何修改：${message}`);
+        return { applied: 0, errors: [message] };
+      }
+
+      set({ index: buildIndex(simulation.nodes.values(), simulation.edges) });
+
+      // select 是纯 UI 操作，事务成功之后才应用
+      const lastSelect = diff.selects.at(-1);
+      if (lastSelect && simulation.nodes.has(lastSelect)) {
+        get().select(lastSelect);
+      }
+
+      toast.success(`AI 的 ${ops.length} 个操作已全部提交。`);
+      return { applied: ops.length, errors: [] };
+    },
+
+    diagnose: () => {
+      const state = get();
+      const issues = validateGraphInvariants({
+        nodes: [...state.index.nodes.values()],
+        edges: state.index.edges,
+      });
+      const hints = findConflictHints(state.index);
+      return {
+        errors: issues.filter((issue) => issue.severity === 'error').map((issue) => issue.message),
+        warnings: [
+          ...issues.filter((issue) => issue.severity === 'warning').map((issue) => issue.message),
+          ...hints.map((hint) => hint.message),
+        ],
+      };
     },
   };
 });

@@ -3,7 +3,13 @@ import { buildIndex } from './graph';
 import { parseGraph, serializeGraph } from './serialize';
 import type { Edge, Node, NodeType } from './schema';
 
-function node(id: string, type: NodeType, parentId: string | null, order: number): Node {
+function node(
+  id: string,
+  type: NodeType,
+  parentId: string | null,
+  order: number,
+  extra: Partial<Node> = {},
+): Node {
   return {
     id,
     type,
@@ -13,6 +19,7 @@ function node(id: string, type: NodeType, parentId: string | null, order: number
     order,
     createdAt: 1,
     updatedAt: 1,
+    ...extra,
   };
 }
 
@@ -20,40 +27,72 @@ const nodes = [
   node('b', 'branch', null, 1024),
   node('c', 'chapter', 'b', 1024),
   node('s', 'section', 'c', 1024),
-  node('t', 'theorem', 's', 1024),
+  node('t', 'theorem', 's', 1024, { title: '定理甲', solution: '设 x 为任意实数，则……' }),
+  node('t2', 'theorem', 's', 2048, { title: '定理乙' }),
 ];
 
-const edges: Edge[] = [
-  {
-    id: 'e1',
-    from: 't',
-    to: 't2',
-    predicate: 'cites',
-    assertedBy: 'manual',
-    createdAt: 1,
-    updatedAt: 1,
-  },
-];
+const toJson = (value: unknown) => JSON.parse(JSON.stringify(value));
 
 describe('导入导出', () => {
   it('导出再导入，树和编号完全一致', () => {
     const before = buildIndex(nodes, []);
-    const json = JSON.parse(JSON.stringify(serializeGraph(nodes, [])));
-    const parsed = parseGraph(json);
+    const parsed = parseGraph(toJson(serializeGraph(nodes, [])));
     const after = buildIndex(parsed.nodes, parsed.edges);
 
     expect(after.numbering.get('t')).toBe(before.numbering.get('t'));
     expect(after.roots).toEqual(before.roots);
+    expect(parsed.migration).toBeNull();
+  });
+
+  it('v2 数据导入时把 solution 迁移成证明节点', () => {
+    const v2 = { ...toJson(serializeGraph(nodes, [])), schemaVersion: 2 };
+    const parsed = parseGraph(v2);
+
+    expect(parsed.migration).toEqual({ from: 2, proofsCreated: 1 });
+
+    const proof = parsed.nodes.find((item) => item.type === 'proof');
+    expect(proof).toBeTruthy();
+    expect(proof?.parentId).toBe('t');
+    expect(proof?.content).toBe('设 x 为任意实数，则……');
+
+    // 原始 solution 保留，可以回滚
+    expect(parsed.nodes.find((item) => item.id === 't')?.solution).toBe('设 x 为任意实数，则……');
+
+    const provesEdge = parsed.edges.find((item) => item.predicate === 'proves');
+    expect(provesEdge?.from).toBe(proof?.id);
+    expect(provesEdge?.to).toBe('t');
+    expect(provesEdge?.reviewState).toBe('unreviewed');
+  });
+
+  it('v3 数据再次导入不会重复生成证明', () => {
+    const v2 = { ...toJson(serializeGraph(nodes, [])), schemaVersion: 2 };
+    const first = parseGraph(v2);
+    const exported = serializeGraph(first.nodes, first.edges);
+    const second = parseGraph(toJson(exported));
+
+    expect(second.migration).toBeNull();
+    expect(second.nodes.filter((item) => item.type === 'proof')).toHaveLength(1);
+    expect(second.edges.filter((item) => item.predicate === 'proves')).toHaveLength(1);
   });
 
   it('拒绝父节点不存在的节点', () => {
     const broken = serializeGraph([node('x', 'theorem', 'missing', 1024)], []);
-    expect(() => parseGraph(JSON.parse(JSON.stringify(broken)))).toThrowError(/父节点不存在/);
+    expect(() => parseGraph(toJson(broken))).toThrowError(/父节点不存在|没通过校验/);
   });
 
   it('拒绝指向空气的边', () => {
-    const broken = serializeGraph(nodes, edges);
-    expect(() => parseGraph(JSON.parse(JSON.stringify(broken)))).toThrowError(/不存在节点/);
+    const broken = serializeGraph(nodes, [
+      {
+        id: 'e1',
+        from: 't',
+        to: 'ghost',
+        predicate: 'depends-on',
+        assertedBy: 'manual',
+        createdAt: 1,
+        updatedAt: 1,
+      } as Edge,
+    ]);
+    expect(() => parseGraph(toJson(broken))).toThrowError(/不存在的节点|没通过校验/);
   });
 
   it('拒绝结构不对的 JSON', () => {
@@ -62,6 +101,38 @@ describe('导入导出', () => {
 
   it('拒绝重复 id', () => {
     const broken = serializeGraph([node('a', 'branch', null, 1024), node('a', 'note', null, 2048)], []);
-    expect(() => parseGraph(JSON.parse(JSON.stringify(broken)))).toThrowError(/id 重复/);
+    expect(() => parseGraph(toJson(broken))).toThrowError(/重复|没通过校验/);
+  });
+
+  it('拒绝依赖成环的数据', () => {
+    const broken = serializeGraph(nodes, [
+      { id: 'e1', from: 't', to: 't2', predicate: 'depends-on', assertedBy: 'manual', createdAt: 1, updatedAt: 1 },
+      { id: 'e2', from: 't2', to: 't', predicate: 'depends-on', assertedBy: 'manual', createdAt: 1, updatedAt: 1 },
+    ]);
+    let message = '';
+    try {
+      parseGraph(toJson(broken));
+    } catch (error) {
+      message = error instanceof Error ? error.message : String(error);
+    }
+    expect(message).toMatch(/前置学习关系成环/);
+  });
+
+  it('接受合法的逻辑成环（A⇒B 与 B⇒A）', () => {
+    const ok = serializeGraph(nodes, [
+      { id: 'e1', from: 't', to: 't2', predicate: 'implies', assertedBy: 'manual', createdAt: 1, updatedAt: 1 },
+      { id: 'e2', from: 't2', to: 't', predicate: 'implies', assertedBy: 'manual', createdAt: 1, updatedAt: 1 },
+    ]);
+    expect(() => parseGraph(toJson(ok))).not.toThrow();
+  });
+
+  it('警告不会阻止导入', () => {
+    // 对称边按非规范方向存储只会产生警告
+    const withWarning = serializeGraph(nodes, [
+      { id: 'e1', from: 't2', to: 't', predicate: 'iff', assertedBy: 'manual', createdAt: 1, updatedAt: 1 },
+    ]);
+    const parsed = parseGraph(toJson(withWarning));
+    expect(parsed.nodes).toHaveLength(nodes.length);
+    expect(parsed.warnings.length).toBeGreaterThan(0);
   });
 });

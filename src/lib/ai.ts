@@ -59,6 +59,14 @@ ${predicateTable()}
 关系方向很重要：from 是主语。如果内容说的是「A 是 B 的必要条件」，要写成 B 到 A 的 implies。
 数学蕴含如果带前提，必须写进 condition 字段（LaTeX）。
 
+# 关于审核、语境与证明
+
+- 你输出的关系一律被系统标记为「未审核」。不要声称任何关系已经被证明或验证。
+- 明确写了适用范围时（实数域、$x>0$、$n$ 为自然数……），把适用范围写进 condition。
+- 如果能对应到图谱里已有的「语境」节点，填 contextId；否则留空，表示语境未知。
+- 反例用 counterexample 节点，反驳一个明确的命题（theorem / lemma / corollary / note），不要用它去「反驳某条边」。
+- 正式证明写成 proof 节点，再用 proves 边指向被证命题；证明里用到的定义/定理用 depends-on 连接。
+
 # 三、书写的格式要求
 
 - 全部用 Markdown。

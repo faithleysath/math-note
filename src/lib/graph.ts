@@ -1,4 +1,12 @@
-import { NODE_TYPE_META, type Edge, type Node, type Predicate } from './schema';
+import {
+  NODE_TYPE_META,
+  type Edge,
+  type EdgeStatus,
+  type Node,
+  type Predicate,
+  type ReviewState,
+} from './schema';
+import { PREDICATE_SPECS, isLogicalPredicate } from './predicates';
 
 /** 兄弟节点排序间隔 */
 export const ORDER_GAP = 1024;
@@ -248,27 +256,76 @@ export function rebalancedOrders(index: GraphIndex, parentId: string | null): Ma
 }
 
 // =============================================================================
-// 图查询
+// 图查询：结构遍历
 // =============================================================================
+// 结构遍历只看「物理上存了哪些边」，不判断数学真假，也不合并语境。
+// 数学推理必须走下面的 inferLogicalRelations。
 
-/** 沿某个谓词可达的节点集合（不含自身） */
+/** 纯结构可达性（导航用），不检查 status / condition / 语境 */
 export function reachable(
   index: GraphIndex,
   startId: string,
   predicate: Predicate,
   direction: 'out' | 'in' = 'out',
 ): Set<string> {
+  const symmetric = PREDICATE_SPECS[predicate].symmetric;
   const result = new Set<string>();
   const queue = [startId];
   const visited = new Set<string>([startId]);
 
   while (queue.length > 0) {
     const current = queue.shift() as string;
-    const edges =
-      direction === 'out' ? (index.edgesFrom.get(current) ?? []) : (index.edgesTo.get(current) ?? []);
+    const edges = direction === 'out'
+      ? (index.edgesFrom.get(current) ?? [])
+      : (index.edgesTo.get(current) ?? []);
+    const reverseEdges = symmetric
+      ? (direction === 'out' ? (index.edgesTo.get(current) ?? []) : (index.edgesFrom.get(current) ?? []))
+      : [];
+
+    for (const edge of [...edges, ...reverseEdges]) {
+      if (edge.predicate !== predicate) continue;
+      const next = direction === 'out'
+        ? (edge.from === current ? edge.to : edge.from)
+        : (edge.to === current ? edge.from : edge.to);
+      if (visited.has(next)) continue;
+      visited.add(next);
+      result.add(next);
+      queue.push(next);
+    }
+  }
+  return result;
+}
+
+export interface StructuralQueryOptions {
+  /** 是否包含已推翻的边，导航视图默认包含（历史记录仍然可看） */
+  includeDisproven?: boolean;
+  /** 是否包含猜想 */
+  includeConjectures?: boolean;
+}
+
+export function reachableStructural(
+  index: GraphIndex,
+  startId: string,
+  predicate: Predicate,
+  options: StructuralQueryOptions = {},
+): Set<string> {
+  const includeDisproven = options.includeDisproven ?? true;
+  const includeConjectures = options.includeConjectures ?? true;
+  const result = new Set<string>();
+  const queue = [startId];
+  const visited = new Set<string>([startId]);
+
+  while (queue.length > 0) {
+    const current = queue.shift() as string;
+    const edges = [
+      ...(index.edgesFrom.get(current) ?? []),
+      ...(PREDICATE_SPECS[predicate].symmetric ? (index.edgesTo.get(current) ?? []) : []),
+    ];
     for (const edge of edges) {
       if (edge.predicate !== predicate) continue;
-      const next = direction === 'out' ? edge.to : edge.from;
+      if (!includeDisproven && edge.status === 'disproven') continue;
+      if (!includeConjectures && edge.status === 'conjecture') continue;
+      const next = edge.from === current ? edge.to : edge.from;
       if (visited.has(next)) continue;
       visited.add(next);
       result.add(next);
@@ -309,32 +366,397 @@ export function findPath(
   return null;
 }
 
+// =============================================================================
+// 图查询：数学推理
+// =============================================================================
+// 只有 qualifies 的边才能参与推理：disproven 永不参与，conjecture 默认不参与，
+// reviewed-only 模式下未审核的边不参与，指定语境时语境不同的边不参与。
+// 路径上任何未满足的前提 / 未知语境 / 未审核都会让结论变成「有条件的候选」。
+
+export type QueryMode = 'navigation' | 'reviewed-only';
+
+export interface LogicalQueryOptions {
+  mode?: QueryMode;
+  includeConjectures?: boolean;
+  /** 指定语境：只接受该语境的边；不指定表示语境未知，不能当作全局成立 */
+  contextId?: string;
+  maxDepth?: number;
+  maxPaths?: number;
+}
+
+export interface DerivedRelation {
+  from: string;
+  to: string;
+  predicate: 'implies' | 'iff';
+  /** 源边 id 的路径，便于解释 */
+  edgePath: string[];
+  /** 路径上累积的结构化前提 */
+  requiredAssumptions: string[];
+  /** 自由文本前提：无法自动判定是否满足 */
+  unresolvedConditions: string[];
+  contextId?: string;
+  verification: ReviewState;
+  /** 只有无未决前提、语境明确且全部已审核时才为 true */
+  unconditional: boolean;
+}
+
+const REVIEW_ORDER: Record<ReviewState, number> = {
+  unreviewed: 0,
+  'human-reviewed': 1,
+  'formally-checked': 2,
+};
+
+export function edgeReviewState(edge: Edge): ReviewState {
+  return edge.reviewState ?? 'unreviewed';
+}
+
+export function edgeStatus(edge: Edge): EdgeStatus {
+  return edge.status ?? 'asserted';
+}
+
+export function passesLogicalFilter(edge: Edge, options: LogicalQueryOptions = {}): boolean {
+  if (isLogicalPredicate(edge.predicate) === false) return false;
+  if (edgeStatus(edge) === 'disproven') return false;
+  if (edgeStatus(edge) === 'conjecture' && !options.includeConjectures) return false;
+  if (options.mode === 'reviewed-only' && edgeReviewState(edge) === 'unreviewed') return false;
+  if (options.contextId !== undefined && edge.contextId !== options.contextId) return false;
+  return true;
+}
+
+function weakestReview(edges: Edge[]): ReviewState {
+  let weakest: ReviewState = 'formally-checked';
+  for (const edge of edges) {
+    const state = edgeReviewState(edge);
+    if (REVIEW_ORDER[state] < REVIEW_ORDER[weakest]) weakest = state;
+  }
+  return weakest;
+}
+
+function buildDerivedRelation(
+  index: GraphIndex,
+  edgeIds: string[],
+  fromId: string,
+  toId: string,
+): DerivedRelation {
+  const edges = edgeIds
+    .map((id) => index.edges.find((edge) => edge.id === id))
+    .filter((edge): edge is Edge => Boolean(edge));
+
+  const conditions: string[] = [];
+  const assumptions = new Set<string>();
+  const contexts = new Set<string | undefined>();
+  for (const edge of edges) {
+    if (edge.condition && edge.condition.trim()) conditions.push(edge.condition.trim());
+    for (const assumptionId of edge.assumptionIds ?? []) assumptions.add(assumptionId);
+    contexts.add(edge.contextId);
+  }
+
+  const singleContext = contexts.size === 1 ? [...contexts][0] : undefined;
+  const contextId = singleContext && singleContext.length > 0 ? singleContext : undefined;
+  const allAsserted = edges.every((edge) => edgeStatus(edge) === 'asserted');
+  const allPredicate = edges.every((edge) => edge.predicate === 'iff');
+
+  return {
+    from: fromId,
+    to: toId,
+    predicate: allPredicate ? 'iff' : 'implies',
+    edgePath: edgeIds,
+    requiredAssumptions: [...assumptions],
+    unresolvedConditions: conditions,
+    contextId,
+    verification: weakestReview(edges),
+    unconditional:
+      conditions.length === 0 &&
+      assumptions.size === 0 &&
+      contextId !== undefined &&
+      allAsserted &&
+      edges.every((edge) => edgeReviewState(edge) !== 'unreviewed'),
+  };
+}
+
+/**
+ * 从起点出发可以「推导」到的结论。
+ * 只走 implies / iff，且每条边都要通过上下文与状态筛选。
+ */
+export function inferLogicalRelations(
+  index: GraphIndex,
+  startId: string,
+  options: LogicalQueryOptions = {},
+): DerivedRelation[] {
+  const result: DerivedRelation[] = [];
+  const visited = new Set<string>([startId]);
+  // BFS 记录最短路径，天然给出「为什么能推到这里」的解释
+  const queue: { id: string; path: string[] }[] = [{ id: startId, path: [] }];
+  const maxDepth = options.maxDepth ?? 6;
+
+  while (queue.length > 0) {
+    const current = queue.shift() as { id: string; path: string[] };
+    if (current.path.length >= maxDepth) continue;
+
+    const edges = [
+      ...(index.edgesFrom.get(current.id) ?? []),
+      ...(index.edgesTo.get(current.id) ?? []).filter((edge) => PREDICATE_SPECS[edge.predicate].symmetric),
+    ];
+
+    for (const edge of edges) {
+      if (!passesLogicalFilter(edge, options)) continue;
+      const next = edge.from === current.id ? edge.to : edge.from;
+      if (visited.has(next) || next === startId) continue;
+      visited.add(next);
+      const path = [...current.path, edge.id];
+      result.push(buildDerivedRelation(index, path, startId, next));
+      queue.push({ id: next, path });
+    }
+  }
+
+  return result;
+}
+
+/** 枚举 from → to 的推理路径（最多 maxPaths 条，避免组合爆炸） */
+export function findImplicationPaths(
+  index: GraphIndex,
+  fromId: string,
+  toId: string,
+  options: LogicalQueryOptions = {},
+): DerivedRelation[] {
+  const results: DerivedRelation[] = [];
+  const maxDepth = options.maxDepth ?? 6;
+  const maxPaths = options.maxPaths ?? 5;
+
+  const walk = (currentId: string, path: string[], visited: Set<string>) => {
+    if (results.length >= maxPaths) return;
+    if (path.length >= maxDepth) return;
+    if (currentId === toId && path.length > 0) {
+      results.push(buildDerivedRelation(index, path, fromId, toId));
+      return;
+    }
+
+    const edges = [
+      ...(index.edgesFrom.get(currentId) ?? []),
+      ...(index.edgesTo.get(currentId) ?? []).filter((edge) => PREDICATE_SPECS[edge.predicate].symmetric),
+    ];
+
+    for (const edge of edges) {
+      if (!passesLogicalFilter(edge, options)) continue;
+      const next = edge.from === currentId ? edge.to : edge.from;
+      if (visited.has(next)) continue;
+      visited.add(next);
+      walk(next, [...path, edge.id], visited);
+      visited.delete(next);
+      if (results.length >= maxPaths) return;
+    }
+  };
+
+  walk(fromId, [], new Set([fromId]));
+  return results;
+}
+
+// =============================================================================
+// 等价类
+// =============================================================================
+
+export interface EquivalenceClass {
+  /** 同一语境下的等价类；undefined 表示语境未知 */
+  contextId?: string;
+  members: string[];
+}
+
+/**
+ * iff 连通分量。按语境分组：不同语境的等价关系不能被并成一个「已证等价类」。
+ */
+export function equivalenceClasses(
+  index: GraphIndex,
+  predicate: Predicate = 'iff',
+  options: LogicalQueryOptions = {},
+): EquivalenceClass[] {
+  const buckets = new Map<string, Map<string, string>>();
+
+  const bucketOf = (contextId?: string) => {
+    const key = contextId ?? '__unknown__';
+    let bucket = buckets.get(key);
+    if (!bucket) {
+      bucket = new Map<string, string>();
+      buckets.set(key, bucket);
+    }
+    return bucket;
+  };
+
+  const find = (parent: Map<string, string>, id: string): string => {
+    let root = id;
+    while (parent.get(root) && parent.get(root) !== root) root = parent.get(root) as string;
+    let cursor = id;
+    while (cursor !== root) {
+      const next = parent.get(cursor) as string;
+      parent.set(cursor, root);
+      cursor = next;
+    }
+    return root;
+  };
+
+  for (const edge of index.edges) {
+    if (edge.predicate !== predicate) continue;
+    if (!passesLogicalFilter(edge, options)) continue;
+    const parent = bucketOf(edge.contextId);
+    if (!parent.has(edge.from)) parent.set(edge.from, edge.from);
+    if (!parent.has(edge.to)) parent.set(edge.to, edge.to);
+    const rootA = find(parent, edge.from);
+    const rootB = find(parent, edge.to);
+    if (rootA !== rootB) parent.set(rootB, rootA);
+  }
+
+  const classes: EquivalenceClass[] = [];
+  for (const [key, parent] of buckets) {
+    const groups = new Map<string, string[]>();
+    for (const id of parent.keys()) {
+      const root = find(parent, id);
+      const group = groups.get(root);
+      if (group) group.push(id);
+      else groups.set(root, [id]);
+    }
+    for (const members of groups.values()) {
+      if (members.length < 2) continue;
+      classes.push({
+        contextId: key === '__unknown__' ? undefined : key,
+        members,
+      });
+    }
+  }
+  return classes;
+}
+
+// =============================================================================
+// 排序与环诊断
+// =============================================================================
+
+/** Tarjan SCC：返回真正的环上节点（自环或分量大小 > 1） */
+export function cycleNodes(index: GraphIndex, predicate: Predicate): Set<string> {
+  const adjacency = new Map<string, string[]>();
+  const nodes = new Set<string>();
+
+  for (const edge of index.edges) {
+    if (edge.predicate !== predicate) continue;
+    nodes.add(edge.from);
+    nodes.add(edge.to);
+    if (edge.from === edge.to) {
+      // 自环单独记录
+      nodes.add(edge.from);
+    }
+    const list = adjacency.get(edge.from);
+    if (list) list.push(edge.to);
+    else adjacency.set(edge.from, [edge.to]);
+  }
+
+  const indexOf = new Map<string, number>();
+  const low = new Map<string, number>();
+  const onStack = new Set<string>();
+  const stack: string[] = [];
+  const result = new Set<string>();
+  let counter = 0;
+
+  const strongConnect = (start: string) => {
+    // 迭代版 Tarjan，避免深图递归爆栈
+    const work: { node: string; edgeIndex: number }[] = [{ node: start, edgeIndex: 0 }];
+    indexOf.set(start, counter);
+    low.set(start, counter);
+    counter += 1;
+    stack.push(start);
+    onStack.add(start);
+
+    while (work.length > 0) {
+      const frame = work[work.length - 1];
+      const edges = adjacency.get(frame.node) ?? [];
+
+      if (frame.edgeIndex < edges.length) {
+        const next = edges[frame.edgeIndex];
+        frame.edgeIndex += 1;
+        if (next === frame.node) {
+          result.add(next);
+          continue;
+        }
+        if (!indexOf.has(next)) {
+          indexOf.set(next, counter);
+          low.set(next, counter);
+          counter += 1;
+          stack.push(next);
+          onStack.add(next);
+          work.push({ node: next, edgeIndex: 0 });
+        } else if (onStack.has(next)) {
+          low.set(frame.node, Math.min(low.get(frame.node) as number, indexOf.get(next) as number));
+        }
+        continue;
+      }
+
+      work.pop();
+      const parentFrame = work[work.length - 1];
+      if (parentFrame) {
+        low.set(parentFrame.node, Math.min(low.get(parentFrame.node) as number, low.get(frame.node) as number));
+      }
+
+      if (low.get(frame.node) === indexOf.get(frame.node)) {
+        const component: string[] = [];
+        let popped: string;
+        do {
+          popped = stack.pop() as string;
+          onStack.delete(popped);
+          component.push(popped);
+        } while (popped !== frame.node);
+        if (component.length > 1) {
+          for (const id of component) result.add(id);
+        }
+      }
+    }
+  };
+
+  for (const node of nodes) {
+    if (!indexOf.has(node)) strongConnect(node);
+  }
+
+  return result;
+}
+
+export interface TopoResult {
+  order: string[];
+  /** 真正在环上的节点 */
+  cyclic: string[];
+  /** 不在环上、但被环阻塞无法排序的节点 */
+  blocked: string[];
+}
+
 /**
  * 传递关系下的拓扑排序。
  *
  * 'from-first'：每条边 from 排在 to 前面（图论标准）。
  * 'to-first'  ：每条边 to 排在 from 前面。对 depends-on 来说，
  *               to 是前置知识，于是得到的就是学习顺序。
+ *
+ * candidateIds 让没有依赖边的孤立知识点也能排进结果。
  */
 export function topoSort(
   index: GraphIndex,
   predicate: Predicate,
   direction: 'from-first' | 'to-first' = 'from-first',
-): { order: string[]; cyclic: string[] } {
-  const involved = new Set<string>();
+  options: { candidateIds?: string[] } = {},
+): TopoResult {
+  const involved = new Set<string>(options.candidateIds ?? []);
   const indegree = new Map<string, number>();
   const adjacency = new Map<string, string[]>();
+
+  const ensure = (id: string) => {
+    involved.add(id);
+    if (!indegree.has(id)) indegree.set(id, 0);
+    if (!adjacency.has(id)) adjacency.set(id, []);
+  };
+
+  for (const candidateId of options.candidateIds ?? []) ensure(candidateId);
 
   for (const edge of index.edges) {
     if (edge.predicate !== predicate) continue;
     const before = direction === 'from-first' ? edge.from : edge.to;
     const after = direction === 'from-first' ? edge.to : edge.from;
-    involved.add(before);
-    involved.add(after);
-    if (!adjacency.has(before)) adjacency.set(before, []);
+    ensure(before);
+    ensure(after);
     adjacency.get(before)!.push(after);
     indegree.set(after, (indegree.get(after) ?? 0) + 1);
-    if (!indegree.has(before)) indegree.set(before, indegree.get(before) ?? 0);
   }
 
   const queue = [...involved].filter((id) => (indegree.get(id) ?? 0) === 0);
@@ -350,57 +772,24 @@ export function topoSort(
     }
   }
 
-  const cyclic = [...involved].filter((id) => !order.includes(id));
-  return { order, cyclic };
+  const inCycle = cycleNodes(index, predicate);
+  const cyclic = [...involved].filter((id) => inCycle.has(id));
+  const blocked = [...involved].filter((id) => !order.includes(id) && !inCycle.has(id));
+
+  return { order, cyclic, blocked };
 }
 
 /** 前置知识顺序：依赖在前，被依赖的放在后面 */
-export function prerequisiteOrder(index: GraphIndex): { order: Node[]; cyclic: string[] } {
-  const { order, cyclic } = topoSort(index, 'depends-on', 'to-first');
+export function prerequisiteOrder(
+  index: GraphIndex,
+  options: { candidateIds?: string[] } = {},
+): { order: Node[]; cyclic: string[]; blocked: string[] } {
+  const { order, cyclic, blocked } = topoSort(index, 'depends-on', 'to-first', options);
   return {
     order: order.map((id) => index.nodes.get(id)).filter((node): node is Node => Boolean(node)),
     cyclic,
+    blocked,
   };
-}
-
-/** 对称传递谓词（iff）的等价类 */
-export function equivalenceClasses(index: GraphIndex, predicate: Predicate): string[][] {
-  const parent = new Map<string, string>();
-  const find = (id: string): string => {
-    let root = id;
-    while (parent.get(root) && parent.get(root) !== root) root = parent.get(root) as string;
-    let cursor = id;
-    while (cursor !== root) {
-      const next = parent.get(cursor) as string;
-      parent.set(cursor, root);
-      cursor = next;
-    }
-    return root;
-  };
-  const union = (a: string, b: string) => {
-    const rootA = find(a);
-    const rootB = find(b);
-    if (rootA !== rootB) parent.set(rootB, rootA);
-  };
-
-  const involved = new Set<string>();
-  for (const edge of index.edges) {
-    if (edge.predicate !== predicate) continue;
-    if (!parent.has(edge.from)) parent.set(edge.from, edge.from);
-    if (!parent.has(edge.to)) parent.set(edge.to, edge.to);
-    involved.add(edge.from);
-    involved.add(edge.to);
-    union(edge.from, edge.to);
-  }
-
-  const groups = new Map<string, string[]>();
-  for (const id of involved) {
-    const root = find(id);
-    const group = groups.get(root);
-    if (group) group.push(id);
-    else groups.set(root, [id]);
-  }
-  return [...groups.values()].filter((group) => group.length > 1);
 }
 
 // =============================================================================

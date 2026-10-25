@@ -17,6 +17,10 @@ export const NODE_TYPES = [
   'exercise', // 练习
   'note', // 笔记
   'attempt', // 解题记录（练习/例题下的尝试）
+  'proof', // 独立证明（挂在命题下，通过 proves 关联被证命题）
+  'concept', // 跨章节共享的数学概念
+  'context', // 语境 / 前提集合
+  'counterexample', // 反例（反驳明确的命题）
 ] as const;
 
 export type NodeType = (typeof NODE_TYPES)[number];
@@ -44,6 +48,10 @@ export const NODE_TYPE_META: Record<NodeType, NodeTypeMeta> = {
   exercise: { label: '练习', short: 'Ex', numbered: true, inTree: true },
   note: { label: '笔记', short: 'Note', numbered: false, inTree: true },
   attempt: { label: '解题记录', short: 'Try', numbered: false, inTree: false },
+  proof: { label: '证明', short: 'Pf', numbered: false, inTree: true },
+  concept: { label: '概念', short: 'Con', numbered: false, inTree: true },
+  context: { label: '语境', short: 'Ctx', numbered: false, inTree: true },
+  counterexample: { label: '反例', short: 'Cex', numbered: false, inTree: true },
 };
 
 /** 教科书里会被编号的类型（定义 / 定理 / 引理 / 推论 / 例题 / 练习） */
@@ -69,23 +77,23 @@ export function allowedChildTypes(parentType: NodeType | null): NodeType[] {
     case null:
       return ['branch'];
     case 'branch':
-      return ['chapter'];
+      return ['chapter', 'concept', 'context'];
     case 'chapter':
-      return ['section', 'note'];
+      return ['section', 'note', 'concept', 'context'];
     case 'section':
-      return ['definition', 'theorem', 'lemma', 'corollary', 'example', 'exercise', 'note'];
+      return ['definition', 'theorem', 'lemma', 'corollary', 'example', 'exercise', 'note', 'concept', 'context'];
     case 'definition':
-      return ['example', 'note'];
+      return ['example', 'note', 'concept'];
     case 'theorem':
-      return ['lemma', 'corollary', 'example', 'note'];
+      return ['lemma', 'corollary', 'example', 'proof', 'counterexample', 'note'];
     case 'lemma':
     case 'corollary':
-      return ['example', 'note'];
+      return ['example', 'proof', 'counterexample', 'note'];
     case 'example':
     case 'exercise':
       return ['attempt', 'note'];
-    case 'note':
-    case 'attempt':
+    case 'concept':
+    case 'context':
       return ['note'];
     default:
       return ['note'];
@@ -106,6 +114,7 @@ export const PREDICATES = [
   'implies', // A ⇒ B
   'iff', // A ⇔ B
   'generalizes', // A 是 B 的推广
+  'defines', // 定义刻画了某个概念
 ] as const;
 
 export type Predicate = (typeof PREDICATES)[number];
@@ -157,6 +166,18 @@ export type ProcessedNode = Node & { displayNumber: string; isChapter: boolean }
 export type EdgeStatus = 'asserted' | 'conjecture' | 'disproven';
 
 /**
+ * 审核级别。人工读过不能冒充机器验证：
+ * formally-checked 只能由真正的形式化检查器写入。
+ */
+export type ReviewState = 'unreviewed' | 'human-reviewed' | 'formally-checked';
+
+export const REVIEW_STATE_LABEL: Record<ReviewState, string> = {
+  unreviewed: '未审核',
+  'human-reviewed': '人工审核',
+  'formally-checked': '形式化验证',
+};
+
+/**
  * 边永远是 from 作为主语、to 作为宾语。
  * 「必要条件」在输入时归一化为 implies 反向，不存第二份。
  */
@@ -169,6 +190,12 @@ export interface Edge {
   condition?: string;
   note?: string;
   status?: EdgeStatus;
+  /** 审核状态，缺省视为 unreviewed */
+  reviewState?: ReviewState;
+  /** 语境：必须指向一个 context 节点；缺省表示「语境未知」，不当作全局成立 */
+  contextId?: string;
+  /** 结构化前提（节点 id 列表），用于条件不足时保留出处 */
+  assumptionIds?: string[];
   assertedBy: 'manual' | 'ai' | 'import';
   model?: string;
   createdAt: number;
@@ -176,7 +203,7 @@ export interface Edge {
 }
 
 export interface GraphJSON {
-  schemaVersion: 2;
+  schemaVersion: 2 | 3;
   exportedAt: number;
   nodes: Node[];
   edges: Edge[];
@@ -223,6 +250,9 @@ export const edgeSchema = z.object({
   condition: z.string().optional(),
   note: z.string().optional(),
   status: z.enum(['asserted', 'conjecture', 'disproven']).optional(),
+  reviewState: z.enum(['unreviewed', 'human-reviewed', 'formally-checked']).optional(),
+  contextId: z.string().optional(),
+  assumptionIds: z.array(z.string()).optional(),
   assertedBy: z.enum(['manual', 'ai', 'import']),
   model: z.string().optional(),
   createdAt: z.number(),
@@ -230,7 +260,7 @@ export const edgeSchema = z.object({
 });
 
 export const graphJSONSchema = z.object({
-  schemaVersion: z.literal(2),
+  schemaVersion: z.union([z.literal(2), z.literal(3)]),
   exportedAt: z.number(),
   nodes: z.array(nodeSchema),
   edges: z.array(edgeSchema),
@@ -275,6 +305,8 @@ export const aiOperationSchema = z.discriminatedUnion('op', [
     predicate: z.enum(PREDICATES),
     condition: z.string().optional(),
     note: z.string().optional(),
+    contextId: z.string().optional(),
+    assumptionIds: z.array(z.string()).optional(),
   }),
   z.object({
     op: z.literal('delete-edge'),

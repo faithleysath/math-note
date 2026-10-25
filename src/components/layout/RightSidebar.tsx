@@ -6,8 +6,8 @@ import RelationshipGraph from '../RelationshipGraph';
 import { Button } from '../ui/button';
 import AddEdgeDialog from '../AddEdgeDialog';
 import { Link, ChevronRight, X } from 'lucide-react';
-import { ancestorNodes } from '../../lib/graph';
-import { NODE_TYPE_META } from '../../lib/schema';
+import { ancestorNodes, inferLogicalRelations } from '../../lib/graph';
+import { NODE_TYPE_META, REVIEW_STATE_LABEL } from '../../lib/schema';
 import { useWindowSize } from '@/hooks/useWindowSize';
 
 const RightSidebar = () => {
@@ -18,10 +18,16 @@ const RightSidebar = () => {
   const { width } = useWindowSize();
   const isMobile = width <= 768;
   const [isAddEdgeOpen, setIsAddEdgeOpen] = useState(false);
+  const [reasonMode, setReasonMode] = useState<'navigation' | 'reviewed-only'>('navigation');
 
   const selectedNode = selectedId ? index.nodes.get(selectedId) : undefined;
 
   const { outgoing, incoming } = useRelatedNodes(selectedId ?? undefined);
+
+  const derived = useMemo(() => {
+    if (!selectedId) return [];
+    return inferLogicalRelations(index, selectedId, { mode: reasonMode });
+  }, [index, selectedId, reasonMode]);
 
   const ancestors = useMemo(
     () => (selectedNode ? [...ancestorNodes(index, selectedNode.id), selectedNode] : []),
@@ -137,6 +143,70 @@ const RightSidebar = () => {
           )}
           <div className="text-sm">
             <RelatedNodesList />
+          </div>
+
+          <div className="mt-6">
+            <div className="flex items-center justify-between mb-2 border-b pb-2">
+              <h3 className="text-md font-semibold">推理</h3>
+              <div className="flex items-center space-x-1">
+                <Button
+                  size="sm"
+                  variant={reasonMode === 'navigation' ? 'default' : 'outline'}
+                  className="h-7"
+                  onClick={() => setReasonMode('navigation')}
+                >
+                  全部关联
+                </Button>
+                <Button
+                  size="sm"
+                  variant={reasonMode === 'reviewed-only' ? 'default' : 'outline'}
+                  className="h-7"
+                  onClick={() => setReasonMode('reviewed-only')}
+                >
+                  仅已审核
+                </Button>
+              </div>
+            </div>
+            <p className="mb-2 text-xs text-muted-foreground">
+              只列能沿蕴含关系推到的结论；括号里是尚未满足的前提，不代表无条件成立。
+            </p>
+            {derived.length === 0 ? (
+              <p className="text-sm text-muted-foreground">没有可推导的结论。</p>
+            ) : (
+              <ul className="space-y-2">
+                {derived.map((relation) => {
+                  const target = index.nodes.get(relation.to);
+                  return (
+                    <li key={`${relation.to}-${relation.edgePath.join('-')}`} className="text-sm">
+                      <span
+                        className="text-primary hover:underline cursor-pointer"
+                        onClick={() => select(relation.to)}
+                      >
+                        {target?.title ?? relation.to}
+                      </span>
+                      <p className="text-xs text-muted-foreground">
+                        {[
+                          relation.predicate === 'iff' ? '等价' : '推导',
+                          REVIEW_STATE_LABEL[relation.verification],
+                          relation.unconditional ? '无条件' : '有前提',
+                          relation.unresolvedConditions.length > 0
+                            ? `未决：${relation.unresolvedConditions.join('；')}`
+                            : null,
+                          relation.requiredAssumptions.length > 0
+                            ? `${relation.requiredAssumptions.length} 个结构化前提`
+                            : null,
+                          relation.contextId
+                            ? `语境：${index.nodes.get(relation.contextId)?.title ?? relation.contextId}`
+                            : '语境未知',
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </p>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </div>
           {isAddEdgeOpen && (
             <AddEdgeDialog

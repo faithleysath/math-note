@@ -1,7 +1,14 @@
 import { useState, useMemo } from 'react';
 import { toast } from 'sonner';
-import type { Node, Predicate } from '../lib/schema';
+import type { Edge, Node, Predicate } from '../lib/schema';
 import { Button } from './ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from './ui/select';
 import {
   Dialog,
   DialogContent,
@@ -32,7 +39,14 @@ const AddEdgeDialog = ({ sourceNode, isOpen, onClose }: AddEdgeDialogProps) => {
   const [selectedTarget, setSelectedTarget] = useState<Node | null>(null);
   const [selectedChoice, setSelectedChoice] = useState<Choice | null>(null);
   const [condition, setCondition] = useState('');
+  const [status, setStatus] = useState<Edge['status']>('asserted');
+  const [contextId, setContextId] = useState<string>('none');
   const createEdge = useGraphStore(state => state.createEdge);
+  const index = useGraphStore(state => state.index);
+  const contexts = useMemo(
+    () => [...index.nodes.values()].filter(node => node.type === 'context'),
+    [index],
+  );
 
   const choices = useMemo((): Choice[] => {
     if (!selectedTarget) return [];
@@ -66,6 +80,8 @@ const AddEdgeDialog = ({ sourceNode, isOpen, onClose }: AddEdgeDialogProps) => {
         to,
         predicate: selectedChoice.predicate,
         condition: condition.trim() || undefined,
+        status,
+        contextId: contextId === 'none' ? undefined : contextId,
       });
       toast.success('链接已成功创建。');
       handleClose();
@@ -79,6 +95,8 @@ const AddEdgeDialog = ({ sourceNode, isOpen, onClose }: AddEdgeDialogProps) => {
     setSelectedTarget(null);
     setSelectedChoice(null);
     setCondition('');
+    setStatus('asserted');
+    setContextId('none');
     onClose();
   };
 
@@ -113,19 +131,57 @@ const AddEdgeDialog = ({ sourceNode, isOpen, onClose }: AddEdgeDialogProps) => {
                   <p className="text-sm text-muted-foreground">这两个节点之间没有合适的关系。</p>
                 )}
               </div>
-              {selectedChoice?.predicate === 'implies' && (
-                <div className="grid grid-cols-6 items-center gap-4 mt-4">
-                  <label htmlFor="condition" className="text-left">
-                    前提条件
-                  </label>
-                  <Input
-                    id="condition"
-                    value={condition}
-                    placeholder="可选，例如 $f$ 在 $[a,b]$ 上连续"
-                    onChange={(e) => setCondition(e.target.value)}
-                    className="col-span-5"
-                  />
-                </div>
+              {selectedChoice && (
+                <>
+                  <div className="grid grid-cols-6 items-center gap-4 mt-4">
+                    <label htmlFor="condition" className="text-left">
+                      前提条件
+                    </label>
+                    <Input
+                      id="condition"
+                      value={condition}
+                      placeholder="可选，例如 $f$ 在 $[a,b]$ 上连续"
+                      onChange={(e) => setCondition(e.target.value)}
+                      className="col-span-5"
+                    />
+                  </div>
+                  <div className="grid grid-cols-6 items-center gap-4 mt-2">
+                    <label className="text-left">状态</label>
+                    <div className="col-span-5 flex flex-wrap gap-2">
+                      {(['asserted', 'conjecture', 'disproven'] as const).map(value => (
+                        <Button
+                          key={value}
+                          variant={status === value ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setStatus(value)}
+                        >
+                          {value === 'asserted' ? '确定' : value === 'conjecture' ? '猜想' : '已推翻'}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-6 items-center gap-4 mt-2">
+                    <label className="text-left">语境</label>
+                    <div className="col-span-5">
+                      <Select value={contextId} onValueChange={setContextId}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="语境未知" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">语境未知</SelectItem>
+                          {contexts.map(context => (
+                            <SelectItem key={context.id} value={context.id}>
+                              {context.title}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    录入的关系一律标记为「未审核」，审核状态请到右侧关系列表查看。
+                  </p>
+                </>
               )}
             </div>
           )}

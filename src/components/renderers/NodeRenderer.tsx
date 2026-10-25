@@ -12,6 +12,7 @@ import ExampleNodeRenderer from './ExampleNodeRenderer';
 import NoteNodeRenderer from './NoteNodeRenderer';
 import ExerciseNodeRenderer from './ExerciseNodeRenderer';
 import SolutionRecordRenderer from './SolutionRecordRenderer';
+import ProseNodeRenderer from './ProseNodeRenderer';
 import DefaultNodeRenderer from './DefaultNodeRenderer';
 
 interface NodeRendererProps {
@@ -45,7 +46,13 @@ const NodeRenderer = memo(({ node }: NodeRendererProps) => {
     case 'exercise':
       return <ExerciseNodeRenderer node={node} />;
     case 'attempt':
+    case 'proof':
       return <SolutionRecordRenderer node={node} />;
+    case 'counterexample':
+      return <ExerciseNodeRenderer node={node} />;
+    case 'concept':
+    case 'context':
+      return <ProseNodeRenderer node={node} />;
     default:
       return <DefaultNodeRenderer node={node} />;
   }
