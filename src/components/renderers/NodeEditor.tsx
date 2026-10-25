@@ -13,7 +13,7 @@ interface NodeEditorProps {
 }
 
 const KEY_TYPES: Node['type'][] = ['definition', 'proposition'];
-const SOLUTION_TYPES: Node['type'][] = ['proposition', 'problem', 'proof'];
+const SOLUTION_TYPES: Node['type'][] = ['problem'];
 
 const NodeEditor = ({ node }: NodeEditorProps) => {
   const [title, setTitle] = useState(node.title);
@@ -75,7 +75,8 @@ const NodeEditor = ({ node }: NodeEditorProps) => {
       await updateNode(node.id, {
         title,
         content,
-        solution,
+        // 只有题目有标准答案；命题的证明是独立的 proof 节点
+        solution: SOLUTION_TYPES.includes(node.type) ? solution : undefined,
         tags: tagsArray,
         aliases: aliasesArray,
         key: key.trim() || null,
@@ -119,14 +120,8 @@ const NodeEditor = ({ node }: NodeEditorProps) => {
     switch (node.type) {
       case 'problem':
         return '标准答案';
-      case 'proposition':
-        return '证明（旧数据兼容）';
-      case 'proof':
-        return '补充说明';
-      case 'attempt':
-        return '个人解法';
       default:
-        return '解法';
+        return '解答';
     }
   }, [node.type]);
 

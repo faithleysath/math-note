@@ -125,12 +125,8 @@ export function isMethodNote(node: { type: NodeType; kind?: string }): boolean {
   return node.type === 'note' && node.kind === 'method';
 }
 
-/** 可以承载「标准答案 / 教科书式证明」的类型 */
-export const SOLUTION_TYPES: ReadonlySet<NodeType> = new Set([
-  'proposition',
-  'problem',
-  'proof',
-]);
+/** 只有题目有「标准答案」；命题的证明是独立的 proof 节点 */
+export const SOLUTION_TYPES: ReadonlySet<NodeType> = new Set(['problem']);
 
 /**
  * 结构规则：什么类型可以放进什么父节点（需求书 2.1）。
@@ -207,7 +203,7 @@ export interface Node {
   title: string;
   /** 陈述 / 题干 / 正文，Markdown + LaTeX + 远程图片 */
   content: string;
-  /** problem 的标准解答；proof 的遗留证明文本 */
+  /** 仅 problem 使用：标准解答 */
   solution?: string;
   parentId: string | null;
   /** 兄弟间排序。间隔 1024，间隙耗尽时局部重排。 */
