@@ -118,7 +118,9 @@ const MainContent = () => {
     return nodes.map((node) => ({
       ...node,
       displayNumber: index.numbering.get(node.id) ?? '',
-      isChapter: node.type === 'chapter' || node.type === 'section',
+      isChapter:
+        node.type === 'section' &&
+        (node.kind === 'chapter' || (node.kind === undefined && index.numbering.get(node.id)?.startsWith('第') === true)),
     }));
   }, [nodes, index]);
 

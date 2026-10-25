@@ -1,0 +1,291 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/faithleysath/math-note/examples/v5.schema.json",
+  "title": "Math Note v5 导入格式",
+  "description": "Math Note 知识图谱 v5 的导入/导出格式。约束的权威定义在 src/lib/schema.ts 与 src/lib/validate.ts；本文件由 scripts/gen-schema.ts 生成。",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "type": "number",
+      "const": 5
+    },
+    "exportedAt": {
+      "type": "number"
+    },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "type": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "solution": {
+            "type": "string"
+          },
+          "parentId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "order": {
+            "type": "number"
+          },
+          "key": {
+            "type": "string",
+            "minLength": 1
+          },
+          "aliases": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "citation": {
+            "type": "object",
+            "properties": {
+              "source": {
+                "type": "string"
+              },
+              "page": {
+                "type": "string"
+              },
+              "originalNumber": {
+                "type": "string"
+              },
+              "book": {
+                "type": "string"
+              },
+              "theoremNo": {
+                "type": "string"
+              }
+            }
+          },
+          "attempt": {
+            "type": "object",
+            "properties": {
+              "correct": {
+                "type": "boolean"
+              },
+              "durationMin": {
+                "type": "number"
+              },
+              "method": {
+                "type": "string"
+              }
+            }
+          },
+          "createdAt": {
+            "type": "number"
+          },
+          "updatedAt": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "title",
+          "content",
+          "parentId",
+          "order",
+          "createdAt",
+          "updatedAt"
+        ]
+      }
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "from": {
+            "type": "string",
+            "minLength": 1
+          },
+          "to": {
+            "type": "string",
+            "minLength": 1
+          },
+          "predicate": {
+            "type": "string",
+            "enum": [
+              "depends-on",
+              "covers",
+              "uses",
+              "proves",
+              "refutes",
+              "implies",
+              "iff",
+              "generalizes",
+              "cites"
+            ]
+          },
+          "condition": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "asserted",
+              "conjecture",
+              "disproven"
+            ]
+          },
+          "reviewState": {
+            "type": "string",
+            "enum": [
+              "unreviewed",
+              "human-reviewed",
+              "formally-checked"
+            ]
+          },
+          "contextId": {
+            "type": "string"
+          },
+          "assumptionIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "assertedBy": {
+            "type": "string",
+            "enum": [
+              "manual",
+              "ai",
+              "import"
+            ]
+          },
+          "model": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "number"
+          },
+          "updatedAt": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "from",
+          "to",
+          "predicate",
+          "assertedBy",
+          "createdAt",
+          "updatedAt"
+        ]
+      }
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "premiseIds": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "conclusionId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "rule": {
+            "type": "string",
+            "minLength": 1
+          },
+          "contextId": {
+            "type": "string"
+          },
+          "proofId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "asserted",
+              "conjecture",
+              "disproven"
+            ]
+          },
+          "reviewState": {
+            "type": "string",
+            "enum": [
+              "unreviewed",
+              "human-reviewed",
+              "formally-checked"
+            ]
+          },
+          "note": {
+            "type": "string"
+          },
+          "assertedBy": {
+            "type": "string",
+            "enum": [
+              "manual",
+              "ai",
+              "import"
+            ]
+          },
+          "createdAt": {
+            "type": "number"
+          },
+          "updatedAt": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "premiseIds",
+          "conclusionId",
+          "rule",
+          "assertedBy",
+          "createdAt",
+          "updatedAt"
+        ]
+      }
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "exportedAt",
+    "nodes",
+    "edges"
+  ]
+}

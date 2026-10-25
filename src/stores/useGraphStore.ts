@@ -12,8 +12,18 @@ import {
   type GraphIndex,
 } from '../lib/graph';
 import { canonicalizePair } from '../lib/predicates';
-import type { AiOperation, Edge, GraphJSON, InferenceStep, Node } from '../lib/schema';
+import {
+  NODE_TYPE_META,
+  isContextNode,
+  type AiOperation,
+  type AnyNode,
+  type Edge,
+  type GraphJSON,
+  type InferenceStep,
+  type Node,
+} from '../lib/schema';
 import { parseGraph, serializeGraph } from '../lib/serialize';
+import { migrateToV5, summarizeMigration, type MigrationReport } from '../lib/migrate';
 import { simulateOperations, type DraftDiff } from '../lib/draft';
 import {
   ValidationError,
@@ -98,6 +108,10 @@ function describeError(error: unknown): string {
   return String(error);
 }
 
+// React StrictMode 会重复触发 effect，init 必须只跑一次，
+// 否则迁移会被执行两遍（虽然幂等，但会重复写备份、重复弹提示）。
+let initStarted = false;
+
 export const useGraphStore = create<GraphState>()((set, get) => {
   const commit = (nodes: Iterable<Node>, edges: Edge[], steps: InferenceStep[]) => {
     set({ index: buildIndex(nodes, edges, steps) });
@@ -120,9 +134,49 @@ export const useGraphStore = create<GraphState>()((set, get) => {
     mobileView: 'main',
 
     init: async () => {
+      if (initStarted) return;
+      initStarted = true;
       try {
         const data = await db.loadAll();
-        const index = buildIndex(data.nodes, data.edges, data.steps);
+        const storedVersion = await db.readMeta('schemaVersion');
+        const hasLegacy = data.nodes.some(
+          (node) =>
+            !((node.type as string) in NODE_TYPE_META) ||
+            // v4 的 section 没有 kind，v5 的同名类型一定有
+            (node.type === 'section' && node.kind === undefined),
+        );
+
+        let nodes: Node[] = data.nodes;
+        let edges = data.edges;
+        let steps = data.steps;
+        let report: MigrationReport | null = null;
+
+        if (hasLegacy && storedVersion !== '5') {
+          // 本地库升级：先整份备份，再单事务替换，任何失败都不会留下半成品
+          const backup = JSON.stringify({
+            schemaVersion: 4,
+            exportedAt: Date.now(),
+            nodes: data.nodes,
+            edges: data.edges,
+            steps: data.steps,
+          });
+          await db.saveBackup(`before-v5-${Date.now()}`, backup);
+
+          const migrated = migrateToV5(
+            { nodes: data.nodes as unknown as AnyNode[], edges, steps },
+            4,
+          );
+          await db.replaceAll(migrated.graph);
+          await db.writeMeta('schemaVersion', '5');
+          nodes = migrated.graph.nodes;
+          edges = migrated.graph.edges;
+          steps = migrated.graph.steps;
+          report = migrated.report;
+        } else if (storedVersion === null) {
+          await db.writeMeta('schemaVersion', '5');
+        }
+
+        const index = buildIndex(nodes, edges, steps);
         const firstBranch = index.roots[0] ?? null;
         set({
           index,
@@ -134,7 +188,12 @@ export const useGraphStore = create<GraphState>()((set, get) => {
           expandedIds: new Set(firstBranch ? [firstBranch] : []),
           selectedId: firstBranch,
         });
+
+        if (report) {
+          toast.success(`数据已升级到 v5：${summarizeMigration(report)}。原始数据已备份。`);
+        }
       } catch (error) {
+        initStarted = false;
         set({ status: 'error', error: describeError(error) });
       }
     },
@@ -180,6 +239,7 @@ export const useGraphStore = create<GraphState>()((set, get) => {
       const node: Node = {
         id: crypto.randomUUID(),
         type: input.type,
+        kind: input.kind || undefined,
         title: input.title.trim(),
         content: input.content ?? '',
         solution: input.solution,
@@ -234,6 +294,7 @@ export const useGraphStore = create<GraphState>()((set, get) => {
       const apply = (node: Node): Node => ({
         ...node,
         title: patch.title !== undefined ? patch.title.trim() : node.title,
+        kind: patch.kind !== undefined ? (patch.kind || undefined) : node.kind,
         content: patch.content !== undefined ? patch.content : node.content,
         solution: patch.solution !== undefined ? patch.solution : node.solution,
         key: patch.key !== undefined ? (patch.key === null ? undefined : patch.key) : node.key,
@@ -281,10 +342,47 @@ export const useGraphStore = create<GraphState>()((set, get) => {
         (step) => !idSet.has(step.conclusionId) && !step.premiseIds.some((id) => idSet.has(id)),
       );
 
+      // 引用被删节点的地方不能留悬空指针：清掉语境、前提、所属证明
+      const now = Date.now();
+      const changedEdges: Edge[] = [];
+      const patchedEdges = edges.map((edge) => {
+        let next = edge;
+        if (edge.contextId && idSet.has(edge.contextId)) {
+          next = { ...next, contextId: undefined, updatedAt: now };
+        }
+        if (edge.assumptionIds?.some((id) => idSet.has(id))) {
+          const remaining = next.assumptionIds?.filter((id) => !idSet.has(id));
+          next = {
+            ...next,
+            assumptionIds: remaining && remaining.length > 0 ? remaining : undefined,
+            updatedAt: now,
+          };
+        }
+        if (next !== edge) changedEdges.push(next);
+        return next;
+      });
+
+      const changedSteps: InferenceStep[] = [];
+      const patchedSteps = steps.map((step) => {
+        let next = step;
+        if (step.contextId && idSet.has(step.contextId)) {
+          next = { ...next, contextId: undefined, updatedAt: now };
+        }
+        if (step.proofId && idSet.has(step.proofId)) {
+          next = { ...next, proofId: undefined, updatedAt: now };
+        }
+        if (next !== step) changedSteps.push(next);
+        return next;
+      });
+
+      if (changedEdges.length > 0 || changedSteps.length > 0) {
+        await db.applyBatch({ putEdges: changedEdges, putSteps: changedSteps });
+      }
+
       const expanded = new Set(get().expandedIds);
       for (const nodeId of ids) expanded.delete(nodeId);
 
-      const nextIndex = buildIndex(nodes.values(), edges, steps);
+      const nextIndex = buildIndex(nodes.values(), patchedEdges, patchedSteps);
       const selectedId = get().selectedId;
       set({
         index: nextIndex,
@@ -457,7 +555,8 @@ export const useGraphStore = create<GraphState>()((set, get) => {
       const next: InferenceStep = { ...existing, ...patch, updatedAt: Date.now() };
 
       if (patch.contextId) {
-        if (state.index.nodes.get(patch.contextId)?.type !== 'context') {
+        const context = state.index.nodes.get(patch.contextId);
+        if (!context || !isContextNode(context)) {
           throw new ValidationError('contextId', '语境必须指向一个「语境」节点。');
         }
       }
@@ -501,6 +600,7 @@ export const useGraphStore = create<GraphState>()((set, get) => {
     importGraph: async (json) => {
       const parsed = parseGraph(json);
       await db.replaceAll({ nodes: parsed.nodes, edges: parsed.edges, steps: parsed.steps });
+      await db.writeMeta('schemaVersion', '5');
       const index = buildIndex(parsed.nodes, parsed.edges, parsed.steps);
       set({
         index,
@@ -514,9 +614,7 @@ export const useGraphStore = create<GraphState>()((set, get) => {
         editingId: null,
       });
       if (parsed.migration) {
-        toast.success(
-          `已从旧格式迁移：生成 ${parsed.migration.proofsCreated} 个证明节点（原有 solution 内容保留）。`,
-        );
+        toast.success(`导入并迁移到 v5：${summarizeMigration(parsed.migration)}。`);
       }
     },
 

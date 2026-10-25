@@ -6,9 +6,6 @@ import MainChapterNodeRenderer from './MainChapterNodeRenderer';
 import SubChapterNodeRenderer from './SubChapterNodeRenderer';
 import DefinitionNodeRenderer from './DefinitionNodeRenderer';
 import TheoremNodeRenderer from './TheoremNodeRenderer';
-import LemmaNodeRenderer from './LemmaNodeRenderer';
-import CorollaryNodeRenderer from './CorollaryNodeRenderer';
-import ExampleNodeRenderer from './ExampleNodeRenderer';
 import NoteNodeRenderer from './NoteNodeRenderer';
 import ExerciseNodeRenderer from './ExerciseNodeRenderer';
 import SolutionRecordRenderer from './SolutionRecordRenderer';
@@ -19,6 +16,12 @@ interface NodeRendererProps {
   node: ProcessedNode;
 }
 
+/**
+ * v5 只有 9 种节点类型，显示风格由 type + kind 决定：
+ * section(kind=chapter) 用大章节样式，其余 section 用居中节样式；
+ * proposition 复用原来的定理排版（编号里已经带上「定理 / 性质 / 公式」）；
+ * problem 复用原来的例题/练习卡片。
+ */
 const NodeRenderer = memo(({ node }: NodeRendererProps) => {
   const editingId = useGraphStore((state) => state.editingId);
 
@@ -27,32 +30,29 @@ const NodeRenderer = memo(({ node }: NodeRendererProps) => {
   }
 
   switch (node.type) {
-    case 'chapter':
-      return <MainChapterNodeRenderer node={node} />;
     case 'section':
-      return <SubChapterNodeRenderer node={node} />;
+      return node.kind === 'chapter' || node.displayNumber.startsWith('第') ? (
+        <MainChapterNodeRenderer node={node} />
+      ) : (
+        <SubChapterNodeRenderer node={node} />
+      );
     case 'definition':
       return <DefinitionNodeRenderer node={node} />;
-    case 'theorem':
+    case 'proposition':
       return <TheoremNodeRenderer node={node} />;
-    case 'lemma':
-      return <LemmaNodeRenderer node={node} />;
-    case 'corollary':
-      return <CorollaryNodeRenderer node={node} />;
-    case 'example':
-      return <ExampleNodeRenderer node={node} />;
-    case 'note':
-      return <NoteNodeRenderer node={node} />;
-    case 'exercise':
-      return <ExerciseNodeRenderer node={node} />;
-    case 'attempt':
     case 'proof':
+    case 'attempt':
       return <SolutionRecordRenderer node={node} />;
-    case 'counterexample':
+    case 'problem':
       return <ExerciseNodeRenderer node={node} />;
-    case 'concept':
-    case 'context':
-      return <ProseNodeRenderer node={node} />;
+    case 'counterexample':
+      return <ExerciseNodeRenderer node={node} solutionLabel="显示/隐藏说明" />;
+    case 'note':
+      return node.kind === 'context' || node.kind === 'topic' ? (
+        <ProseNodeRenderer node={node} />
+      ) : (
+        <NoteNodeRenderer node={node} />
+      );
     default:
       return <DefaultNodeRenderer node={node} />;
   }

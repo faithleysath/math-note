@@ -1,16 +1,19 @@
 import type { Node, NodeType, Predicate } from './schema';
 
 // =============================================================================
-// 谓词注册表
+// 谓词注册表（恰好 9 种）
 // =============================================================================
 // 这张表是关系的唯一真相来源：UI 按钮、方向判断、校验规则、显示文案、
-// 图谱箭头、推理规则全部从这里生成，不再散落在各个组件里。
+// 图谱箭头、推理规则全部从这里生成。
 
 export type PredicateFamily = 'semantic' | 'epistemic' | 'evidential' | 'logical';
 
+export interface TypePair {
+  from: NodeType;
+  to: NodeType;
+}
+
 export interface PredicateSpec {
-  /** 这条关系是否参与数学推理（implies / iff） */
-  logical: boolean;
   family: PredicateFamily;
   /** from 侧看这条边叫什么 */
   fromLabel: string;
@@ -18,65 +21,65 @@ export interface PredicateSpec {
   inverseLabel: string;
   /** 拼句子用的动词 */
   verb: string;
+  /** 这条关系是否参与数学推理（implies / iff） */
+  logical: boolean;
   /**
    * 可传递：A→B→C 蕴含 A→C。
-   * 注意这只对「结构/学习」查询有意义；数学推理必须走 logicalDerivation，
-   * 因为传递性要额外检查条件与语境（需求书 P0-2）。
+   * 只对结构/学习查询有意义；数学推理必须逐边检查条件与语境。
    */
   transitive: boolean;
   /** 对称：A↔B 与 B↔A 是同一事实 */
   symmetric: boolean;
-  /** 构成等价类（只对 symmetric + transitive 有意义） */
+  /** 构成等价类 */
   equivalence: boolean;
   /**
-   * 是否禁止成环。
-   * 只有 depends-on（学习前置）禁止：它要求 DAG。
-   * implies / iff / generalizes 允许成环：A⇒B 与 B⇒A 同时成立是合法的，
-   * A⇔B⇔C⇔A 也是合法的等价类（需求书 P0-1）。
+   * 是否禁止成环。只有 depends-on（学习前置）禁止：
+   * 它要求 DAG。implies / iff 允许成环。
    */
   forbidCycle: boolean;
-  /** 允许出现的 from / to 节点类型 */
+  /** 允许出现的 from 类型 */
   from: NodeType[];
+  /** 允许出现的 to 类型 */
   to: NodeType[];
-  /** 是否提供「方向反转」的输入方式（如 必要条件 = implies 反向） */
+  /** 需要精确到 (from,to) 组合时使用，例如 generalizes 只能同类推广 */
+  pairs?: TypePair[];
+  /** 是否提供「方向反转」的输入方式（充分条件 / 必要条件） */
   swappable: boolean;
 }
 
-const CONTENT: NodeType[] = [
-  'chapter',
+/** 可以承载学习内容的节点（depends-on 的起点） */
+const LEARNABLE: NodeType[] = [
   'section',
   'definition',
-  'theorem',
-  'lemma',
-  'corollary',
-  'example',
-  'exercise',
+  'proposition',
+  'proof',
+  'problem',
   'note',
   'attempt',
-  'proof',
-  'concept',
-  'context',
   'counterexample',
 ];
 
-/** 可以被称为「命题」、参与蕴含关系的类型 */
-const CLAIMS: NodeType[] = ['definition', 'theorem', 'lemma', 'corollary', 'note'];
+/** 可以被依赖 / 使用 / 考查的知识点（终点） */
+const KNOWLEDGE: NodeType[] = ['section', 'definition', 'proposition', 'note'];
+
+/** 可以作为证明/解法来源的节点 */
+const EVIDENCE_SOURCES: NodeType[] = ['proof', 'attempt', 'problem', 'note'];
+
+/** cites 的端点：除 branch 外的一切 */
+const CITABLE: NodeType[] = [
+  'section',
+  'definition',
+  'proposition',
+  'proof',
+  'problem',
+  'note',
+  'counterexample',
+  'attempt',
+];
+
+const CLAIMS: NodeType[] = ['proposition'];
 
 export const PREDICATE_SPECS: Record<Predicate, PredicateSpec> = {
-  'defines': {
-    family: 'semantic',
-    fromLabel: '定义了',
-    inverseLabel: '被定义',
-    verb: '定义了',
-    logical: false,
-    transitive: false,
-    symmetric: false,
-    equivalence: false,
-    forbidCycle: false,
-    from: ['definition'],
-    to: ['concept'],
-    swappable: false,
-  },
   'depends-on': {
     family: 'epistemic',
     fromLabel: '依赖',
@@ -86,25 +89,38 @@ export const PREDICATE_SPECS: Record<Predicate, PredicateSpec> = {
     transitive: true,
     symmetric: false,
     equivalence: false,
-    // 学习前置关系必须是 DAG：A 依赖 B、B 依赖 A 会让人无法排出学习顺序。
-    // 这不是数学矛盾，提示语也要这么说。
+    // 学习前置关系必须是 DAG；这不是数学矛盾
     forbidCycle: true,
-    from: CONTENT,
-    to: ['definition', 'theorem', 'lemma', 'corollary', 'concept'],
+    from: LEARNABLE,
+    to: KNOWLEDGE,
     swappable: false,
   },
-  cites: {
-    family: 'epistemic',
-    fromLabel: '提及',
-    inverseLabel: '被提及',
-    verb: '提及',
+  covers: {
+    family: 'semantic',
+    fromLabel: '考查',
+    inverseLabel: '被考查',
+    verb: '考查了',
     logical: false,
     transitive: false,
     symmetric: false,
     equivalence: false,
     forbidCycle: false,
-    from: CONTENT,
-    to: CONTENT,
+    from: ['problem'],
+    to: KNOWLEDGE,
+    swappable: false,
+  },
+  uses: {
+    family: 'semantic',
+    fromLabel: '使用',
+    inverseLabel: '被使用',
+    verb: '使用了',
+    logical: false,
+    transitive: false,
+    symmetric: false,
+    equivalence: false,
+    forbidCycle: false,
+    from: EVIDENCE_SOURCES,
+    to: KNOWLEDGE,
     swappable: false,
   },
   proves: {
@@ -117,9 +133,8 @@ export const PREDICATE_SPECS: Record<Predicate, PredicateSpec> = {
     symmetric: false,
     equivalence: false,
     forbidCycle: false,
-    // 正式证明必须是 proof 节点：命题之间的笼统「证明」不算证明
     from: ['proof'],
-    to: ['theorem', 'lemma', 'corollary'],
+    to: CLAIMS,
     swappable: false,
   },
   refutes: {
@@ -132,9 +147,8 @@ export const PREDICATE_SPECS: Record<Predicate, PredicateSpec> = {
     symmetric: false,
     equivalence: false,
     forbidCycle: false,
-    // 反例反驳的是「明确的命题」，不是某条边
     from: ['counterexample'],
-    to: ['theorem', 'lemma', 'corollary', 'note'],
+    to: CLAIMS,
     swappable: false,
   },
   implies: {
@@ -146,7 +160,7 @@ export const PREDICATE_SPECS: Record<Predicate, PredicateSpec> = {
     transitive: true,
     symmetric: false,
     equivalence: false,
-    // A⇒B 与 B⇒A 可以同时成立；不再禁环
+    // A⇒B 与 B⇒A 可以同时成立
     forbidCycle: false,
     from: CLAIMS,
     to: CLAIMS,
@@ -161,7 +175,6 @@ export const PREDICATE_SPECS: Record<Predicate, PredicateSpec> = {
     transitive: true,
     symmetric: true,
     equivalence: true,
-    // A⇔B⇔C⇔A 是合法的；重复边只提示冗余，不拒绝
     forbidCycle: false,
     from: CLAIMS,
     to: CLAIMS,
@@ -178,29 +191,46 @@ export const PREDICATE_SPECS: Record<Predicate, PredicateSpec> = {
     symmetric: false,
     equivalence: false,
     forbidCycle: false,
-    from: CLAIMS,
-    to: CLAIMS,
+    from: ['definition', 'proposition'],
+    to: ['definition', 'proposition'],
+    // 定义推广定义、命题推广命题，不能跨类型
+    pairs: [
+      { from: 'definition', to: 'definition' },
+      { from: 'proposition', to: 'proposition' },
+    ],
     swappable: true,
+  },
+  cites: {
+    family: 'epistemic',
+    fromLabel: '提及',
+    inverseLabel: '被提及',
+    verb: '提及了',
+    logical: false,
+    transitive: false,
+    symmetric: false,
+    equivalence: false,
+    forbidCycle: false,
+    from: CITABLE,
+    to: CITABLE,
+    swappable: false,
   },
 };
 
-export const FAMILY_META: Record<PredicateFamily, { label: string; order: number }> = {
-  semantic: { label: '概念定义', order: 1 },
-  epistemic: { label: '引用与依赖', order: 2 },
-  evidential: { label: '论证', order: 3 },
-  logical: { label: '逻辑关系', order: 4 },
-};
+export const PREDICATE_LIST = Object.keys(PREDICATE_SPECS) as Predicate[];
 
 export function isLogicalPredicate(predicate: Predicate): boolean {
   return PREDICATE_SPECS[predicate].logical;
 }
 
-export const PREDICATE_LIST = Object.keys(PREDICATE_SPECS) as Predicate[];
-
 /** 参与数学推理的谓词 */
-export const LOGICAL_PREDICATES: Predicate[] = PREDICATE_LIST.filter(
-  (predicate) => PREDICATE_SPECS[predicate].logical,
-);
+export const LOGICAL_PREDICATES: Predicate[] = PREDICATE_LIST.filter(isLogicalPredicate);
+
+export const FAMILY_META: Record<PredicateFamily, { label: string; order: number }> = {
+  semantic: { label: '知识点关系', order: 1 },
+  epistemic: { label: '引用与依赖', order: 2 },
+  evidential: { label: '论证', order: 3 },
+  logical: { label: '逻辑关系', order: 4 },
+};
 
 export function predicatesByFamily(): { family: PredicateFamily; label: string; predicates: Predicate[] }[] {
   return (Object.keys(FAMILY_META) as PredicateFamily[])
@@ -222,31 +252,30 @@ export interface ApplicablePredicate {
   reversed: boolean;
 }
 
-/**
- * 给定两个节点类型，列出所有可用的谓词。
- * 反向也可用的谓词会带上 reversed 标记，由 UI 让用户选择方向。
- */
+/** 某个谓词是否允许 fromType → toType */
+export function isDirectionAllowed(predicate: Predicate, fromType: NodeType, toType: NodeType): boolean {
+  const spec = PREDICATE_SPECS[predicate];
+  if (spec.pairs) {
+    return spec.pairs.some((pair) => pair.from === fromType && pair.to === toType);
+  }
+  return spec.from.includes(fromType) && spec.to.includes(toType);
+}
+
 export function applicablePredicates(fromType: NodeType, toType: NodeType): ApplicablePredicate[] {
   const result: ApplicablePredicate[] = [];
   for (const predicate of PREDICATE_LIST) {
     const spec = PREDICATE_SPECS[predicate];
-    const forwardOk = spec.from.includes(fromType) && spec.to.includes(toType);
-    const backwardOk = spec.from.includes(toType) && spec.to.includes(fromType);
+    const forwardOk = isDirectionAllowed(predicate, fromType, toType);
+    const backwardOk = isDirectionAllowed(predicate, toType, fromType);
     if (forwardOk) {
       result.push({ predicate, reversed: false });
     }
-    // 可换方向的说法（充分条件 / 必要条件）两个方向都给，
-    // 单向关系在正方向不成立时才给出反向选项。
+    // 可换方向的说法（充分条件 / 必要条件、推广 / 特例）两个方向都给
     if (backwardOk && (spec.swappable || !forwardOk)) {
       result.push({ predicate, reversed: true });
     }
   }
   return result;
-}
-
-export function isDirectionAllowed(predicate: Predicate, fromType: NodeType, toType: NodeType): boolean {
-  const spec = PREDICATE_SPECS[predicate];
-  return spec.from.includes(fromType) && spec.to.includes(toType);
 }
 
 /** 对称谓词的规范化：保证只存一条（按 id 字典序） */
@@ -272,17 +301,20 @@ export interface EdgeDescription {
   direction: 'out' | 'in';
 }
 
-export function describeEdge(edge: { from: string; to: string; predicate: Predicate }, viewerId: string, nodes: Map<string, Node>): EdgeDescription {
+export function describeEdge(
+  edge: { from: string; to: string; predicate: Predicate },
+  viewerId: string,
+  nodes: Map<string, Node>,
+): EdgeDescription {
   const spec = PREDICATE_SPECS[edge.predicate];
   const fromNode = nodes.get(edge.from);
   const toNode = nodes.get(edge.to);
   const fromTitle = fromNode?.title ?? edge.from;
   const toTitle = toNode?.title ?? edge.to;
   const isFrom = viewerId === edge.from;
-  const sentence = `${fromTitle} ${spec.verb} ${toTitle}`;
   return {
     label: isFrom ? spec.fromLabel : spec.inverseLabel,
-    sentence,
+    sentence: `${fromTitle} ${spec.verb} ${toTitle}`,
     otherId: isFrom ? edge.to : edge.from,
     direction: isFrom ? 'out' : 'in',
   };
@@ -292,11 +324,10 @@ export function describeEdge(edge: { from: string; to: string; predicate: Predic
 export function mermaidArrow(predicate: Predicate): string {
   switch (predicate) {
     case 'implies':
+    case 'proves':
       return '==>';
     case 'iff':
       return '<-->';
-    case 'proves':
-      return '==>';
     case 'cites':
     case 'refutes':
       return '-.->';

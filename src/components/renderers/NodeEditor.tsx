@@ -3,7 +3,7 @@ import MDEditor from '@uiw/react-md-editor';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import { toast } from 'sonner';
-import type { Node } from '../../lib/schema';
+import { KIND_LABELS, KIND_OPTIONS, type Node } from '../../lib/schema';
 import { useGraphStore } from '../../stores/useGraphStore';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -12,15 +12,16 @@ interface NodeEditorProps {
   node: Node;
 }
 
-const KEY_TYPES = ['definition', 'theorem', 'lemma', 'corollary'];
-const SOLUTION_TYPES = ['theorem', 'lemma', 'corollary', 'example', 'exercise', 'attempt'];
+const KEY_TYPES: Node['type'][] = ['definition', 'proposition'];
+const SOLUTION_TYPES: Node['type'][] = ['proposition', 'problem', 'proof'];
 
 const NodeEditor = ({ node }: NodeEditorProps) => {
   const [title, setTitle] = useState(node.title);
   const [content, setContent] = useState(node.content);
   const [solution, setSolution] = useState(node.solution || '');
   const [tags, setTags] = useState(node.tags?.join(', ') || '');
-  const [source, setSource] = useState(node.citation?.book || '');
+  const [source, setSource] = useState(node.citation?.source || '');
+  const [kind, setKind] = useState(node.kind || '');
   const [key, setKey] = useState(node.key || '');
   const [aliases, setAliases] = useState(node.aliases?.join(', ') || '');
   const [method, setMethod] = useState(node.attempt?.method || '');
@@ -58,7 +59,8 @@ const NodeEditor = ({ node }: NodeEditorProps) => {
     setContent(node.content);
     setSolution(node.solution || '');
     setTags(node.tags?.join(', ') || '');
-    setSource(node.citation?.book || '');
+    setSource(node.citation?.source || '');
+    setKind(node.kind || '');
     setKey(node.key || '');
     setAliases(node.aliases?.join(', ') || '');
     setMethod(node.attempt?.method || '');
@@ -77,7 +79,8 @@ const NodeEditor = ({ node }: NodeEditorProps) => {
         tags: tagsArray,
         aliases: aliasesArray,
         key: key.trim() || null,
-        citation: source.trim() ? { book: source.trim() } : undefined,
+        citation: source.trim() ? { source: source.trim() } : undefined,
+        kind: kind || undefined,
         attempt:
           node.type === 'attempt'
             ? {
@@ -101,13 +104,12 @@ const NodeEditor = ({ node }: NodeEditorProps) => {
 
   const contentLabel = useMemo(() => {
     switch (node.type) {
-      case 'example':
-      case 'exercise':
+      case 'problem':
         return '题干';
-      case 'theorem':
-      case 'lemma':
-      case 'corollary':
+      case 'proposition':
         return '陈述';
+      case 'proof':
+        return '证明正文';
       default:
         return '内容';
     }
@@ -115,13 +117,12 @@ const NodeEditor = ({ node }: NodeEditorProps) => {
 
   const solutionLabel = useMemo(() => {
     switch (node.type) {
-      case 'example':
-      case 'exercise':
+      case 'problem':
         return '标准答案';
-      case 'theorem':
-      case 'lemma':
-      case 'corollary':
-        return '证明';
+      case 'proposition':
+        return '证明（旧数据兼容）';
+      case 'proof':
+        return '补充说明';
       case 'attempt':
         return '个人解法';
       default:
@@ -143,6 +144,26 @@ const NodeEditor = ({ node }: NodeEditorProps) => {
             className="text-lg"
           />
         </div>
+
+        {KIND_OPTIONS[node.type].length > 0 && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              细分 (kind)
+            </label>
+            <select
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+              value={kind}
+              onChange={(e) => setKind(e.target.value)}
+            >
+              <option value="">未指定</option>
+              {KIND_OPTIONS[node.type].map((option) => (
+                <option key={option} value={option}>
+                  {KIND_LABELS[option] ?? option}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {KEY_TYPES.includes(node.type) && (
           <div>

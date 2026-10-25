@@ -12,9 +12,10 @@ import {
 
 interface ExerciseNodeRendererProps {
   node: ProcessedNode;
+  solutionLabel?: string;
 }
 
-const ExerciseNodeRenderer = ({ node }: ExerciseNodeRendererProps) => {
+const ExerciseNodeRenderer = ({ node, solutionLabel = '显示/隐藏题解' }: ExerciseNodeRendererProps) => {
   const displayContent = useMemo(() => {
     return node.content;
   }, [node.content]);
@@ -35,7 +36,7 @@ const ExerciseNodeRenderer = ({ node }: ExerciseNodeRendererProps) => {
         <Accordion type="single" collapsible className="w-full">
           <AccordionItem value="item-1">
             <AccordionTrigger className="text-blue-700 hover:no-underline hover:text-blue-800 cursor-pointer">
-              显示/隐藏题解
+              {solutionLabel}
             </AccordionTrigger>
             <AccordionContent>
               <MDEditor.Markdown

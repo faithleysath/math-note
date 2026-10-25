@@ -1,5 +1,5 @@
 import {
-  NODE_TYPE_META,
+  typeLabel,
   type Edge,
   type EdgeStatus,
   type InferenceStep,
@@ -117,16 +117,16 @@ function computeNumbering(
   const numbering = new Map<string, string>();
   const counters = new Map<string, number>();
 
-  const bump = (containerId: string, kind: string): number => {
-    const key = `${containerId}|${kind}`;
-    const next = (counters.get(key) ?? 0) + 1;
-    counters.set(key, next);
+  const bump = (containerId: string, key: string): number => {
+    const counterKey = `${containerId}|${key}`;
+    const next = (counters.get(counterKey) ?? 0) + 1;
+    counters.set(counterKey, next);
     return next;
   };
 
   interface Ctx {
-    chapter?: number;
-    section?: number;
+    /** 祖先 section 的序号路径，例如 [1, 2] 表示 1.2 */
+    path: number[];
     containerId: string;
   }
 
@@ -137,33 +137,29 @@ function computeNumbering(
 
     switch (node.type) {
       case 'branch': {
-        childCtx = { containerId: id };
-        break;
-      }
-      case 'chapter': {
-        const n = bump(ctx.containerId, 'chapter');
-        numbering.set(id, `第 ${n} 章`);
-        childCtx = { chapter: n, containerId: id };
+        childCtx = { path: [], containerId: id };
         break;
       }
       case 'section': {
-        const n = bump(ctx.containerId, 'section');
-        numbering.set(id, ctx.chapter != null ? `§ ${ctx.chapter}.${n}` : `§ ${n}`);
-        childCtx = { chapter: ctx.chapter, section: n, containerId: id };
+        // section 可以任意嵌套：编号来自祖先 section 路径，不写死两层
+        const position = bump(ctx.containerId, '__section');
+        const path = [...ctx.path, position];
+        const isChapter = node.kind === 'chapter' || (node.kind === undefined && path.length === 1);
+        numbering.set(id, isChapter ? `第 ${position} 章` : path.join('.'));
+        childCtx = { path, containerId: id };
         break;
       }
-      case 'definition':
-      case 'theorem':
-      case 'lemma':
-      case 'corollary':
-      case 'example':
-      case 'exercise': {
-        const n = bump(ctx.containerId, node.type);
-        const prefix = [ctx.chapter, ctx.section]
-          .filter((v): v is number => typeof v === 'number')
-          .join('.');
-        const label = NODE_TYPE_META[node.type].label;
-        numbering.set(id, prefix ? `${label} ${prefix}.${n}` : `${label} ${n}`);
+      case 'definition': {
+        const position = bump(ctx.containerId, 'definition');
+        numbering.set(id, prefixNumber('定义', ctx.path, position));
+        break;
+      }
+      case 'proposition':
+      case 'problem': {
+        // 同一 kind 各自计数，保证迁移后「定理 1.1.2」这类编号不变
+        const kind = node.kind ?? (node.type === 'proposition' ? 'theorem' : 'example');
+        const position = bump(ctx.containerId, `${node.type}:${kind}`);
+        numbering.set(id, prefixNumber(typeLabel(node), ctx.path, position));
         break;
       }
       default:
@@ -173,8 +169,13 @@ function computeNumbering(
     for (const childId of childrenOf.get(id) ?? []) visit(childId, childCtx);
   };
 
-  for (const rootId of childrenOf.get(null) ?? []) visit(rootId, { containerId: 'root' });
+  for (const rootId of childrenOf.get(null) ?? []) visit(rootId, { path: [], containerId: 'root' });
   return numbering;
+}
+
+function prefixNumber(label: string, path: number[], position: number): string {
+  const prefix = path.join('.');
+  return prefix ? `${label} ${prefix}.${position}` : `${label} ${position}`;
 }
 
 // =============================================================================
@@ -1008,8 +1009,9 @@ export function topoSort(
   }
 
   const inCycle = cycleNodes(index, predicate);
+  const ordered = new Set(order);
   const cyclic = [...involved].filter((id) => inCycle.has(id));
-  const blocked = [...involved].filter((id) => !order.includes(id) && !inCycle.has(id));
+  const blocked = [...involved].filter((id) => !ordered.has(id) && !inCycle.has(id));
 
   return { order, cyclic, blocked };
 }

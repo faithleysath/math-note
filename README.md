@@ -1,180 +1,136 @@
 # 数学笔记
 
-一个纯前端的数学知识图谱：按教科书的层级记笔记，用带语义的关系把定义、定理、例题、练习连成网，数据存在自己的浏览器里。
+一个纯前端的数学知识图谱：按目录组织内容，用带语义的关系把定义、命题、证明、题目连成网，数据存在自己的浏览器里。
 
 线上示例：<https://math-note-delta.vercel.app>
 
-## 它和普通笔记软件有什么不同
+## 模型：9 种节点 + 9 种关系 + 可选推理步骤
 
-**1. 节点类型就是数学教科书的结构**
+### 节点
 
-| 类型 | 编号 | 用途 |
+| `type` | 语义 | `kind` |
 |---|---|---|
-| 分支 | — | 数学分析、高等代数… |
-| 主章节 / 子章节 | `第 1 章` / `§ 1.1` | 目录层级 |
-| 定义 / 定理 / 引理 / 推论 / 例题 / 练习 | `定理 1.1.2` | 正文单元 |
-| 笔记 | — | 评注、易错点 |
-| 解题记录 | — | 挂在例题或练习下的尝试历史 |
-| 证明 | — | 独立的知识对象，用 `proves` 指向被证命题，用 `depends-on` 指向用到的定义/定理 |
-| 概念 | — | 跨章节共享的数学概念，定义用 `defines` 指向它 |
-| 语境 | — | 变量范围 / 前提集合，供关系引用 |
-| 反例 | — | 反驳一个明确的命题 |
+| `branch` | 根知识分支 | — |
+| `section` | 任意深度知识目录 | `chapter` / `section` / `subsection` / `topic` |
+| `definition` | 概念及其定义 | `notation` |
+| `proposition` | 有真假意义的数学断言 | `theorem` / `lemma` / `corollary` / `property` / `formula` / `criterion` / `claim` |
+| `proof` | 独立证明文本 | `direct` / `contradiction` / `induction` / `geometric` / `other` |
+| `problem` | 例题、练习、探究题 | `example` / `exercise` / `exploration` / `review` |
+| `note` | 讲解、方法、总结、数学文化、语境 | `explanation` / `method` / `summary` / `history` / `context` / `topic` / `remark` |
+| `counterexample` | 否定某一断言的反例 | `numerical` / `geometric` / `other` |
+| `attempt` | 一次个人解题过程 | `personal` / `review` |
 
-编号不是手写的，是按节点在树里的位置算出来的：挪动、插入、删除之后，后面所有编号自动重排。
+「定理 / 引理 / 推论」不再是独立类型，而是 `proposition.kind`；「例题 / 练习」是 `problem.kind`；
+「章节 / 小节」是 `section.kind`。`section` 可以任意嵌套，不设固定两层。
 
-**2. 一个节点 = 两层内容**
+`kind` 是强类型属性：新建/编辑只能从对应枚举里选；导入历史数据时未知 `kind` 会暂存并告警。
 
-`content` 是命题陈述或题干，`solution` 是教科书式证明或标准答案，默认折叠。例题和练习下面还能挂多次「解题记录」，记对错、用时、方法——「第一次做错、第二次换方法做对」是刷题笔记里最值钱的信息。
+### 关系
 
-**3. 关系有语义，而且能推理**
+统一 `from → predicate → to`，方向永远是主语 → 宾语。
 
-存储的谓词只有 8 个，方向永远是「主语 → 宾语」：
-
-| 谓词 | 读法 | 性质 |
+| 谓词 | 起点 → 终点 | 说明 |
 |---|---|---|
-| `depends-on` | A 依赖 B（学习前置） | 可传递，**禁止成环** |
-| `cites` | A 提及 B | 不传递 |
-| `proves` | 证明 A 证明了命题 B | 起点必须是证明节点 |
-| `refutes` | 反例 A 反驳了命题 B | 起点必须是反例节点 |
-| `implies` | A ⇒ B | 可传递，**允许成环**（A⇒B 与 B⇒A 可以同时成立） |
-| `iff` | A ⇔ B | 对称，允许环，按语境聚等价类 |
-| `generalizes` | A 是 B 的推广 | 只作为记录的关联，不自动跨语境传递 |
-| `defines` | 定义 A 刻画了概念 B | — |
+| `depends-on` | 可学习内容 → section / definition / proposition / note | 学习前置；用于拓扑排序；**要求无环**；不等于数学蕴含 |
+| `covers` | problem → definition / proposition / note | 题目考查的知识点；不传递 |
+| `uses` | proof / attempt / problem / note → definition / proposition / note | 证明或解法实际用到的依据；不传递 |
+| `proves` | proof → proposition | 证明归属；不代表证明过程已被验证 |
+| `refutes` | counterexample → proposition | 反例针对明确命题 |
+| `implies` | proposition → proposition | 有条件蕴含；允许双向与合法环 |
+| `iff` | proposition ↔ proposition | 同一语境下的等价；单条规范化存储、双向查看 |
+| `generalizes` | definition → definition 或 proposition → proposition | 推广；不自动当作蕴含 |
+| `cites` | 任意非 branch 内容 → 任意非 branch 内容 | 弱引用；不传递 |
 
-「充分条件 / 必要条件」是同一个 `implies` 的两个视图；「是…的定义 / 定理 / 例题」由类型 + 层级派生，都不单独存储。
+每条关系还可以带：
 
-每条关系还带：
-
-- `condition`：前提（LaTeX），推理时必须一起显示，不能被忽略
-- `status`：确定 / 猜想 / 已推翻。`disproven` 永不参与推理，`conjecture` 默认也不参与
-- `reviewState`：未审核 / 人工审核 / 形式化验证。人工阅读不会自动变成「机器验证」
-- `contextId`：语境（指向一个「语境」节点）。语境未知不会被当作全局成立
+- `condition`：文本化前提（LaTeX），推理时只保留和展示，不做语义解析
+- `status`：确定 / 猜想 / 已推翻。`disproven` 永不参与推理，`conjecture` 默认不参与
+- `reviewState`：未审核 / 人工审核 / 形式化验证（后者只能由真正的检查器写入）
+- `contextId`：指向 `note(kind='context')`；缺省表示语境未知
 - `assumptionIds`：结构化前提
 
-**目录不是逻辑**：`parentId` 只决定笔记排在哪里，不代表数学依赖。
-**引用不是依赖**：`cites` 只是提到，`depends-on` 才是学习前置。
+去重键是「谓词 + 端点（`iff` 无序）+ 语境 + 规范化条件 + 前提集合」。端点相同但前提不同的两条边是两条断言，都会保留，不会互相删除。
 
 ### 推理步骤（超边）
 
-二元边只能表达「任一前提足够」（OR）。数学里大量推理是「几个前提同时成立才够」（AND）：
-
-> {f 在 [a,b] 上连续, [a,b] 是闭区间} ⇒ f 在 [a,b] 上有界
-
-拆成 `A⇒C`、`B⇒C` 两条边都是假命题。所以另外存一类对象：
+二元边只能表达 OR（任一前提足够）。需要多个前提同时成立时（AND）用独立的 `InferenceStep`：
 
 ```jsonc
 {
-  "id": "uuid",
-  "premiseIds": ["uuid-a", "uuid-b"],   // 至少一个，全部成立才够
-  "conclusionId": "uuid-c",
+  "premiseIds": ["uuid-continuous", "uuid-closed-interval"],  // 全部成立才够
+  "conclusionId": "uuid-bounded",
   "rule": "紧集上连续函数有界",
-  "contextId": "uuid-context",          // 可选
-  "proofId": "uuid-proof",              // 这条推导属于哪个证明，可选
-  "status": "asserted",
-  "reviewState": "human-reviewed"
+  "contextId": "uuid-context",
+  "proofId": "uuid-proof"
 }
 ```
 
-推理步骤不参与目录树、没有位置和编号。推导引擎是前向链式：先跑蕴含/等价边，再看哪些步骤的**所有**前提都已经成立；每一步累积前提、语境和最弱审核级别，右侧「推理」面板会写出「按规则『…』推出（前提：…）」。
+它不参与目录树、没有位置和编号。推理引擎是前向链式：先走 `implies`/`iff`，再看哪些步骤的所有前提都成立；
+每条结论都带「依据 + 未决前提 + 语境 + 最弱审核级别」。前提和结论都必须是 `proposition`。
 
-### 结构遍历 vs 数学推理
+### 编号
 
-- 结构遍历（导航）：只看存了哪些边，不判断真假。`iff` 在结构上双向可达。
-- 数学推理：走 `implies` / `iff` 和推理步骤，逐条检查状态、语境、前提与审核级别，输出**结论 + 依据（边路径或多前提规则）+ 未决前提 + 最弱审核级别**。只要有一条未决前提、语境未知或未审核，就标成「有前提的候选」，不会说成无条件的定理。
+- `section(kind=chapter)` → `第 n 章`；其余 section 按祖先 section 路径 → `1.2`、`1.2.3`
+- `definition` / `proposition` / `problem` → `${kind 标签} ${章节路径}.${同类序号}`，例如 `性质 2.1.1`、`例题 2.1.3`
+- 引用只能靠 `id` / `key`，不要依赖会随移动变化的编号
 
-由此得到的查询：
+## 结构与推理是两回事
 
-- 前置知识顺序（`depends-on` 的拓扑排序 = 学习顺序，孤立知识点也能排进去）
-- 环诊断区分「真正在环上的节点」与「被环阻塞的节点」
-- 等价命题组（`iff` 连通分量，按语境分组，跳过已推翻）
-- 可推导结论及其解释路径（右侧「推理」面板，可切换「全部关联 / 仅已审核」）
-- 冲突线索（互为推广、不同前提的双向蕴含）——只是提醒人工核查，不做数学判定
-
-**4. 身份只有一个**
-
-层级只用 `parentId + order` 表达，不存 `children` 数组。任何一次写操作只动一个节点，删除时递归删子树并清掉所有牵连的边。编号、子节点列表、祖先链全部是内存里的派生数据，每次图变更整体重建——不会出现「父子两边不一致」。
-
-**5. 手写笔记直接进图谱**
-
-上传手写笔记照片，模型把它拆成结构化的操作序列（`create-node` / `create-edge` …），**先在对话框里预览，确认后才写入**，写入前还要过一遍数据层的不变式。
-
-## 快捷键
-
-| 快捷键 | 功能 |
-|---|---|
-| `Cmd/Ctrl + F` | 聚焦搜索 |
-| `j` / `k` | 在当前分支里上下移动选中项 |
-| `e` 或 `Cmd/Ctrl + E` | 编辑选中项 |
-| `Cmd/Ctrl + S` | 保存（编辑中） |
-| `Esc` | 取消编辑 |
+- **目录不是逻辑**：`parentId` 只决定内容排在哪里，不代表依赖或蕴含。
+- **引用不是依赖**：`cites` 只是提到，`depends-on` 是学习前置，`uses` 才是证明里真正用到。
+- **导航 vs 推理**：结构遍历只看存了哪些边；数学推理只走 `implies` / `iff` / 推理步骤，逐条检查状态、语境、前提与审核级别。
+  只要有一条未决前提、语境未知或未审核，就标成「有前提的候选」，不会说成无条件定理。
+- **证明不是验证**：`proof --proves--> proposition` 只表示存在一份声称证明的文档，不代表证明过程已被机器检查。
 
 ## 数据
 
 - 全部存在浏览器 IndexedDB（数据库 `math-note-graph`），不联网、不登录。
-- 导入 v2 备份时会自动迁移：定理/引理/推论上的 `solution` 会复制成独立的「证明」节点并建立 `proves` 边，原字段保留可回滚。
-- v2/v3 备份没有 `steps` 字段，导入后按空数组处理。
-- 「导出」下载一份 JSON，「导入」会覆盖当前数据（会二次确认）。
-- 「分享」把快照传到 Vercel Blob，生成只读链接 `?note_url=…`，打开后所有写操作被禁用。
+- 「导出」下载 v5 JSON，「导入」整份替换（二次确认，失败不改动原数据）。
+- 「分享」把快照传到 Vercel Blob，生成只读链接 `?note_url=…`。
 
-数据格式：
+### 导入旧版本
+
+导入 v2 / v3 / v4 备份会自动迁移到 v5：
+
+| 旧类型 | 新类型 |
+|---|---|
+| `chapter` / `section` | `section` + kind |
+| `theorem` / `lemma` / `corollary` | `proposition` + kind |
+| `example` / `exercise` | `problem` + kind |
+| `context` | `note(kind='context')`，**保留原 ID**，引用它的关系仍然有效 |
+| `concept` | `note(kind='topic')`，**不按标题自动合并**，进入人工审核清单 |
+| `defines` 边 | 降级为 `cites` 并附迁移备注，不静默删除 |
+
+- v2 的 `solution` 会复制成独立 `proof` 节点（稳定 ID，重复迁移不新增），原字段保留可回滚。
+- 迁移报告包含前后计数、类型映射数量、`warnings`、`needsManualReview`、被改写/丢弃的关系数量。
+- 本地库首次以 v5 打开时会自动升级：先把原始 JSON 备份到 IndexedDB 的 `backups` 表，再单事务替换。
+
+### 给外部脚本的格式
+
+- `examples/v5.schema.json`：JSON Schema（由 `bun run gen:schema` 从 `src/lib/schema.ts` 生成）
+- `examples/v5-minimal.json`：最小样例
+- `examples/v5-gaokao-sample.json`：覆盖 9 种节点与 9 种关系的完整样例
 
 ```jsonc
 {
-  "schemaVersion": 4,
-  "nodes": [
-    {
-      "id": "uuid",
-      "type": "theorem",
-      "title": "夹逼定理",
-      "content": "若 $a_n \\le b_n \\le c_n$ …",
-      "solution": "对任意 $\\varepsilon>0$ …",
-      "parentId": "uuid-of-section",
-      "order": 3072,
-      "key": "squeeze-theorem",
-      "aliases": ["夹逼准则"],
-      "tags": [],
-      "citation": { "book": "数学分析", "page": "35", "theoremNo": "2.3.1" },
-      "createdAt": 0,
-      "updatedAt": 0
-    }
-  ],
-  "edges": [
-    {
-      "id": "uuid",
-      "from": "uuid-of-theorem",
-      "to": "uuid-of-definition",
-      "predicate": "depends-on",
-      "condition": "$a_n \\le b_n \\le c_n$",
-      "status": "asserted",
-      "reviewState": "unreviewed",
-      "contextId": "uuid-of-context",
-      "assertedBy": "manual",
-      "createdAt": 0,
-      "updatedAt": 0
-    }
-  ],
-  "steps": [
-    {
-      "id": "uuid",
-      "premiseIds": ["uuid-theorem-a", "uuid-theorem-b"],
-      "conclusionId": "uuid-theorem-c",
-      "rule": "紧集上连续函数有界",
-      "status": "asserted",
-      "reviewState": "human-reviewed",
-      "assertedBy": "manual",
-      "createdAt": 0,
-      "updatedAt": 0
-    }
-  ]
+  "schemaVersion": 5,
+  "exportedAt": 0,
+  "nodes": [],
+  "edges": [],
+  "steps": []
 }
 ```
+
+身份规则：`id` 在同一知识库内稳定唯一（不要每次重新 `randomUUID`）；`key` 只给可复用的核心知识点；
+标题可以重名，不能作为去重依据。图片用 `![描述](https://...)` 直接写进 `content` / `solution`，
+图床失效只会导致图片不显示，不影响数据。
 
 ## 开发
 
 ```bash
 bun install
 bun dev          # http://localhost:5173
-bun test         # 编号、图算法、不变式的单元测试
+bun test         # 编号、图算法、校验、迁移、推理
 bun run lint
 bun run build
 ```
@@ -182,13 +138,33 @@ bun run build
 技术栈：React 19 + TypeScript + Vite 7 + Tailwind 4 + shadcn/ui + Zustand 5 + Dexie 4 + zod + KaTeX。
 
 ```
-src/lib/schema.ts      节点 / 边 / 谓词的类型与 zod 校验
-src/lib/predicates.ts  谓词注册表（方向、传递性、允许的类型、显示文案）
-src/lib/graph.ts       纯函数：索引、编号、遍历、闭包、拓扑排序、搜索
-src/lib/validate.ts    不变式（类型白名单、防环、唯一性、防镜像层级）
-src/lib/db.ts          Dexie 持久化
+src/lib/schema.ts      9 种节点 / kind 枚举 / 9 种谓词 / 推理步骤 / zod
+src/lib/predicates.ts  谓词注册表（方向、传递性、类型白名单、显示文案）
+src/lib/graph.ts       纯函数：索引、递归编号、遍历、推理、拓扑排序、搜索
+src/lib/validate.ts    全图不变式与单条校验
+src/lib/migrate.ts     v2/v4 → v5 迁移与报告
+src/lib/serialize.ts   版本链导入、导出、失败回滚
+src/lib/db.ts          Dexie（含 meta / backups）
+src/lib/draft.ts       AI 批量操作的草稿预演
 src/stores/useGraphStore.ts  内存图 + 写穿
+examples/              可直接导入的 v5 样例
 ```
+
+## 性能（本机实测，`bun run bench`）
+
+| 规模 | 建索引 | 搜索 | 前置排序（1000 候选） | 导入校验 | JSON | 堆内存 |
+|---|---|---|---|---|---|---|
+| 5.5k 节点 / 4.5k 边 | 4 ms | 1.2 ms | 6 ms | 20 ms | 1.8 MB | 19 MB |
+| 22k 节点 / 18k 边 | 17 ms | 5.7 ms | 17 ms | 44 ms | 7.3 MB | 73 MB |
+
+全量内存 + 写穿的架构在万级节点下仍然可用；再往上（十万级）需要改增量索引。
+
+## 已知限制
+
+- 未形式化验证的推理只是**带依据的候选关系**，不承诺从自由文本判断真假。
+- `condition` 只做保存与展示，不会自动判断两条条件是否等价。
+- 不做教材/PDF 解析、图床管理、小问实体、增量合并。
+- 搜索是全量线性扫描，二十万级以上需要倒排索引。
 
 ## 部署
 

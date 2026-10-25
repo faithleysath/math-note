@@ -1,5 +1,13 @@
 import { PREDICATE_LIST, PREDICATE_SPECS } from './predicates';
-import { NODE_TYPE_META, NODE_TYPES, aiOperationListSchema, type AiOperation, type Node } from './schema';
+import {
+  KIND_LABELS,
+  KIND_OPTIONS,
+  NODE_TYPE_META,
+  NODE_TYPES,
+  aiOperationListSchema,
+  type AiOperation,
+  type Node,
+} from './schema';
 import { useAiConfigStore } from '../stores/useAiConfigStore';
 
 // =============================================================================
@@ -9,7 +17,13 @@ import { useAiConfigStore } from '../stores/useAiConfigStore';
 // 输出已经不存在的关系。现在只有注册表一个来源。
 
 function nodeTypeTable(): string {
-  return NODE_TYPES.map((type) => `- ${type}：${NODE_TYPE_META[type].label}`).join('\n');
+  return NODE_TYPES.map((type) => {
+    const kinds = KIND_OPTIONS[type];
+    const kindText = kinds.length
+      ? `（kind 可选：${kinds.map((kind) => `${kind}=${KIND_LABELS[kind] ?? kind}`).join('、')}）`
+      : '';
+    return `- ${type}：${NODE_TYPE_META[type].label}${kindText}`;
+  }).join('\n');
 }
 
 function predicateTable(): string {
@@ -48,9 +62,13 @@ export function buildPrompt(context: {
 ${nodeTypeTable()}
 
 约定：
-- 「定义」「定理」「引理」「推论」「例题」「练习」会自动获得教科书编号，不需要在标题里写编号。
-- 定理 / 引理 / 推论 / 例题 / 练习 的命题陈述或题干放在 content，教科书式证明或标准答案放在 solution。
-- 「笔记」用来放评注、易错点、想法，不参与编号。
+- 只有 9 种节点类型。定理/引理/推论是 proposition 的 kind；例题/练习是 problem 的 kind；
+  章节/小节是 section 的 kind。新建节点时用 kind 表达细分。
+- 定义、命题、题目会自动获得教科书编号，不需要在标题里写编号。
+- 命题的完整陈述（含量词和成立条件）放 content；题目的题干放 content，标准解答放 solution。
+- 证明要写成独立的 proof 节点，用 proves 指向被证命题；证明里实际用到的知识用 uses 连接。
+- 题目考查了哪些知识点用 covers；不要用 covers 表达「引用」。
+- 「笔记」用来放讲解、方法、总结、数学文化，不参与编号；语境用 note(kind=context)。
 
 # 二、可用的关系
 
@@ -284,8 +302,10 @@ export function describeOperation(op: AiOperation, nodes: Map<string, Node>): st
   };
 
   switch (op.op) {
-    case 'create-node':
-      return `新建${NODE_TYPE_META[op.type].label}「${op.title}」${op.ref ? `（ref: ${op.ref}）` : ''}`;
+    case 'create-node': {
+      const kindText = op.kind ? `${KIND_LABELS[op.kind] ?? op.kind}` : NODE_TYPE_META[op.type].label;
+      return `新建${kindText}「${op.title}」${op.ref ? `（ref: ${op.ref}）` : ''}`;
+    }
     case 'update-node':
       return `修改${title(op.id)}`;
     case 'delete-node':

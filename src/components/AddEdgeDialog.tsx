@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { toast } from 'sonner';
-import type { Edge, Node, Predicate } from '../lib/schema';
+import { isContextNode, type Edge, type Node, type Predicate } from '../lib/schema';
 import { Button } from './ui/button';
 import {
   Select,
@@ -44,7 +44,7 @@ const AddEdgeDialog = ({ sourceNode, isOpen, onClose }: AddEdgeDialogProps) => {
   const createEdge = useGraphStore(state => state.createEdge);
   const index = useGraphStore(state => state.index);
   const contexts = useMemo(
-    () => [...index.nodes.values()].filter(node => node.type === 'context'),
+    () => [...index.nodes.values()].filter(isContextNode),
     [index],
   );
 

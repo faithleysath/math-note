@@ -1,39 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import { buildIndex, deriveWithSteps, explainTrace, stepsForNode } from './graph';
 import { validateGraphInvariants, validateNewStep } from './validate';
-import type { Edge, InferenceStep, Node, NodeType } from './schema';
+import { mkEdge, mkNode } from './test-helpers';
+import type { Edge, InferenceStep, Node } from './schema';
 
-function node(
+const node = (
   id: string,
-  type: NodeType,
+  type: string,
   parentId: string | null,
   order: number,
   extra: Partial<Node> = {},
-): Node {
-  return {
-    id,
-    type,
-    title: id,
-    content: '',
-    parentId,
-    order,
-    createdAt: 0,
-    updatedAt: 0,
-    ...extra,
-  };
-}
+): Node => mkNode(id, type, parentId, order, extra);
 
 function edge(from: string, to: string, predicate: Edge['predicate'], extra: Partial<Edge> = {}): Edge {
-  return {
-    id: `e-${from}-${to}`,
-    from,
-    to,
-    predicate,
-    assertedBy: 'manual',
-    createdAt: 0,
-    updatedAt: 0,
-    ...extra,
-  };
+  return mkEdge(from, to, predicate, extra);
 }
 
 function step(extra: Partial<InferenceStep> = {}): InferenceStep {
@@ -185,7 +165,7 @@ describe('推理步骤校验', () => {
   it('结论必须是命题类节点', () => {
     expect(() =>
       validateNewStep(index, { premiseIds: ['a'], conclusionId: 'ctx', rule: '规则' }),
-    ).toThrowError(/命题类节点/);
+    ).toThrowError(/结论必须是命题/);
   });
 
   it('结构节点不能当前提', () => {

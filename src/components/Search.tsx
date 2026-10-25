@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react';
 import { Input } from './ui/input';
 import { searchNodes } from '../lib/graph';
-import { NODE_TYPE_META, type Node, type NodeType } from '../lib/schema';
+import { NODE_TYPE_META, typeLabel, type Node } from '../lib/schema';
+import { nodeBadgeColor } from './nodeColors';
 import { useGraphStore } from '../stores/useGraphStore';
 import { cn } from '@/lib/utils';
 import { useDebounce } from '@/hooks/useDebounce';
@@ -9,24 +10,6 @@ import { useDebounce } from '@/hooks/useDebounce';
 interface SearchProps {
   onSelectNode?: (node: Node) => void;
 }
-
-const nodeTypeColors: Record<NodeType, string> = {
-  branch: 'bg-gray-200 text-gray-800',
-  chapter: 'bg-slate-200 text-slate-800',
-  section: 'bg-stone-200 text-stone-800',
-  definition: 'bg-blue-100 text-blue-800',
-  theorem: 'bg-green-100 text-green-800',
-  lemma: 'bg-teal-100 text-teal-800',
-  corollary: 'bg-cyan-100 text-cyan-800',
-  example: 'bg-orange-100 text-orange-800',
-  exercise: 'bg-purple-100 text-purple-800',
-  attempt: 'bg-red-100 text-red-800',
-  note: 'bg-yellow-100 text-yellow-800',
-  proof: 'bg-red-100 text-red-800',
-  concept: 'bg-indigo-100 text-indigo-800',
-  context: 'bg-zinc-100 text-zinc-800',
-  counterexample: 'bg-rose-100 text-rose-800',
-};
 
 const Search = ({ onSelectNode }: SearchProps) => {
   const index = useGraphStore(state => state.index);
@@ -77,9 +60,9 @@ const Search = ({ onSelectNode }: SearchProps) => {
                 <p className="font-semibold truncate">{node.title}</p>
                 <span className={cn(
                   "text-xs font-semibold px-2 py-0.5 rounded-full",
-                  nodeTypeColors[node.type] || 'bg-gray-200 text-gray-800'
+                  nodeBadgeColor(node)
                 )}>
-                  {NODE_TYPE_META[node.type].label}
+                  {typeLabel(node) || NODE_TYPE_META[node.type].label}
                 </span>
               </div>
               <p className="text-xs text-muted-foreground truncate mt-1">{node.content}</p>

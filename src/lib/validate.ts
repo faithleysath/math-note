@@ -1,9 +1,12 @@
 import type { GraphIndex } from './graph';
 import { ancestorIds, collectSubtree, findPath } from './graph';
-import { PREDICATE_SPECS, canonicalizePair } from './predicates';
+import { PREDICATE_SPECS, canonicalizePair, isDirectionAllowed } from './predicates';
 import {
+  KIND_OPTIONS,
   NODE_TYPE_META,
   allowedChildTypes,
+  isContextNode,
+  isKnownKind,
   type AttemptMeta,
   type Citation,
   type Edge,
@@ -57,6 +60,7 @@ function issuesMessage(issues: ValidationIssue[]): string {
 
 export interface NewNodeInput {
   type: NodeType;
+  kind?: string;
   title: string;
   content?: string;
   solution?: string;
@@ -71,6 +75,7 @@ export interface NewNodeInput {
 
 export interface NodePatch {
   title?: string;
+  kind?: string;
   content?: string;
   solution?: string;
   key?: string | null;
@@ -102,6 +107,20 @@ export interface NewEdgeInput {
 function assertTitle(title: string) {
   if (!title.trim()) {
     throw errorOf('title', 'empty-title', '标题不能为空。');
+  }
+}
+
+function assertKind(type: NodeType, kind?: string) {
+  if (!kind) return;
+  if (!isKnownKind(type, kind)) {
+    const allowed = KIND_OPTIONS[type].map((option) => KIND_OPTIONS[type].length && option).join('、');
+    throw errorOf(
+      'kind',
+      'invalid-kind',
+      allowed
+        ? `「${NODE_TYPE_META[type].label}」不接受 kind="${kind}"。可选：${allowed}`
+        : `「${NODE_TYPE_META[type].label}」没有 kind 分类，请留空。`,
+    );
   }
 }
 
@@ -143,18 +162,12 @@ function assertParentUsable(index: GraphIndex, parentId: string | null, type: No
 
 export function validateNewNode(index: GraphIndex, input: NewNodeInput): void {
   assertTitle(input.title);
+  assertKind(input.type, input.kind);
 
   if (input.type === 'attempt') {
     const parent = input.parentId ? index.nodes.get(input.parentId) : undefined;
-    if (!parent || (parent.type !== 'exercise' && parent.type !== 'example')) {
-      throw errorOf('parentId', 'invalid-attempt-parent', '「解题记录」只能挂在例题或练习下面。');
-    }
-  }
-
-  if (input.type === 'proof') {
-    const parent = input.parentId ? index.nodes.get(input.parentId) : undefined;
-    if (!parent || !['theorem', 'lemma', 'corollary'].includes(parent.type)) {
-      throw errorOf('parentId', 'invalid-proof-parent', '「证明」只能挂在定理、引理或推论下面。');
+    if (!parent || parent.type !== 'problem') {
+      throw errorOf('parentId', 'invalid-attempt-parent', '「解题记录」只能挂在题目下面。');
     }
   }
 
@@ -182,6 +195,7 @@ export function validateNodePatch(index: GraphIndex, id: string, patch: NodePatc
   if (!node) throw errorOf('id', 'missing-node', '节点不存在。');
 
   if (patch.title !== undefined) assertTitle(patch.title);
+  if (patch.kind !== undefined) assertKind(node.type, patch.kind);
 
   if (patch.key) {
     if (!/^[a-z0-9][a-z0-9-]*$/.test(patch.key)) {
@@ -229,7 +243,8 @@ const PREDICATE_HINT: Record<Predicate, string> = {
   implies: '充分条件 / 必要条件',
   iff: '等价',
   generalizes: '推广 / 特例',
-  defines: '定义了',
+  covers: '考查',
+  uses: '使用',
 };
 
 function typeNames(types: NodeType[]): string {
@@ -245,21 +260,28 @@ function normalizeCondition(condition?: string): string {
  * 只有谓词、端点、语境、前提全都相同才算重复；
  * 相同端点但前提不同是两条不同的数学断言，必须都保留。
  */
-export function sameRelationKey(
-  a: Pick<Edge, 'predicate' | 'from' | 'to' | 'contextId' | 'condition'>,
-  b: Pick<Edge, 'predicate' | 'from' | 'to' | 'contextId' | 'condition'>,
-): boolean {
-  if (a.predicate !== b.predicate) return false;
-  if (normalizeCondition(a.condition) !== normalizeCondition(b.condition)) return false;
-  if ((a.contextId ?? '') !== (b.contextId ?? '')) return false;
+type RelationKeyFields = Pick<Edge, 'predicate' | 'from' | 'to' | 'contextId' | 'condition'> & {
+  assumptionIds?: string[];
+};
 
-  const spec = PREDICATE_SPECS[a.predicate];
-  if (spec.symmetric) {
-    return (
-      (a.from === b.from && a.to === b.to) || (a.from === b.to && a.to === b.from)
-    );
-  }
-  return a.from === b.from && a.to === b.to;
+/** 去重键：谓词 + 端点（对称谓词无序）+ 语境 + 规范化条件 + 前提集合 */
+export function relationKey(edge: RelationKeyFields): string {
+  const spec = PREDICATE_SPECS[edge.predicate];
+  const endpoints = spec.symmetric
+    ? [edge.from, edge.to].sort().join('|')
+    : `${edge.from}|${edge.to}`;
+  const assumptions = [...(edge.assumptionIds ?? [])].sort().join(',');
+  return [
+    edge.predicate,
+    endpoints,
+    edge.contextId ?? '',
+    normalizeCondition(edge.condition),
+    assumptions,
+  ].join('::');
+}
+
+export function sameRelationKey(a: RelationKeyFields, b: RelationKeyFields): boolean {
+  return relationKey(a) === relationKey(b);
 }
 
 export interface EdgeCheckResult {
@@ -284,7 +306,7 @@ export function validateNewEdge(index: GraphIndex, input: NewEdgeInput): EdgeChe
 
   const spec = PREDICATE_SPECS[predicate];
 
-  if (!spec.from.includes(fromNode.type) || !spec.to.includes(toNode.type)) {
+  if (!isDirectionAllowed(predicate, fromNode.type, toNode.type)) {
     throw errorOf(
       'predicate',
       'invalid-endpoint-type',
@@ -305,8 +327,8 @@ export function validateNewEdge(index: GraphIndex, input: NewEdgeInput): EdgeChe
 
   if (input.contextId) {
     const context = index.nodes.get(input.contextId);
-    if (!context || context.type !== 'context') {
-      throw errorOf('contextId', 'invalid-context', '语境必须指向一个「语境」节点。', {
+    if (!context || !isContextNode(context)) {
+      throw errorOf('contextId', 'invalid-context', '语境必须指向一个「语境」节点（note, kind=context）。', {
         field: 'contextId',
       });
     }
@@ -405,10 +427,8 @@ export function validateNewEdge(index: GraphIndex, input: NewEdgeInput): EdgeChe
 // 推理步骤（超边）校验
 // =============================================================================
 
-/** 结论可以是这些类型：它们才配叫「命题」 */
-const STEP_CONCLUSION_TYPES: NodeType[] = ['definition', 'theorem', 'lemma', 'corollary', 'note'];
-/** 前提不能是纯结构节点 */
-const STEP_PREMISE_EXCLUDED: NodeType[] = ['branch', 'chapter', 'section', 'context'];
+/** 推理步骤的前提和结论都必须是 proposition */
+const STEP_STATEMENT_TYPE: NodeType = 'proposition';
 
 export interface NewStepInput {
   premiseIds: string[];
@@ -455,12 +475,12 @@ export function validateNewStep(index: GraphIndex, input: NewStepInput): void {
     if (!premise) {
       throw errorOf('premiseIds', 'missing-premise', `前提节点 ${premiseId} 不存在。`);
     }
-    if (STEP_PREMISE_EXCLUDED.includes(premise.type)) {
+    if (premise.type !== STEP_STATEMENT_TYPE) {
       throw errorOf(
         'premiseIds',
         'invalid-premise-type',
-        `「${NODE_TYPE_META[premise.type].label}」不能作为推理前提。`,
-        { suggestion: '前提应该是定义、命题、笔记或证明这类内容节点。' },
+        `「${NODE_TYPE_META[premise.type].label}」不是有真假意义的命题，不能作为推理前提。`,
+        { suggestion: '定义与方法的依赖请用 uses 关系表达；推理前提必须是 proposition。' },
       );
     }
   }
@@ -469,11 +489,11 @@ export function validateNewStep(index: GraphIndex, input: NewStepInput): void {
   if (!conclusion) {
     throw errorOf('conclusionId', 'missing-conclusion', '结论节点不存在。');
   }
-  if (!STEP_CONCLUSION_TYPES.includes(conclusion.type)) {
+  if (conclusion.type !== STEP_STATEMENT_TYPE) {
     throw errorOf(
       'conclusionId',
       'invalid-conclusion-type',
-      `结论必须是命题类节点，不能是「${NODE_TYPE_META[conclusion.type].label}」。`,
+      `结论必须是命题，不能是「${NODE_TYPE_META[conclusion.type].label}」。`,
     );
   }
   if (premiseIds.includes(input.conclusionId)) {
@@ -485,7 +505,8 @@ export function validateNewStep(index: GraphIndex, input: NewStepInput): void {
   }
 
   if (input.contextId) {
-    if (index.nodes.get(input.contextId)?.type !== 'context') {
+    const context = index.nodes.get(input.contextId);
+    if (!context || !isContextNode(context)) {
       throw errorOf('contextId', 'invalid-context', '语境必须指向一个「语境」节点。');
     }
   }
@@ -547,6 +568,16 @@ export function validateGraphInvariants(graph: {
       });
       continue;
     }
+    if (!(node.type in NODE_TYPE_META)) {
+      issues.push({
+        severity: 'error',
+        code: 'unknown-node-type',
+        message: `节点「${node.title}」的类型 "${node.type}" 不是 v5 支持的 9 种类型之一。`,
+        nodeId: node.id,
+        field: 'type',
+      });
+      continue;
+    }
     nodes.set(node.id, node);
 
     if (!node.title.trim()) {
@@ -556,6 +587,15 @@ export function validateGraphInvariants(graph: {
         message: `节点 ${node.id} 的标题为空。`,
         nodeId: node.id,
         field: 'title',
+      });
+    }
+    if (!isKnownKind(node.type, node.kind)) {
+      issues.push({
+        severity: 'warning',
+        code: 'unknown-kind',
+        message: `节点「${node.title}」的 kind="${node.kind}" 不在「${NODE_TYPE_META[node.type].label}」的分类里，已暂存但不会被识别。`,
+        nodeId: node.id,
+        field: 'kind',
       });
     }
     if (!Number.isFinite(node.order)) {
@@ -686,11 +726,12 @@ export function validateGraphInvariants(graph: {
       });
     }
 
-    if (edge.contextId && nodes.get(edge.contextId)?.type !== 'context') {
+    const contextNode = edge.contextId ? nodes.get(edge.contextId) : undefined;
+    if (edge.contextId && (!contextNode || !isContextNode(contextNode))) {
       issues.push({
         severity: 'error',
         code: 'invalid-context',
-        message: `关系 ${edge.id} 的语境 ${edge.contextId} 不是语境节点。`,
+        message: `关系 ${edge.id} 的语境 ${edge.contextId} 不是语境节点（note, kind=context）。`,
         edgeId: edge.id,
         field: 'contextId',
       });
@@ -721,21 +762,21 @@ export function validateGraphInvariants(graph: {
     }
   }
 
-  // 重复关系（同谓词 + 同端点 + 同语境 + 同前提）
-  const seen = new Map<string, Edge>();
+  // 重复关系（同谓词 + 同端点 + 同语境 + 同前提），用哈希键避免 O(n²)
+  const seenRelations = new Map<string, Edge>();
   for (const edge of edges) {
-    for (const other of seen.values()) {
-      if (sameRelationKey(edge, other)) {
-        issues.push({
-          severity: 'error',
-          code: 'duplicate-edge',
-          message: `关系 ${edge.id} 与 ${other.id} 完全相同。`,
-          edgeId: edge.id,
-        });
-        break;
-      }
+    const key = relationKey(edge);
+    const other = seenRelations.get(key);
+    if (other) {
+      issues.push({
+        severity: 'error',
+        code: 'duplicate-edge',
+        message: `关系 ${edge.id} 与 ${other.id} 完全相同。`,
+        edgeId: edge.id,
+      });
+    } else {
+      seenRelations.set(key, edge);
     }
-    seen.set(edge.id, edge);
   }
 
   // 只有学习前置关系要求无环
@@ -786,6 +827,19 @@ export function validateGraphInvariants(graph: {
     }
   }
 
+  // 证明节点没有 proves 边时只是草稿，给出提示而不是拒绝
+  for (const node of nodes.values()) {
+    if (node.type !== 'proof') continue;
+    if (!edges.some((edge) => edge.from === node.id && edge.predicate === 'proves')) {
+      issues.push({
+        severity: 'warning',
+        code: 'proof-without-proves',
+        message: `证明「${node.title}」还没有用 proves 指向任何命题。`,
+        nodeId: node.id,
+      });
+    }
+  }
+
   // ---- 推理步骤 ----
   const stepIds = new Set<string>();
   const steps = graph.steps ?? [];
@@ -820,11 +874,11 @@ export function validateGraphInvariants(graph: {
         });
         continue;
       }
-      if (STEP_PREMISE_EXCLUDED.includes(premise.type)) {
+      if (premise.type !== STEP_STATEMENT_TYPE) {
         issues.push({
           severity: 'error',
           code: 'invalid-premise-type',
-          message: `推理步骤 ${step.id} 把「${NODE_TYPE_META[premise.type].label}」当成前提。`,
+          message: `推理步骤 ${step.id} 把「${NODE_TYPE_META[premise.type].label}」当成前提（必须是 proposition）。`,
         });
       }
     }
@@ -836,11 +890,11 @@ export function validateGraphInvariants(graph: {
         code: 'missing-conclusion',
         message: `推理步骤 ${step.id} 的结论 ${step.conclusionId} 不存在。`,
       });
-    } else if (!STEP_CONCLUSION_TYPES.includes(conclusion.type)) {
+    } else if (conclusion.type !== STEP_STATEMENT_TYPE) {
       issues.push({
         severity: 'error',
         code: 'invalid-conclusion-type',
-        message: `推理步骤 ${step.id} 的结论不是命题类节点。`,
+        message: `推理步骤 ${step.id} 的结论必须是 proposition。`,
       });
     }
 
@@ -860,11 +914,12 @@ export function validateGraphInvariants(graph: {
       });
     }
 
-    if (step.contextId && nodes.get(step.contextId)?.type !== 'context') {
+    const stepContext = step.contextId ? nodes.get(step.contextId) : undefined;
+    if (step.contextId && (!stepContext || !isContextNode(stepContext))) {
       issues.push({
         severity: 'error',
         code: 'invalid-context',
-        message: `推理步骤 ${step.id} 的语境 ${step.contextId} 不是语境节点。`,
+        message: `推理步骤 ${step.id} 的语境 ${step.contextId} 不是语境节点（note, kind=context）。`,
       });
     }
 
@@ -877,16 +932,23 @@ export function validateGraphInvariants(graph: {
     }
   }
 
-  const seenSteps: InferenceStep[] = [];
+  const seenSteps = new Set<string>();
   for (const step of steps) {
-    if (seenSteps.some((other) => sameStepKey(step, other))) {
+    const key = [
+      step.conclusionId,
+      step.rule.trim(),
+      step.contextId ?? '',
+      [...step.premiseIds].sort().join(','),
+    ].join('::');
+    if (seenSteps.has(key)) {
       issues.push({
         severity: 'error',
         code: 'duplicate-step',
         message: `推理步骤 ${step.id} 与已有步骤完全相同。`,
       });
+    } else {
+      seenSteps.add(key);
     }
-    seenSteps.push(step);
   }
 
   return issues;

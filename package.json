@@ -9,7 +9,9 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "gen:schema": "bun run scripts/gen-schema.ts",
+    "bench": "bun run scripts/bench.ts"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "^1.2.11",

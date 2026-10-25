@@ -1,20 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { buildIndex } from './graph';
 import { simulateOperations } from './draft';
-import type { AiOperation, Edge, Node, NodeType } from './schema';
+import { mkNode } from './test-helpers';
+import type { AiOperation, Edge, Node } from './schema';
 
-function node(id: string, type: NodeType, parentId: string | null, order: number): Node {
-  return {
-    id,
-    type,
-    title: id,
-    content: '',
-    parentId,
-    order,
-    createdAt: 0,
-    updatedAt: 0,
-  };
-}
+const node = (
+  id: string,
+  type: string,
+  parentId: string | null,
+  order: number,
+): Node => mkNode(id, type, parentId, order);
 
 const base = [
   node('b1', 'branch', null, 1024),
@@ -28,7 +23,7 @@ let counter = 0;
 const newId = () => `new-${(counter += 1)}`;
 
 const ops: AiOperation[] = [
-  { op: 'create-node', ref: 'n1', parentId: 's1', type: 'theorem', title: '新定理一', content: '内容一' },
+  { op: 'create-node', ref: 'n1', parentId: 's1', type: 'proposition', kind: 'theorem', title: '新定理一', content: '内容一' },
   { op: 'create-node', ref: 'n2', parentId: 'ref:n1', type: 'proof', title: '证明', content: '证明正文' },
   { op: 'create-edge', from: 'ref:n2', to: 'ref:n1', predicate: 'proves' },
 ];
@@ -108,8 +103,8 @@ describe('AI 批量操作模拟', () => {
     const result = simulateOperations(
       index,
       [
-        { op: 'create-node', ref: 'p1', parentId: 's1', type: 'theorem', title: '前提一', content: '' },
-        { op: 'create-node', ref: 'p2', parentId: 's1', type: 'theorem', title: '前提二', content: '' },
+        { op: 'create-node', ref: 'p1', parentId: 's1', type: 'proposition', kind: 'theorem', title: '前提一', content: '' },
+        { op: 'create-node', ref: 'p2', parentId: 's1', type: 'proposition', kind: 'theorem', title: '前提二', content: '' },
         { op: 'create-edge', from: 't1', to: 'ref:p1', predicate: 'implies' },
         { op: 'create-edge', from: 't1', to: 'ref:p2', predicate: 'implies' },
         { op: 'create-step', premiseIds: ['ref:p1', 'ref:p2'], conclusionId: 't2', rule: '两前提规则' },
@@ -128,7 +123,7 @@ describe('AI 批量操作模拟', () => {
     const result = simulateOperations(
       index,
       [
-        { op: 'create-node', ref: 'p1', parentId: 's1', type: 'theorem', title: '前提一', content: '' },
+        { op: 'create-node', ref: 'p1', parentId: 's1', type: 'proposition', kind: 'theorem', title: '前提一', content: '' },
         // 前提为空
         { op: 'create-step', premiseIds: [], conclusionId: 't2', rule: '规则' },
       ],
@@ -137,6 +132,74 @@ describe('AI 批量操作模拟', () => {
     expect(result.errors[0]).toMatch(/至少需要一个前提/);
     expect(result.diff.createdNodes).toEqual([]);
     expect(result.diff.createdSteps).toEqual([]);
+  });
+
+  it('删除被推理步骤引用的节点会一并删掉该步骤', () => {
+    const index = buildIndex(base, [], [
+      {
+        id: 's1',
+        premiseIds: ['t1', 't2'],
+        conclusionId: 't1',
+        rule: '占位',
+        assertedBy: 'manual',
+        createdAt: 0,
+        updatedAt: 0,
+      },
+    ]);
+    const result = simulateOperations(index, [{ op: 'delete-node', id: 't2' }], { now: 1, newId });
+    expect(result.errors).toEqual([]);
+    expect(result.diff.deletedStepIds).toEqual(['s1']);
+    expect(result.steps).toHaveLength(0);
+  });
+
+  it('删除语境节点会清掉边和步骤上的语境引用', () => {
+    const nodes = [
+      ...base,
+      node('ctx', 'context', null, 2048),
+      node('pf', 'proof', 't1', 1024),
+    ];
+    const edges: Edge[] = [
+      {
+        id: 'e1',
+        from: 't1',
+        to: 't2',
+        predicate: 'implies',
+        contextId: 'ctx',
+        assumptionIds: ['ctx'],
+        assertedBy: 'manual',
+        createdAt: 0,
+        updatedAt: 0,
+      },
+    ];
+    const steps = [
+      {
+        id: 's1',
+        premiseIds: ['t1'],
+        conclusionId: 't2',
+        rule: '规则',
+        contextId: 'ctx',
+        proofId: 'pf',
+        assertedBy: 'manual' as const,
+        createdAt: 0,
+        updatedAt: 0,
+      },
+    ];
+    const index = buildIndex(nodes, edges, steps);
+    const result = simulateOperations(index, [{ op: 'delete-node', id: 'ctx' }], { now: 1, newId });
+
+    expect(result.errors).toEqual([]);
+    expect(result.edges[0].contextId).toBeUndefined();
+    expect(result.edges[0].assumptionIds).toBeUndefined();
+    expect(result.steps[0].contextId).toBeUndefined();
+    // 证明还在，所以 proofId 保留
+    expect(result.steps[0].proofId).toBe('pf');
+
+    const afterProof = simulateOperations(
+      buildIndex(result.nodes.values(), result.edges, result.steps),
+      [{ op: 'delete-node', id: 'pf' }],
+      { now: 1, newId },
+    );
+    expect(afterProof.steps[0].proofId).toBeUndefined();
   });
 
   it('select 是纯 UI 操作，记录在 diff 里', () => {

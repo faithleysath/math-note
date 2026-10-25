@@ -15,9 +15,11 @@ interface ProseNodeRendererProps {
  */
 const ProseNodeRenderer = ({ node }: ProseNodeRendererProps) => {
   const displayContent = useMemo(() => {
-    const label = NODE_TYPE_META[node.type].label;
+    const label = node.kind
+      ? NODE_TYPE_META[node.type].kindLabel(node.kind)
+      : NODE_TYPE_META[node.type].label;
     return `**${label}：${node.title}**\n\n${node.content}`;
-  }, [node.content, node.title, node.type]);
+  }, [node.content, node.title, node.type, node.kind]);
 
   return (
     <div className="text-base">

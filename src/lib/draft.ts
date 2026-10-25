@@ -104,6 +104,7 @@ export function simulateOperations(
           let index = draftIndex();
           validateNewNode(index, {
             type: op.type,
+            kind: op.kind,
             title: op.title,
             parentId,
             content: op.content,
@@ -113,6 +114,7 @@ export function simulateOperations(
           const node: Node = {
             id: newId(),
             type: op.type,
+            kind: op.kind,
             title: op.title.trim(),
             content: op.content ?? '',
             solution: op.solution,
@@ -146,6 +148,7 @@ export function simulateOperations(
           if (!existing) throw new ValidationError('id', '节点不存在。');
           const patch = {
             title: op.title,
+            kind: op.kind,
             content: op.content,
             solution: op.solution,
             aliases: op.aliases,
@@ -173,6 +176,34 @@ export function simulateOperations(
             if (idSet.has(steps[i].conclusionId) || steps[i].premiseIds.some((id) => idSet.has(id))) {
               steps.splice(i, 1);
             }
+          }
+          // 清掉指向被删节点的语境 / 前提 / 所属证明，避免悬空引用
+          for (let i = 0; i < edges.length; i += 1) {
+            const edge = edges[i];
+            let next = edge;
+            if (edge.contextId && idSet.has(edge.contextId)) {
+              next = { ...next, contextId: undefined, updatedAt: now };
+            }
+            if (edge.assumptionIds?.some((id) => idSet.has(id))) {
+              const remaining = next.assumptionIds?.filter((id) => !idSet.has(id));
+              next = {
+                ...next,
+                assumptionIds: remaining && remaining.length > 0 ? remaining : undefined,
+                updatedAt: now,
+              };
+            }
+            if (next !== edge) edges[i] = next;
+          }
+          for (let i = 0; i < steps.length; i += 1) {
+            const step = steps[i];
+            let next = step;
+            if (step.contextId && idSet.has(step.contextId)) {
+              next = { ...next, contextId: undefined, updatedAt: now };
+            }
+            if (step.proofId && idSet.has(step.proofId)) {
+              next = { ...next, proofId: undefined, updatedAt: now };
+            }
+            if (next !== step) steps[i] = next;
           }
           break;
         }

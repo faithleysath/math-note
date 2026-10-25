@@ -1,27 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { buildIndex } from './graph';
 import { parseGraph, serializeGraph } from './serialize';
-import type { Edge, InferenceStep, Node, NodeType } from './schema';
+import { mkNode } from './test-helpers';
+import type { Edge, InferenceStep, Node } from './schema';
 
-function node(
+const node = (
   id: string,
-  type: NodeType,
+  type: string,
   parentId: string | null,
   order: number,
   extra: Partial<Node> = {},
-): Node {
-  return {
-    id,
-    type,
-    title: id,
-    content: '',
-    parentId,
-    order,
-    createdAt: 1,
-    updatedAt: 1,
-    ...extra,
-  };
-}
+): Node => mkNode(id, type, parentId, order, extra);
 
 const nodes = [
   node('b', 'branch', null, 1024),
@@ -55,7 +44,11 @@ describe('导入导出', () => {
   });
 
   it('旧版本（没有 steps 字段）导入后 steps 为空', () => {
-    const v3 = { ...toJson(serializeGraph(nodes, [])), schemaVersion: 3 };
+    const v3 = {
+      ...toJson(serializeGraph(nodes, [])),
+      schemaVersion: 3,
+      nodes: nodes.map((item) => ({ ...item, type: item.type === 'section' ? 'chapter' : item.type })),
+    };
     delete (v3 as { steps?: unknown }).steps;
     const parsed = parseGraph(v3);
     expect(parsed.steps).toEqual([]);
@@ -78,10 +71,32 @@ describe('导入导出', () => {
   });
 
   it('v2 数据导入时把 solution 迁移成证明节点', () => {
-    const v2 = { ...toJson(serializeGraph(nodes, [])), schemaVersion: 2 };
-    const parsed = parseGraph(v2);
+    // v2 的节点类型是旧名字，必须原样构造
+    const legacy = toJson({
+      schemaVersion: 2,
+      exportedAt: 0,
+      nodes: [
+        { id: 'b', type: 'branch', title: 'b', content: '', parentId: null, order: 1024, createdAt: 0, updatedAt: 0 },
+        { id: 'c', type: 'chapter', title: 'c', content: '', parentId: 'b', order: 1024, createdAt: 0, updatedAt: 0 },
+        { id: 's', type: 'section', title: 's', content: '', parentId: 'c', order: 1024, createdAt: 0, updatedAt: 0 },
+        {
+          id: 't',
+          type: 'theorem',
+          title: '定理甲',
+          content: '陈述',
+          solution: '设 x 为任意实数，则……',
+          parentId: 's',
+          order: 1024,
+          createdAt: 0,
+          updatedAt: 0,
+        },
+      ],
+      edges: [],
+    });
+    const parsed = parseGraph(legacy);
 
-    expect(parsed.migration).toEqual({ from: 2, proofsCreated: 1 });
+    expect(parsed.migration?.from).toBe(2);
+    expect(parsed.migration?.proofsCreated).toBe(1);
 
     const proof = parsed.nodes.find((item) => item.type === 'proof');
     expect(proof).toBeTruthy();
@@ -97,9 +112,19 @@ describe('导入导出', () => {
     expect(provesEdge?.reviewState).toBe('unreviewed');
   });
 
-  it('v3 数据再次导入不会重复生成证明', () => {
-    const v2 = { ...toJson(serializeGraph(nodes, [])), schemaVersion: 2 };
-    const first = parseGraph(v2);
+  it('v2 迁移后再导出导入不会重复生成证明', () => {
+    const legacy = toJson({
+      schemaVersion: 2,
+      exportedAt: 0,
+      nodes: [
+        { id: 'b', type: 'branch', title: 'b', content: '', parentId: null, order: 1024, createdAt: 0, updatedAt: 0 },
+        { id: 'c', type: 'chapter', title: 'c', content: '', parentId: 'b', order: 1024, createdAt: 0, updatedAt: 0 },
+        { id: 's', type: 'section', title: 's', content: '', parentId: 'c', order: 1024, createdAt: 0, updatedAt: 0 },
+        { id: 't', type: 'theorem', title: '定理甲', content: '陈述', solution: '证明正文', parentId: 's', order: 1024, createdAt: 0, updatedAt: 0 },
+      ],
+      edges: [],
+    });
+    const first = parseGraph(legacy);
     const exported = serializeGraph(first.nodes, first.edges);
     const second = parseGraph(toJson(exported));
 

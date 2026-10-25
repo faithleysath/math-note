@@ -15,48 +15,8 @@ import {
   searchNodes,
   topoSort,
 } from './graph';
-import type { Edge, Node, NodeType } from './schema';
-
-let seq = 0;
-
-function node(
-  id: string,
-  type: NodeType,
-  parentId: string | null,
-  order: number,
-  extra: Partial<Node> = {},
-): Node {
-  return {
-    id,
-    type,
-    title: id,
-    content: '',
-    parentId,
-    order,
-    createdAt: 0,
-    updatedAt: 0,
-    ...extra,
-  };
-}
-
-function edge(
-  from: string,
-  to: string,
-  predicate: Edge['predicate'],
-  extra: Partial<Edge> = {},
-): Edge {
-  seq += 1;
-  return {
-    id: `e${seq}`,
-    from,
-    to,
-    predicate,
-    assertedBy: 'manual',
-    createdAt: 0,
-    updatedAt: 0,
-    ...extra,
-  };
-}
+import { mkEdge as edge, mkNode as node } from './test-helpers';
+import type { Node } from './schema';
 
 /** 一个两章两节的最小结构，数字全部可预测 */
 function textbook() {
@@ -77,12 +37,12 @@ describe('教科书编号', () => {
   it('按路径算出章节与命题编号', () => {
     const index = buildIndex(textbook(), []);
     expect(index.numbering.get('c1')).toBe('第 1 章');
-    expect(index.numbering.get('s11')).toBe('§ 1.1');
+    expect(index.numbering.get('s11')).toBe('1.1');
     expect(index.numbering.get('d1')).toBe('定义 1.1.1');
     expect(index.numbering.get('t1')).toBe('定理 1.1.1');
     expect(index.numbering.get('t2')).toBe('定理 1.1.2');
     expect(index.numbering.get('c2')).toBe('第 2 章');
-    expect(index.numbering.get('s21')).toBe('§ 2.1');
+    expect(index.numbering.get('s21')).toBe('2.1');
     expect(index.numbering.get('t3')).toBe('定理 2.1.1');
     expect(index.numbering.has('b1')).toBe(false);
   });
@@ -147,7 +107,7 @@ describe('树遍历', () => {
 
   it('dumpTree 可读', () => {
     const index = buildIndex(textbook(), []);
-    expect(dumpTree(index)).toContain('theorem [定理 1.1.1] t1');
+    expect(dumpTree(index)).toContain('proposition [定理 1.1.1] t1');
   });
 });
 

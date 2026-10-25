@@ -10,27 +10,16 @@ import {
   validateNewNode,
   ValidationError,
 } from './validate';
-import type { Edge, Node, NodeType } from './schema';
+import { mkNode } from './test-helpers';
+import type { Edge, Node } from './schema';
 
-function node(
+const node = (
   id: string,
-  type: NodeType,
+  type: string,
   parentId: string | null,
   order: number,
   extra: Partial<Node> = {},
-): Node {
-  return {
-    id,
-    type,
-    title: id,
-    content: '',
-    parentId,
-    order,
-    createdAt: 0,
-    updatedAt: 0,
-    ...extra,
-  };
-}
+): Node => mkNode(id, type, parentId, order, extra);
 
 function edge(id: string, from: string, to: string, predicate: Edge['predicate'], extra: Partial<Edge> = {}): Edge {
   return {
@@ -74,11 +63,11 @@ describe('节点校验', () => {
     );
   });
 
-  it('分支下不能直接放定理', () => {
+  it('分支下不能直接放命题', () => {
     const index = buildIndex(base, []);
     expect(() =>
-      validateNewNode(index, { type: 'theorem', title: 'x', parentId: 'b1' }),
-    ).toThrowError(/「分支」下不能放「定理」/);
+      validateNewNode(index, { type: 'proposition', kind: 'theorem', title: 'x', parentId: 'b1' }),
+    ).toThrowError(/「分支」下不能放「命题」/);
   });
 
   it('术语键必须唯一且格式合法', () => {
@@ -95,20 +84,24 @@ describe('节点校验', () => {
     const index = buildIndex(base, []);
     expect(() =>
       validateNewNode(index, { type: 'attempt', title: '尝试', parentId: 's11' }),
-    ).toThrowError(/只能挂在例题或练习/);
+    ).toThrowError(/只能挂在题目/);
     expect(() =>
       validateNewNode(index, { type: 'attempt', title: '尝试', parentId: 'ex1' }),
     ).not.toThrow();
   });
 
-  it('证明只能挂在命题下', () => {
+  it('证明可以暂时放在目录下，也可以挂在命题下', () => {
     const index = buildIndex(base, []);
     expect(() =>
       validateNewNode(index, { type: 'proof', title: '证', parentId: 's11' }),
-    ).toThrowError(/只能挂在定理/);
+    ).not.toThrow();
     expect(() =>
       validateNewNode(index, { type: 'proof', title: '证', parentId: 't2' }),
     ).not.toThrow();
+    // 题目下不能放证明
+    expect(() =>
+      validateNewNode(index, { type: 'proof', title: '证', parentId: 'ex1' }),
+    ).toThrowError(/下不能放/);
   });
 
   it('不能把节点移动到自己的子孙下', () => {
@@ -192,12 +185,16 @@ describe('边校验', () => {
   });
 
   it('A⇔B⇔C⇔A 合法，只提示冗余', () => {
+    const triangles = [
+      ...base,
+      node('t3', 'theorem', 's11', 5120, { title: '定理丙' }),
+    ];
     const edges = [
       edge('e1', 't1', 't2', 'iff'),
-      edge('e2', 't2', 'd1', 'iff'),
+      edge('e2', 't2', 't3', 'iff'),
     ];
-    const index = buildIndex(base, edges);
-    const result = validateNewEdge(index, { from: 'd1', to: 't1', predicate: 'iff' });
+    const index = buildIndex(triangles, edges);
+    const result = validateNewEdge(index, { from: 't3', to: 't1', predicate: 'iff' });
     expect(result.warnings.map((w) => w.code)).toContain('redundant-equivalence');
   });
 

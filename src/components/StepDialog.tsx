@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from './ui/select';
-import { NODE_TYPE_META, type Node } from '../lib/schema';
+import { isContextNode, typeLabel, type Node } from '../lib/schema';
 import { useGraphStore } from '../stores/useGraphStore';
 
 interface StepDialogProps {
@@ -50,7 +50,7 @@ const StepDialog = ({ isOpen, onClose, defaultConclusionId, defaultPremiseIds }:
   const [contextId, setContextId] = useState('none');
   const [proofId, setProofId] = useState('none');
 
-  const contexts = [...index.nodes.values()].filter((node) => node.type === 'context');
+  const contexts = [...index.nodes.values()].filter(isContextNode);
   const proofs = [...index.nodes.values()].filter((node) => node.type === 'proof');
 
   const reset = () => {
@@ -116,7 +116,7 @@ const StepDialog = ({ isOpen, onClose, defaultConclusionId, defaultPremiseIds }:
                       className="flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-xs"
                     >
                       <span className="text-muted-foreground">
-                        {NODE_TYPE_META[premise.type].label}
+                        {typeLabel(premise)}
                       </span>
                       {premise.title}
                       <button
@@ -142,7 +142,7 @@ const StepDialog = ({ isOpen, onClose, defaultConclusionId, defaultPremiseIds }:
                 <div className="flex items-center justify-between rounded border bg-muted/40 px-2 py-1 text-sm">
                   <span>
                     <span className="mr-1 text-xs text-muted-foreground">
-                      {NODE_TYPE_META[conclusion.type].label}
+                      {typeLabel(conclusion)}
                     </span>
                     {conclusion.title}
                   </span>

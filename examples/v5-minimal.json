@@ -1,0 +1,130 @@
+{
+  "schemaVersion": 5,
+  "exportedAt": 0,
+  "nodes": [
+    {
+      "id": "high",
+      "type": "branch",
+      "title": "高中数学",
+      "content": "",
+      "parentId": null,
+      "order": 1024,
+      "createdAt": 0,
+      "updatedAt": 0
+    },
+    {
+      "id": "func",
+      "type": "section",
+      "kind": "chapter",
+      "title": "函数",
+      "content": "",
+      "parentId": "high",
+      "order": 1024,
+      "createdAt": 0,
+      "updatedAt": 0
+    },
+    {
+      "id": "quadratic",
+      "type": "definition",
+      "title": "二次函数",
+      "content": "一般地，$f(x)=ax^2+bx+c$，其中 $a\\ne 0$。",
+      "parentId": "func",
+      "order": 1024,
+      "key": "quadratic-function",
+      "createdAt": 0,
+      "updatedAt": 0
+    },
+    {
+      "id": "axis",
+      "type": "proposition",
+      "kind": "property",
+      "title": "二次函数的对称轴",
+      "content": "实数范围内，若 $a\\ne 0$，则 $f(x)=ax^2+bx+c$ 的对称轴为 $x=-\\frac{b}{2a}$。",
+      "parentId": "func",
+      "order": 2048,
+      "key": "quadratic-axis",
+      "createdAt": 0,
+      "updatedAt": 0
+    },
+    {
+      "id": "axis-proof",
+      "type": "proof",
+      "title": "配方法证明",
+      "content": "利用配方法：$f(x)=a(x+\\frac{b}{2a})^2+c-\\frac{b^2}{4a}$。",
+      "parentId": "axis",
+      "order": 1024,
+      "createdAt": 0,
+      "updatedAt": 0
+    },
+    {
+      "id": "axis-example",
+      "type": "problem",
+      "kind": "example",
+      "title": "求二次函数的对称轴",
+      "content": "已知 $f(x)=2x^2-4x+1$：（1）求对称轴；（2）求最小值。",
+      "solution": "（1）$x=1$；（2）最小值 $-1$。",
+      "parentId": "func",
+      "order": 3072,
+      "createdAt": 0,
+      "updatedAt": 0
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "from": "axis",
+      "to": "quadratic",
+      "predicate": "depends-on",
+      "assertedBy": "import",
+      "status": "asserted",
+      "reviewState": "unreviewed",
+      "createdAt": 0,
+      "updatedAt": 0
+    },
+    {
+      "id": "e2",
+      "from": "axis-proof",
+      "to": "axis",
+      "predicate": "proves",
+      "assertedBy": "import",
+      "status": "asserted",
+      "reviewState": "unreviewed",
+      "createdAt": 0,
+      "updatedAt": 0
+    },
+    {
+      "id": "e3",
+      "from": "axis-proof",
+      "to": "quadratic",
+      "predicate": "uses",
+      "assertedBy": "import",
+      "status": "asserted",
+      "reviewState": "unreviewed",
+      "createdAt": 0,
+      "updatedAt": 0
+    },
+    {
+      "id": "e4",
+      "from": "axis-example",
+      "to": "axis",
+      "predicate": "covers",
+      "assertedBy": "import",
+      "status": "asserted",
+      "reviewState": "unreviewed",
+      "createdAt": 0,
+      "updatedAt": 0
+    },
+    {
+      "id": "e5",
+      "from": "axis-example",
+      "to": "quadratic",
+      "predicate": "covers",
+      "assertedBy": "import",
+      "status": "asserted",
+      "reviewState": "unreviewed",
+      "createdAt": 0,
+      "updatedAt": 0
+    }
+  ],
+  "steps": []
+}

@@ -8,7 +8,7 @@ import AddEdgeDialog from '../AddEdgeDialog';
 import StepDialog from '../StepDialog';
 import { Link, ChevronRight, X } from 'lucide-react';
 import { ancestorNodes, deriveWithSteps, explainTrace, stepsForNode } from '../../lib/graph';
-import { NODE_TYPE_META, REVIEW_STATE_LABEL } from '../../lib/schema';
+import { REVIEW_STATE_LABEL, typeLabel } from '../../lib/schema';
 import { useWindowSize } from '@/hooks/useWindowSize';
 
 const RightSidebar = () => {
@@ -105,7 +105,7 @@ const RightSidebar = () => {
             )}
             <div>
               <span className="font-semibold">类型:</span>
-              <span className="ml-2 text-muted-foreground">{NODE_TYPE_META[selectedNode.type].label}</span>
+              <span className="ml-2 text-muted-foreground">{typeLabel(selectedNode)}</span>
             </div>
             <div>
               <span className="font-semibold">ID:</span>
@@ -135,10 +135,10 @@ const RightSidebar = () => {
                 </span>
               </div>
             )}
-            {selectedNode.citation?.book && (
+            {selectedNode.citation?.source && (
               <div>
                 <span className="font-semibold">来源:</span>
-                <span className="ml-2 text-muted-foreground">{selectedNode.citation.book}</span>
+                <span className="ml-2 text-muted-foreground">{selectedNode.citation.source}</span>
               </div>
             )}
             <div>
