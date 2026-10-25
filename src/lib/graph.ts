@@ -4,6 +4,7 @@ import {
   type EdgeStatus,
   type InferenceStep,
   type Node,
+  type NodeType,
   type Predicate,
   type ReviewState,
 } from './schema';
@@ -763,6 +764,40 @@ export function deriveWithSteps(
   );
 }
 
+// =============================================================================
+// covers：知识点 ↔ 题目
+// =============================================================================
+
+/** 考查某个知识点的全部题目（problem --covers--> 本节点） */
+export function coveringProblems(index: GraphIndex, nodeId: string): Node[] {
+  const seen = new Set<string>();
+  const result: Node[] = [];
+  for (const edge of index.edgesTo.get(nodeId) ?? []) {
+    if (edge.predicate !== 'covers') continue;
+    if (seen.has(edge.from)) continue;
+    const problem = index.nodes.get(edge.from);
+    if (problem?.type !== 'problem') continue;
+    seen.add(edge.from);
+    result.push(problem);
+  }
+  return result;
+}
+
+/** 某个题目考查的全部知识点（本节点 --covers--> 目标） */
+export function coveredKnowledge(index: GraphIndex, problemId: string): Node[] {
+  const seen = new Set<string>();
+  const result: Node[] = [];
+  for (const edge of index.edgesFrom.get(problemId) ?? []) {
+    if (edge.predicate !== 'covers') continue;
+    if (seen.has(edge.to)) continue;
+    const target = index.nodes.get(edge.to);
+    if (!target) continue;
+    seen.add(edge.to);
+    result.push(target);
+  }
+  return result;
+}
+
 /** 涉及某个节点的推理步骤 */
 export function stepsForNode(
   index: GraphIndex,
@@ -1050,12 +1085,43 @@ const FIELD_WEIGHT: Record<SearchField, number> = {
   content: 20,
 };
 
-export function searchNodes(index: GraphIndex, rawTerm: string, limit = 50): SearchHit[] {
+export interface SearchFilter {
+  type?: NodeType;
+  kind?: string;
+}
+
+function matchesFilter(node: Node, filter?: SearchFilter): boolean {
+  if (!filter) return true;
+  if (filter.type && node.type !== filter.type) return false;
+  if (filter.kind && node.kind !== filter.kind) return false;
+  return true;
+}
+
+/** 只按类型/细分筛选，不做关键词匹配（筛选器单独使用时的浏览模式） */
+export function nodesMatching(index: GraphIndex, filter?: SearchFilter, limit = 30): Node[] {
+  const result: Node[] = [];
+  for (const node of index.nodes.values()) {
+    if (!matchesFilter(node, filter)) continue;
+    result.push(node);
+    if (result.length >= limit * 4) break;
+  }
+  return result
+    .sort((a, b) => a.title.localeCompare(b.title, 'zh-Hans-CN'))
+    .slice(0, limit);
+}
+
+export function searchNodes(
+  index: GraphIndex,
+  rawTerm: string,
+  limit = 50,
+  filter?: SearchFilter,
+): SearchHit[] {
   const term = rawTerm.trim().toLowerCase();
   if (!term) return [];
   const hits: SearchHit[] = [];
 
   for (const node of index.nodes.values()) {
+    if (!matchesFilter(node, filter)) continue;
     const candidates: [SearchField, string | undefined][] = [
       ['key', node.key],
       ['title', node.title],

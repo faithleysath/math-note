@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   ancestorIds,
+  coveredKnowledge,
+  coveringProblems,
+  nodesMatching,
   buildIndex,
   collectSubtree,
   computeInsertOrder,
@@ -324,6 +327,44 @@ describe('拓扑排序与环诊断', () => {
   });
 });
 
+describe('covers：知识点 ↔ 题目', () => {
+  const nodes = [
+    node('b', 'branch', null, 1024),
+    node('c', 'section', 'b', 1024, { kind: 'chapter' }),
+    node('s', 'section', 'c', 1024, { kind: 'section' }),
+    node('def', 'definition', 's', 1024, { title: '二次函数', key: 'quadratic' }),
+    node('prop', 'proposition', 's', 2048, { title: '对称轴', kind: 'formula' }),
+    node('p1', 'problem', 's', 3072, { title: '求对称轴', kind: 'example' }),
+    node('p2', 'problem', 's', 4096, { title: '求最值', kind: 'exercise' }),
+  ];
+  const edges = [
+    edge('p1', 'def', 'covers'),
+    edge('p1', 'prop', 'covers'),
+    edge('p2', 'def', 'covers'),
+  ];
+
+  it('反查考查某个知识点的题目', () => {
+    const index = buildIndex(nodes, edges);
+    expect(coveringProblems(index, 'def').map((item) => item.id).sort()).toEqual(['p1', 'p2']);
+    expect(coveringProblems(index, 'prop').map((item) => item.id)).toEqual(['p1']);
+  });
+
+  it('正查某个题目考查的知识点', () => {
+    const index = buildIndex(nodes, edges);
+    expect(coveredKnowledge(index, 'p1').map((item) => item.id).sort()).toEqual(['def', 'prop']);
+  });
+
+  it('只统计 covers，不把 cites / depends-on 混进来', () => {
+    const index = buildIndex(nodes, [
+      ...edges,
+      edge('p2', 'prop', 'cites'),
+      edge('prop', 'def', 'depends-on'),
+    ]);
+    expect(coveringProblems(index, 'prop').map((item) => item.id)).toEqual(['p1']);
+    expect(coveredKnowledge(index, 'p2').map((item) => item.id)).toEqual(['def']);
+  });
+});
+
 describe('搜索', () => {
   const nodes = [
     node('n1', 'definition', null, 1024, { title: '幂集', content: '集合的所有子集', key: 'power-set' }),
@@ -347,5 +388,43 @@ describe('搜索', () => {
   it('空词返回空', () => {
     const index = buildIndex(nodes, []);
     expect(searchNodes(index, '   ')).toEqual([]);
+  });
+
+  it('按类型筛选', () => {
+    const filtered = [
+      ...nodes,
+      node('n4', 'proposition', null, 4096, { title: '幂集的性质', content: '关于幂集' }),
+      node('n5', 'problem', null, 5120, { title: '幂集练习', content: '求幂集' }),
+    ];
+    const index = buildIndex(filtered, []);
+    const all = searchNodes(index, '幂集');
+    expect(all.map((hit) => hit.node.type).sort()).toEqual(['definition', 'note', 'note', 'problem', 'proposition']);
+
+    const onlyPropositions = searchNodes(index, '幂集', 50, { type: 'proposition' });
+    expect(onlyPropositions.map((hit) => hit.node.id)).toEqual(['n4']);
+
+    const onlyProblems = searchNodes(index, '幂集', 50, { type: 'problem' });
+    expect(onlyProblems.map((hit) => hit.node.id)).toEqual(['n5']);
+  });
+
+  it('按细分筛选', () => {
+    const filtered = [
+      node('t1', 'proposition', null, 1024, { title: '定理甲', kind: 'theorem' }),
+      node('t2', 'proposition', null, 2048, { title: '性质甲', kind: 'property' }),
+    ];
+    const index = buildIndex(filtered, []);
+    expect(searchNodes(index, '甲', 50, { type: 'proposition', kind: 'theorem' }).map((h) => h.node.id)).toEqual(['t1']);
+    expect(searchNodes(index, '甲', 50, { type: 'proposition', kind: 'property' }).map((h) => h.node.id)).toEqual(['t2']);
+  });
+
+  it('只给筛选器时按类型浏览', () => {
+    const filtered = [
+      node('t1', 'proposition', null, 1024, { title: '定理甲', kind: 'theorem' }),
+      node('t2', 'proposition', null, 2048, { title: '定理乙', kind: 'theorem' }),
+      node('n1', 'note', null, 3072, { title: '随便笔记' }),
+    ];
+    const index = buildIndex(filtered, []);
+    expect(nodesMatching(index, { type: 'proposition' }).map((item) => item.id).sort()).toEqual(['t1', 't2']);
+    expect(nodesMatching(index, undefined).length).toBe(3);
   });
 });

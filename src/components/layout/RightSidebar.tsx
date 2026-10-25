@@ -7,8 +7,15 @@ import { Button } from '../ui/button';
 import AddEdgeDialog from '../AddEdgeDialog';
 import StepDialog from '../StepDialog';
 import { Link, ChevronRight, X } from 'lucide-react';
-import { ancestorNodes, deriveWithSteps, explainTrace, stepsForNode } from '../../lib/graph';
-import { REVIEW_STATE_LABEL, typeLabel } from '../../lib/schema';
+import {
+  ancestorNodes,
+  coveredKnowledge,
+  coveringProblems,
+  deriveWithSteps,
+  explainTrace,
+  stepsForNode,
+} from '../../lib/graph';
+import { REVIEW_STATE_LABEL, typeLabel, type Node } from '../../lib/schema';
 import { useWindowSize } from '@/hooks/useWindowSize';
 
 const RightSidebar = () => {
@@ -50,6 +57,14 @@ const RightSidebar = () => {
   }, [index, selectedId]);
 
   const deleteStep = useGraphStore((state) => state.deleteStep);
+
+  const coversPanel = useMemo(() => {
+    if (!selectedId || !selectedNode) return { mode: 'none' as const, items: [] as Node[] };
+    if (selectedNode.type === 'problem') {
+      return { mode: 'outgoing' as const, items: coveredKnowledge(index, selectedId) };
+    }
+    return { mode: 'incoming' as const, items: coveringProblems(index, selectedId) };
+  }, [index, selectedId, selectedNode]);
 
   const ancestors = useMemo(
     () => (selectedNode ? [...ancestorNodes(index, selectedNode.id), selectedNode] : []),
@@ -166,6 +181,32 @@ const RightSidebar = () => {
           <div className="text-sm">
             <RelatedNodesList />
           </div>
+
+          {coversPanel.items.length > 0 && (
+            <div className="mt-6">
+              <div className="mb-2 border-b pb-2">
+                <h3 className="text-md font-semibold">
+                  {coversPanel.mode === 'outgoing'
+                    ? `本题考查的知识点（${coversPanel.items.length}）`
+                    : `考查此知识点的题目（${coversPanel.items.length}）`}
+                </h3>
+              </div>
+              <ul className="space-y-1">
+                {coversPanel.items.map(item => (
+                  <li key={item.id} className="flex items-baseline gap-2 text-sm">
+                    <button
+                      className="text-left text-primary hover:underline"
+                      onClick={() => select(item.id)}
+                    >
+                      {item.title}
+                    </button>
+                    <span className="shrink-0 text-xs text-muted-foreground">{typeLabel(item)}</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-1 text-xs text-muted-foreground">按 covers 关系统计。</p>
+            </div>
+          )}
 
           <div className="mt-6">
             <div className="flex items-center justify-between mb-2 border-b pb-2">

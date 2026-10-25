@@ -212,7 +212,7 @@ const LeftSidebar = () => {
           </div>
         </div>
         <div className="mb-4">
-          <Search />
+          <Search showFilters />
         </div>
         <div className="flex-grow overflow-y-auto min-h-0">
           <TreeView />
