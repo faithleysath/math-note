@@ -177,12 +177,13 @@ export function applicablePredicates(fromType: NodeType, toType: NodeType): Appl
   for (const predicate of PREDICATE_LIST) {
     const spec = PREDICATE_SPECS[predicate];
     const forwardOk = spec.from.includes(fromType) && spec.to.includes(toType);
-    const backwardOk = spec.swappable && spec.from.includes(toType) && spec.to.includes(fromType);
+    const backwardOk = spec.from.includes(toType) && spec.to.includes(fromType);
     if (forwardOk) {
       result.push({ predicate, reversed: false });
-    } else if (backwardOk) {
-      result.push({ predicate, reversed: true });
-    } else if (spec.from.includes(toType) && spec.to.includes(fromType)) {
+    }
+    // 可换方向的说法（充分条件 / 必要条件）两个方向都给，
+    // 单向关系在正方向不成立时才给出反向选项。
+    if (backwardOk && (spec.swappable || !forwardOk)) {
       result.push({ predicate, reversed: true });
     }
   }

@@ -69,18 +69,26 @@ export function allowedChildTypes(parentType: NodeType | null): NodeType[] {
     case null:
       return ['branch'];
     case 'branch':
-      return ['chapter', 'note'];
+      return ['chapter'];
     case 'chapter':
-      return ['section', 'definition', 'theorem', 'lemma', 'corollary', 'example', 'exercise', 'note'];
+      return ['section', 'note'];
     case 'section':
       return ['definition', 'theorem', 'lemma', 'corollary', 'example', 'exercise', 'note'];
+    case 'definition':
+      return ['example', 'note'];
+    case 'theorem':
+      return ['lemma', 'corollary', 'example', 'note'];
+    case 'lemma':
+    case 'corollary':
+      return ['example', 'note'];
     case 'example':
     case 'exercise':
       return ['attempt', 'note'];
+    case 'note':
     case 'attempt':
-      return [];
+      return ['note'];
     default:
-      return ['note', 'example', 'exercise'];
+      return ['note'];
   }
 }
 
@@ -142,6 +150,9 @@ export interface Node {
   createdAt: number;
   updatedAt: number;
 }
+
+/** 渲染用的节点：附带算好的教科书编号 */
+export type ProcessedNode = Node & { displayNumber: string; isChapter: boolean };
 
 export type EdgeStatus = 'asserted' | 'conjecture' | 'disproven';
 

@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { toast } from 'sonner';
 import * as db from '../lib/db';
 import {
+  ancestorIds,
   buildIndex,
   collectSubtree,
   computeInsertOrder,
@@ -11,7 +12,6 @@ import {
   type GraphIndex,
 } from '../lib/graph';
 import { canonicalizePair } from '../lib/predicates';
-import { buildSample } from '../lib/sample';
 import type { AiOperation, Edge, GraphJSON, Node } from '../lib/schema';
 import { parseGraph, serializeGraph } from '../lib/serialize';
 import {
@@ -37,12 +37,14 @@ export interface GraphState {
   expandedBranchId: string | null;
   expandedIds: Set<string>;
   editingId: string | null;
+  mobileView: 'main' | 'left' | 'right';
 
   init: () => Promise<void>;
   select: (id: string | null) => void;
   setEditing: (id: string | null) => void;
   toggleExpanded: (id: string) => void;
   setExpandedBranch: (id: string | null) => void;
+  setMobileView: (view: 'main' | 'left' | 'right') => void;
 
   createNode: (input: NewNodeInput) => Promise<Node>;
   updateNode: (id: string, patch: NodePatch) => Promise<void>;
@@ -56,7 +58,6 @@ export interface GraphState {
   exportGraph: () => GraphJSON;
   importGraph: (json: unknown) => Promise<void>;
   loadSnapshot: (json: unknown, label: string) => Promise<void>;
-  loadSample: () => Promise<void>;
   clearAll: () => Promise<void>;
   applyAiOperations: (ops: AiOperation[]) => Promise<{ applied: number; errors: string[] }>;
 }
@@ -94,6 +95,7 @@ export const useGraphStore = create<GraphState>()((set, get) => {
     expandedBranchId: null,
     expandedIds: new Set(),
     editingId: null,
+    mobileView: 'main',
 
     init: async () => {
       try {
@@ -115,7 +117,18 @@ export const useGraphStore = create<GraphState>()((set, get) => {
       }
     },
 
-    select: (id) => set({ selectedId: id }),
+    select: (id) => {
+      if (!id) {
+        set({ selectedId: null });
+        return;
+      }
+      // 选中时自动展开它的祖先链，和原版行为保持一致
+      const next = new Set(get().expandedIds);
+      for (const ancestorId of ancestorIds(get().index, id)) next.add(ancestorId);
+      set({ selectedId: id, expandedIds: next });
+    },
+
+    setMobileView: (view) => set({ mobileView: view }),
 
     setEditing: (id) => set({ editingId: id }),
 
@@ -395,20 +408,6 @@ export const useGraphStore = create<GraphState>()((set, get) => {
         expandedIds: new Set(index.roots.slice(0, 1)),
         editingId: null,
       });
-    },
-
-    loadSample: async () => {
-      const sample = buildSample();
-      await db.replaceAll(sample);
-      const index = buildIndex(sample.nodes, sample.edges);
-      set({
-        index,
-        status: 'ready',
-        selectedId: index.roots[0] ?? null,
-        expandedBranchId: index.roots[0] ?? null,
-        expandedIds: new Set(index.roots.slice(0, 1)),
-      });
-      toast.success('示例笔记已载入。');
     },
 
     clearAll: async () => {

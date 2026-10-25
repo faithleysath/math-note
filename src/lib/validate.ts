@@ -88,9 +88,6 @@ function assertParentUsable(index: GraphIndex, parentId: string | null, type: No
   if (!parent) {
     throw new ValidationError('parentId', '父节点不存在。');
   }
-  if (parent.type === 'attempt') {
-    throw new ValidationError('parentId', '「解题记录」下不能再挂子节点。');
-  }
   const allowed = allowedChildTypes(parent.type);
   if (!allowed.includes(type)) {
     throw new ValidationError(

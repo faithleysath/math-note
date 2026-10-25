@@ -1,93 +1,96 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import mermaid from 'mermaid';
-import { PREDICATE_SPECS, mermaidArrow } from '@/lib/predicates';
-import { useGraphStore } from '@/stores/useGraphStore';
+import type { Node } from '../lib/schema';
+import type { RelatedNodeInfo } from '../hooks/useRelatedNodes';
+import { PREDICATE_SPECS } from '../lib/predicates';
 
 interface RelationshipGraphProps {
-  nodeId: string;
+  selectedNode: Node;
+  incoming: RelatedNodeInfo[];
+  outgoing: RelatedNodeInfo[];
 }
 
-/** mermaid 的 id 只认字母数字下划线，标题里的 $ 和引号会把图弄坏 */
-function safeId(id: string): string {
-  return `n_${id.replace(/[^a-zA-Z0-9]/g, '')}`;
-}
+// Function to sanitize node titles for Mermaid IDs
+const sanitizeId = (id: string) => {
+  return `node_${id.replace(/[^a-zA-Z0-9_]/g, '')}`;
+};
 
-function safeLabel(title: string): string {
-  const cleaned = title
-    .replace(/\$[^$]*\$/g, 'φ') // 公式换成中性符号，避免 KaTeX 语法进 mermaid
-    .replace(/["<>{}[\]()|]/g, '')
-    .slice(0, 28);
-  return cleaned || '未命名';
-}
+// Mermaid 会把 $ 和引号当成语法，标题里的公式先去掉
+const sanitizeTitle = (title: string) => {
+  return title.replace(/\$[^$]*\$/g, 'φ').replace(/["<>{}[\]()|]/g, '').slice(0, 28) || '未命名';
+};
 
-export function RelationshipGraph({ nodeId }: RelationshipGraphProps) {
-  const index = useGraphStore((state) => state.index);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [failed, setFailed] = useState(false);
-  const renderId = useMemo(() => `rel-${Math.random().toString(36).slice(2)}`, []);
-
-  const edges = useMemo(() => {
-    const related = index.edges.filter((edge) => edge.from === nodeId || edge.to === nodeId);
-    return related.slice(0, 24);
-  }, [index, nodeId]);
+const RelationshipGraph = ({ selectedNode, incoming, outgoing }: RelationshipGraphProps) => {
+  const ref = useRef<HTMLDivElement>(null);
+  const graphId = useMemo(() => `mermaid-graph-${crypto.randomUUID()}`, []);
 
   useEffect(() => {
-    const node = index.nodes.get(nodeId);
-    if (!node || edges.length === 0) return;
+    let isCancelled = false;
+    mermaid.initialize({ startOnLoad: false, theme: 'neutral' });
 
-    let cancelled = false;
-    mermaid.initialize({ startOnLoad: false, theme: 'neutral', securityLevel: 'loose' });
+    const selectedNodeId = sanitizeId(selectedNode.id);
+    let graphDefinition = 'graph LR\n';
 
-    const lines = ['graph LR'];
-    lines.push(`  ${safeId(nodeId)}["${safeLabel(node.title)}"]`);
-    lines.push(`  style ${safeId(nodeId)} fill:#1d4ed8,color:#fff,stroke:#1e3a8a`);
+    // Add selected node with special styling
+    graphDefinition += `  ${selectedNodeId}["<b>${sanitizeTitle(selectedNode.title)}</b>"];\n`;
+    graphDefinition += `  style ${selectedNodeId} fill:#007bff,stroke:#333,stroke-width:2px,color:#fff;\n`;
 
-    const declared = new Set<string>([safeId(nodeId)]);
-
-    for (const edge of edges) {
-      const other = index.nodes.get(edge.from === nodeId ? edge.to : edge.from);
-      if (!other) continue;
-      const otherId = safeId(other.id);
-      if (!declared.has(otherId)) {
-        lines.push(`  ${otherId}["${safeLabel(other.title)}"]`);
-        declared.add(otherId);
+    const getLinkStyle = (label: string) => {
+      switch (label) {
+        case '充分条件':
+        case '必要条件':
+          return '==>';
+        case '等价于':
+          return '<-->';
+        default:
+          return '-->';
       }
-      const label = PREDICATE_SPECS[edge.predicate].fromLabel;
-      const arrow = mermaidArrow(edge.predicate);
-      lines.push(`  ${safeId(edge.from)} ${arrow}|"${label}"| ${safeId(edge.to)}`);
-    }
+    };
 
-    const definition = lines.join('\n');
+    const labelOf = (relation: RelatedNodeInfo) => {
+      const spec = PREDICATE_SPECS[relation.edge.predicate];
+      return relation.edge.from === selectedNode.id ? spec.fromLabel : spec.inverseLabel;
+    };
 
-    mermaid
-      .render(renderId, definition)
-      .then(({ svg }) => {
-        if (cancelled) return;
-        setFailed(false);
-        if (containerRef.current) containerRef.current.innerHTML = svg;
-      })
-      .catch(() => {
-        if (!cancelled) setFailed(true);
-      });
+    // Add incoming nodes and links
+    incoming.forEach(({ edge, relatedNode }) => {
+      const relatedNodeId = sanitizeId(relatedNode.id);
+      const link = getLinkStyle(labelOf({ edge, relatedNode }));
+      graphDefinition += `  ${relatedNodeId}["${sanitizeTitle(relatedNode.title)}"] ${link}|"${labelOf({ edge, relatedNode })}"| ${selectedNodeId};\n`;
+    });
+
+    // Add outgoing nodes and links
+    outgoing.forEach(({ edge, relatedNode }) => {
+      const relatedNodeId = sanitizeId(relatedNode.id);
+      const link = getLinkStyle(labelOf({ edge, relatedNode }));
+      graphDefinition += `  ${selectedNodeId} ${link}|"${labelOf({ edge, relatedNode })}"| ${relatedNodeId}["${sanitizeTitle(relatedNode.title)}"];\n`;
+    });
+
+    const renderGraph = async () => {
+      if (ref.current) {
+        try {
+          // Ensure the container is empty before rendering
+          ref.current.innerHTML = '';
+          const { svg } = await mermaid.render(graphId, graphDefinition);
+          if (ref.current && !isCancelled) {
+            ref.current.innerHTML = svg;
+          }
+        } catch (error) {
+          if (!isCancelled) {
+            console.error('Mermaid rendering failed:', error);
+          }
+        }
+      }
+    };
+
+    renderGraph();
 
     return () => {
-      cancelled = true;
+      isCancelled = true;
     };
-  }, [edges, index, nodeId, renderId]);
+  }, [selectedNode, incoming, outgoing, graphId]);
 
-  if (edges.length === 0) {
-    return <p className="text-xs text-muted-foreground">还没有关系。点「添加关系」建一条。</p>;
-  }
-
-  return (
-    <div>
-      {failed ? (
-        <p className="text-xs text-muted-foreground">关系图渲染失败，但关系本身没问题。</p>
-      ) : (
-        <div ref={containerRef} className="w-full overflow-x-auto [&_svg]:mx-auto [&_svg]:max-w-full" />
-      )}
-    </div>
-  );
-}
+  return <div ref={ref} className="mermaid-container w-full flex justify-center" />;
+};
 
 export default RelationshipGraph;

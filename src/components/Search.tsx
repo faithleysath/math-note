@@ -1,98 +1,90 @@
-import { useMemo, useState } from 'react';
-import { Search as SearchIcon } from 'lucide-react';
-import { NodeBadge } from '@/components/NodeBadge';
-import { Input } from '@/components/ui/input';
-import { ancestorNodes, searchNodes, type SearchHit } from '@/lib/graph';
-import type { Node } from '@/lib/schema';
-import { useGraphStore } from '@/stores/useGraphStore';
+import { useState, useMemo } from 'react';
+import { Input } from './ui/input';
+import { searchNodes } from '../lib/graph';
+import { NODE_TYPE_META, type Node, type NodeType } from '../lib/schema';
+import { useGraphStore } from '../stores/useGraphStore';
 import { cn } from '@/lib/utils';
+import { useDebounce } from '@/hooks/useDebounce';
 
 interface SearchProps {
-  onSelect: (node: Node) => void;
-  placeholder?: string;
-  autoFocus?: boolean;
-  className?: string;
-  /** 选项被点击后是否清空输入 */
-  clearOnSelect?: boolean;
+  onSelectNode?: (node: Node) => void;
 }
 
-const FIELD_LABEL: Record<SearchHit['field'], string> = {
-  key: '术语键',
-  title: '标题',
-  alias: '别名',
-  tag: '标签',
-  content: '正文',
+const nodeTypeColors: Record<NodeType, string> = {
+  branch: 'bg-gray-200 text-gray-800',
+  chapter: 'bg-slate-200 text-slate-800',
+  section: 'bg-stone-200 text-stone-800',
+  definition: 'bg-blue-100 text-blue-800',
+  theorem: 'bg-green-100 text-green-800',
+  lemma: 'bg-teal-100 text-teal-800',
+  corollary: 'bg-cyan-100 text-cyan-800',
+  example: 'bg-orange-100 text-orange-800',
+  exercise: 'bg-purple-100 text-purple-800',
+  attempt: 'bg-red-100 text-red-800',
+  note: 'bg-yellow-100 text-yellow-800',
 };
 
-export function Search({
-  onSelect,
-  placeholder = '搜索标题、正文、别名、标签…',
-  autoFocus,
-  className,
-  clearOnSelect = false,
-}: SearchProps) {
-  const index = useGraphStore((state) => state.index);
-  const [term, setTerm] = useState('');
+const Search = ({ onSelectNode }: SearchProps) => {
+  const index = useGraphStore(state => state.index);
+  const select = useGraphStore(state => state.select);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isOpen, setIsOpen] = useState(false);
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
-  const hits = useMemo(() => searchNodes(index, term, 20), [index, term]);
+  const results = useMemo(() => {
+    if (debouncedSearchTerm.length > 1) {
+      return searchNodes(index, debouncedSearchTerm).map(hit => hit.node);
+    }
+    return [] as Node[];
+  }, [debouncedSearchTerm, index]);
+
+  const handleSelectNode = (node: Node) => {
+    if (onSelectNode) {
+      onSelectNode(node);
+    } else {
+      select(node.id);
+    }
+    setSearchTerm('');
+    setIsOpen(false);
+  };
 
   return (
-    <div className={cn('relative', className)}>
-      <div className="relative">
-        <SearchIcon className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          autoFocus={autoFocus}
-          value={term}
-          placeholder={placeholder}
-          className="h-8 pl-7 text-sm"
-          onChange={(event) => setTerm(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Escape') setTerm('');
-            if (event.key === 'Enter' && hits.length > 0) {
-              onSelect(hits[0].node);
-              if (clearOnSelect) setTerm('');
-            }
-          }}
-        />
-      </div>
-
-      {term.trim() && (
-        <div className="absolute z-30 mt-1 max-h-72 w-full overflow-auto rounded-md border bg-popover p-1 shadow-lg">
-          {hits.length === 0 && (
-            <div className="px-2 py-3 text-center text-xs text-muted-foreground">没有匹配的节点</div>
-          )}
-          {hits.map((hit) => {
-            const trail = ancestorNodes(index, hit.node.id)
-              .slice(-3)
-              .map((node) => node.title)
-              .join(' / ');
-            return (
-              <button
-                key={hit.node.id}
-                className="flex w-full flex-col items-start gap-0.5 rounded px-2 py-1.5 text-left hover:bg-accent"
-                onClick={() => {
-                  onSelect(hit.node);
-                  if (clearOnSelect) setTerm('');
-                }}
-              >
-                <div className="flex w-full items-center gap-2">
-                  <NodeBadge type={hit.node.type} />
-                  <span className="truncate text-sm font-medium">{hit.node.title}</span>
-                  <span className="ml-auto shrink-0 text-[11px] text-muted-foreground">
-                    {FIELD_LABEL[hit.field]}
-                  </span>
-                </div>
-                {trail && <span className="truncate text-[11px] text-muted-foreground">{trail}</span>}
-                {hit.snippet && (
-                  <span className="truncate text-[11px] text-muted-foreground">…{hit.snippet}…</span>
-                )}
-              </button>
-            );
-          })}
+    <div className="relative">
+      <Input
+        placeholder="搜索..."
+        value={searchTerm}
+        onChange={(e) => {
+          setSearchTerm(e.target.value);
+          setIsOpen(true);
+        }}
+        onBlur={() => setTimeout(() => setIsOpen(false), 150)} // Delay to allow click
+        onFocus={() => setIsOpen(true)}
+      />
+      {isOpen && results.length > 0 && (
+        <div className="absolute z-10 w-full mt-1 bg-background border rounded-md shadow-lg max-h-60 overflow-y-auto">
+          {results.map(node => (
+            <div
+              key={node.id}
+              className="p-2 hover:bg-accent cursor-pointer"
+              onMouseDown={(e) => e.preventDefault()} // Prevent onBlur from firing before onClick
+              onClick={() => handleSelectNode(node)}
+            >
+              <div className="flex justify-between items-center">
+                <p className="font-semibold truncate">{node.title}</p>
+                <span className={cn(
+                  "text-xs font-semibold px-2 py-0.5 rounded-full",
+                  nodeTypeColors[node.type] || 'bg-gray-200 text-gray-800'
+                )}>
+                  {NODE_TYPE_META[node.type].label}
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground truncate mt-1">{node.content}</p>
+            </div>
+          ))}
         </div>
       )}
     </div>
   );
-}
+};
 
 export default Search;

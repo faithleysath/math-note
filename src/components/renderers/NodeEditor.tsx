@@ -1,78 +1,83 @@
-import { useEffect, useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import MDEditor from '@uiw/react-md-editor';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
 import { toast } from 'sonner';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { SOLUTION_TYPES, type Node } from '@/lib/schema';
-import { useGraphStore } from '@/stores/useGraphStore';
+import type { Node } from '../../lib/schema';
+import { useGraphStore } from '../../stores/useGraphStore';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
 
 interface NodeEditorProps {
   node: Node;
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block space-y-1">
-      <span className="text-xs font-medium text-muted-foreground">{label}</span>
-      {children}
-    </label>
-  );
-}
+const KEY_TYPES = ['definition', 'theorem', 'lemma', 'corollary'];
+const SOLUTION_TYPES = ['theorem', 'lemma', 'corollary', 'example', 'exercise', 'attempt'];
 
-export function NodeEditor({ node }: NodeEditorProps) {
-  const updateNode = useGraphStore((state) => state.updateNode);
-  const setEditing = useGraphStore((state) => state.setEditing);
-
+const NodeEditor = ({ node }: NodeEditorProps) => {
   const [title, setTitle] = useState(node.title);
   const [content, setContent] = useState(node.content);
-  const [solution, setSolution] = useState(node.solution ?? '');
-  const [key, setKey] = useState(node.key ?? '');
-  const [aliases, setAliases] = useState((node.aliases ?? []).join(', '));
-  const [tags, setTags] = useState((node.tags ?? []).join(', '));
-  const [book, setBook] = useState(node.citation?.book ?? '');
-  const [page, setPage] = useState(node.citation?.page ?? '');
-  const [theoremNo, setTheoremNo] = useState(node.citation?.theoremNo ?? '');
-  const [method, setMethod] = useState(node.attempt?.method ?? '');
+  const [solution, setSolution] = useState(node.solution || '');
+  const [tags, setTags] = useState(node.tags?.join(', ') || '');
+  const [source, setSource] = useState(node.citation?.book || '');
+  const [key, setKey] = useState(node.key || '');
+  const [aliases, setAliases] = useState(node.aliases?.join(', ') || '');
+  const [method, setMethod] = useState(node.attempt?.method || '');
   const [duration, setDuration] = useState(
     node.attempt?.durationMin != null ? String(node.attempt.durationMin) : '',
   );
   const [correct, setCorrect] = useState<boolean | null>(node.attempt?.correct ?? null);
-  const [saving, setSaving] = useState(false);
+
+  const setEditing = useGraphStore((state) => state.setEditing);
+  const updateNode = useGraphStore((state) => state.updateNode);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Save with Cmd/Ctrl + S
+      if ((event.metaKey || event.ctrlKey) && event.key === 's') {
+        event.preventDefault();
+        handleSave();
+      }
+      // Cancel with Escape
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        handleCancel();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [title, content, solution, key, aliases, method, duration, correct]); // Re-bind when content changes to save the latest state
 
   useEffect(() => {
     setTitle(node.title);
     setContent(node.content);
-    setSolution(node.solution ?? '');
-    setKey(node.key ?? '');
-    setAliases((node.aliases ?? []).join(', '));
-    setTags((node.tags ?? []).join(', '));
-    setBook(node.citation?.book ?? '');
-    setPage(node.citation?.page ?? '');
-    setTheoremNo(node.citation?.theoremNo ?? '');
-    setMethod(node.attempt?.method ?? '');
+    setSolution(node.solution || '');
+    setTags(node.tags?.join(', ') || '');
+    setSource(node.citation?.book || '');
+    setKey(node.key || '');
+    setAliases(node.aliases?.join(', ') || '');
+    setMethod(node.attempt?.method || '');
     setDuration(node.attempt?.durationMin != null ? String(node.attempt.durationMin) : '');
     setCorrect(node.attempt?.correct ?? null);
   }, [node]);
 
-  const splitList = (value: string) =>
-    value
-      .split(/[,，]/)
-      .map((item) => item.trim())
-      .filter(Boolean);
-
-  const save = async () => {
-    if (saving) return;
-    setSaving(true);
+  const handleSave = async () => {
     try {
-      const citation = book || page || theoremNo ? { book, page, theoremNo } : undefined;
+      const tagsArray = tags.split(',').map(tag => tag.trim()).filter(Boolean);
+      const aliasesArray = aliases.split(',').map(alias => alias.trim()).filter(Boolean);
       await updateNode(node.id, {
         title,
         content,
-        solution: SOLUTION_TYPES.has(node.type) || solution ? solution : undefined,
-        key: key.trim() ? key.trim() : null,
-        aliases: splitList(aliases),
-        tags: splitList(tags),
-        citation,
+        solution,
+        tags: tagsArray,
+        aliases: aliasesArray,
+        key: key.trim() || null,
+        citation: source.trim() ? { book: source.trim() } : undefined,
         attempt:
           node.type === 'attempt'
             ? {
@@ -82,129 +87,202 @@ export function NodeEditor({ node }: NodeEditorProps) {
               }
             : undefined,
       });
-      toast.success('已保存。');
-      setEditing(null);
+      toast.success(`节点 "${title}" 已保存。`);
+      setEditing(null); // Exit editing mode
     } catch (error) {
+      console.error("Failed to save node:", error);
       toast.error(error instanceof Error ? error.message : '保存失败。');
-    } finally {
-      setSaving(false);
     }
   };
 
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key === 's') {
-        event.preventDefault();
-        void save();
-      }
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        setEditing(null);
-      }
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  });
+  const handleCancel = () => {
+    setEditing(null); // Exit editing mode
+  };
+
+  const contentLabel = useMemo(() => {
+    switch (node.type) {
+      case 'example':
+      case 'exercise':
+        return '题干';
+      case 'theorem':
+      case 'lemma':
+      case 'corollary':
+        return '陈述';
+      default:
+        return '内容';
+    }
+  }, [node.type]);
+
+  const solutionLabel = useMemo(() => {
+    switch (node.type) {
+      case 'example':
+      case 'exercise':
+        return '标准答案';
+      case 'theorem':
+      case 'lemma':
+      case 'corollary':
+        return '证明';
+      case 'attempt':
+        return '个人解法';
+      default:
+        return '解法';
+    }
+  }, [node.type]);
 
   return (
-    <div className="space-y-3 rounded-md border border-primary/30 bg-background p-3 shadow-sm">
-      <div className="grid gap-2 sm:grid-cols-2">
-        <Field label="标题">
-          <Input value={title} onChange={(event) => setTitle(event.target.value)} />
-        </Field>
-        <Field label="术语键（可选，全局唯一，用于跨章节引用）">
+    <div className="p-4 border rounded-lg bg-slate-50 dark:bg-slate-900">
+      <div className="space-y-4">
+        <div>
+          <label htmlFor="title" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            标题
+          </label>
           <Input
-            value={key}
-            placeholder="power-set"
-            onChange={(event) => setKey(event.target.value)}
+            id="title"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="text-lg"
           />
-        </Field>
-      </div>
-
-      <div data-color-mode="light">
-        <span className="text-xs font-medium text-muted-foreground">
-          {node.type === 'exercise' || node.type === 'example' ? '题干' : '内容'}
-        </span>
-        <MDEditor value={content} onChange={(value) => setContent(value ?? '')} height={180} preview="edit" />
-      </div>
-
-      {(SOLUTION_TYPES.has(node.type) || solution) && (
-        <div data-color-mode="light">
-          <span className="text-xs font-medium text-muted-foreground">
-            {node.type === 'exercise' || node.type === 'example' ? '标准答案' : '证明'}
-          </span>
-          <MDEditor value={solution} onChange={(value) => setSolution(value ?? '')} height={140} preview="edit" />
         </div>
-      )}
 
-      {node.type === 'attempt' && (
-        <div className="flex flex-wrap items-end gap-2">
-          <Field label="方法">
-            <Input className="h-8 w-40" value={method} onChange={(event) => setMethod(event.target.value)} />
-          </Field>
-          <Field label="用时（分钟）">
+        {KEY_TYPES.includes(node.type) && (
+          <div>
+            <label htmlFor="key" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              术语键 (全局唯一，可留空)
+            </label>
             <Input
-              className="h-8 w-24"
-              inputMode="numeric"
-              value={duration}
-              onChange={(event) => setDuration(event.target.value.replace(/[^0-9]/g, ''))}
+              id="key"
+              value={key}
+              placeholder="power-set"
+              onChange={(e) => setKey(e.target.value)}
             />
-          </Field>
-          <div className="flex items-center gap-1">
-            <Button
-              size="sm"
-              variant={correct === true ? 'default' : 'outline'}
-              className="h-8"
-              onClick={() => setCorrect(true)}
-            >
-              做对
-            </Button>
-            <Button
-              size="sm"
-              variant={correct === false ? 'default' : 'outline'}
-              className="h-8"
-              onClick={() => setCorrect(false)}
-            >
-              做错
-            </Button>
-            <Button size="sm" variant="ghost" className="h-8" onClick={() => setCorrect(null)}>
-              清除
-            </Button>
           </div>
+        )}
+
+        <div>
+          <label htmlFor="aliases" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            别名 (用逗号分隔)
+          </label>
+          <Input
+            id="aliases"
+            value={aliases}
+            onChange={(e) => setAliases(e.target.value)}
+          />
         </div>
-      )}
 
-      <div className="grid gap-2 sm:grid-cols-2">
-        <Field label="别名（逗号分隔，参与搜索）">
-          <Input value={aliases} onChange={(event) => setAliases(event.target.value)} />
-        </Field>
-        <Field label="标签（逗号分隔）">
-          <Input value={tags} onChange={(event) => setTags(event.target.value)} />
-        </Field>
+        <div>
+          <label htmlFor="tags" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            标签 (用逗号分隔)
+          </label>
+          <Input
+            id="tags"
+            value={tags}
+            onChange={(e) => setTags(e.target.value)}
+          />
+        </div>
+
+        <div>
+          <label htmlFor="source" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            来源
+          </label>
+          <Input
+            id="source"
+            value={source}
+            onChange={(e) => setSource(e.target.value)}
+          />
+        </div>
+
+        {node.type === 'attempt' && (
+          <div className="flex flex-wrap items-end gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                结果
+              </label>
+              <div className="flex items-center space-x-2">
+                <Button
+                  size="sm"
+                  variant={correct === true ? 'default' : 'outline'}
+                  onClick={() => setCorrect(true)}
+                >
+                  做对
+                </Button>
+                <Button
+                  size="sm"
+                  variant={correct === false ? 'default' : 'outline'}
+                  onClick={() => setCorrect(false)}
+                >
+                  做错
+                </Button>
+              </div>
+            </div>
+            <div>
+              <label htmlFor="method" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                方法
+              </label>
+              <Input
+                id="method"
+                value={method}
+                className="w-40"
+                onChange={(e) => setMethod(e.target.value)}
+              />
+            </div>
+            <div>
+              <label htmlFor="duration" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                用时 (分钟)
+              </label>
+              <Input
+                id="duration"
+                value={duration}
+                className="w-24"
+                inputMode="numeric"
+                onChange={(e) => setDuration(e.target.value.replace(/[^0-9]/g, ''))}
+              />
+            </div>
+          </div>
+        )}
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            {contentLabel}
+          </label>
+          <MDEditor
+            value={content}
+            onChange={(val) => setContent(val || '')}
+            preview="live"
+            previewOptions={{
+              remarkPlugins: [remarkMath],
+              rehypePlugins: [[rehypeKatex, { throwOnError: false }]],
+            }}
+          />
+        </div>
+
+        {SOLUTION_TYPES.includes(node.type) && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              {solutionLabel}
+            </label>
+            <MDEditor
+              value={solution}
+              onChange={(val) => setSolution(val || '')}
+              preview="live"
+              previewOptions={{
+                remarkPlugins: [remarkMath],
+                rehypePlugins: [[rehypeKatex, { throwOnError: false }]],
+              }}
+            />
+          </div>
+        )}
       </div>
 
-      <div className="grid gap-2 sm:grid-cols-3">
-        <Field label="出处：书">
-          <Input value={book} onChange={(event) => setBook(event.target.value)} />
-        </Field>
-        <Field label="页码">
-          <Input value={page} onChange={(event) => setPage(event.target.value)} />
-        </Field>
-        <Field label="定理号">
-          <Input value={theoremNo} onChange={(event) => setTheoremNo(event.target.value)} />
-        </Field>
-      </div>
-
-      <div className="flex justify-end gap-2">
-        <Button variant="ghost" size="sm" onClick={() => setEditing(null)}>
-          取消 (Esc)
+      <div className="flex justify-end space-x-2 mt-4">
+        <Button onClick={handleCancel} variant="outline">
+          取消
         </Button>
-        <Button size="sm" onClick={() => void save()} disabled={saving}>
-          保存 (⌘S)
+        <Button onClick={handleSave}>
+          保存
         </Button>
       </div>
     </div>
   );
-}
+};
 
 export default NodeEditor;
