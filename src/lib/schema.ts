@@ -223,9 +223,6 @@ export interface Node {
   updatedAt: number;
 }
 
-/** 导入旧版本时允许出现历史类型字符串 */
-export type AnyNode = Omit<Node, 'type'> & { type: string };
-
 /** 渲染用的节点：附带算好的教科书编号 */
 export type ProcessedNode = Node & { displayNumber: string; isChapter: boolean };
 
@@ -293,7 +290,7 @@ export interface InferenceStep {
 }
 
 export interface GraphJSON {
-  schemaVersion: 2 | 3 | 4 | 5;
+  schemaVersion: 5;
   exportedAt: number;
   nodes: Node[];
   edges: Edge[];
@@ -308,9 +305,6 @@ const citationSchema = z.object({
   source: z.string().optional(),
   page: z.string().optional(),
   originalNumber: z.string().optional(),
-  // 兼容 v4 的字段名
-  book: z.string().optional(),
-  theoremNo: z.string().optional(),
 });
 
 const attemptMetaSchema = z.object({
@@ -319,9 +313,9 @@ const attemptMetaSchema = z.object({
   method: z.string().optional(),
 });
 
-export const rawNodeSchema = z.object({
+export const nodeSchema = z.object({
   id: z.string().min(1),
-  type: z.string().min(1),
+  type: z.enum(NODE_TYPES),
   // 历史数据的未知 kind 允许暂存，校验器会告警
   kind: z.string().optional(),
   title: z.string(),
@@ -336,10 +330,6 @@ export const rawNodeSchema = z.object({
   attempt: attemptMetaSchema.optional(),
   createdAt: z.number(),
   updatedAt: z.number(),
-});
-
-export const nodeSchema = rawNodeSchema.extend({
-  type: z.enum(NODE_TYPES),
 });
 
 export const edgeSchema = z.object({
@@ -375,11 +365,11 @@ export const stepSchema = z.object({
 });
 
 export const graphJSONSchema = z.object({
-  schemaVersion: z.union([z.literal(2), z.literal(3), z.literal(4), z.literal(5)]),
+  schemaVersion: z.literal(5),
   exportedAt: z.number(),
-  nodes: z.array(rawNodeSchema),
+  nodes: z.array(nodeSchema),
   edges: z.array(edgeSchema),
-  steps: z.array(stepSchema).optional(),
+  steps: z.array(stepSchema).default([]),
 });
 
 // =============================================================================

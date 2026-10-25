@@ -84,26 +84,13 @@
 
 ## 数据
 
-- 全部存在浏览器 IndexedDB（数据库 `math-note-graph`），不联网、不登录。
+- 全部存在浏览器 IndexedDB（数据库 `math-note-graph-v5`），不联网、不登录。
 - 「导出」下载 v5 JSON，「导入」整份替换（二次确认，失败不改动原数据）。
 - 「分享」把快照传到 Vercel Blob，生成只读链接 `?note_url=…`。
 
-### 导入旧版本
+### 导入格式
 
-导入 v2 / v3 / v4 备份会自动迁移到 v5：
-
-| 旧类型 | 新类型 |
-|---|---|
-| `chapter` / `section` | `section` + kind |
-| `theorem` / `lemma` / `corollary` | `proposition` + kind |
-| `example` / `exercise` | `problem` + kind |
-| `context` | `note(kind='context')`，**保留原 ID**，引用它的关系仍然有效 |
-| `concept` | `note(kind='topic')`，**不按标题自动合并**，进入人工审核清单 |
-| `defines` 边 | 降级为 `cites` 并附迁移备注，不静默删除 |
-
-- v2 的 `solution` 会复制成独立 `proof` 节点（稳定 ID，重复迁移不新增），原字段保留可回滚。
-- 迁移报告包含前后计数、类型映射数量、`warnings`、`needsManualReview`、被改写/丢弃的关系数量。
-- 本地库首次以 v5 打开时会自动升级：先把原始 JSON 备份到 IndexedDB 的 `backups` 表，再单事务替换。
+只有 v5 一种格式。`schemaVersion` 不是 5、结构不对或全图校验不通过，导入会被整个拒绝，现有数据不会变。
 
 ### 给外部脚本的格式
 
@@ -130,7 +117,7 @@
 ```bash
 bun install
 bun dev          # http://localhost:5173
-bun test         # 编号、图算法、校验、迁移、推理
+bun test         # 编号、图算法、校验、推理
 bun run lint
 bun run build
 ```
@@ -142,9 +129,8 @@ src/lib/schema.ts      9 种节点 / kind 枚举 / 9 种谓词 / 推理步骤 / 
 src/lib/predicates.ts  谓词注册表（方向、传递性、类型白名单、显示文案）
 src/lib/graph.ts       纯函数：索引、递归编号、遍历、推理、拓扑排序、搜索
 src/lib/validate.ts    全图不变式与单条校验
-src/lib/migrate.ts     v2/v4 → v5 迁移与报告
-src/lib/serialize.ts   版本链导入、导出、失败回滚
-src/lib/db.ts          Dexie（含 meta / backups）
+src/lib/serialize.ts   导入校验、导出
+src/lib/db.ts          Dexie 持久化
 src/lib/draft.ts       AI 批量操作的草稿预演
 src/stores/useGraphStore.ts  内存图 + 写穿
 examples/              可直接导入的 v5 样例

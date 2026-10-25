@@ -2,10 +2,12 @@ import type { Edge, InferenceStep, Node, NodeType, Predicate } from './schema';
 
 /**
  * 测试用构造器。
- * 允许写 v4 的旧类型名，自动映射成 v5 的 type/kind，
- * 这样大量既有用例不用逐条改。
+ *
+ * ALIAS 只是测试里的简写（写 'theorem' 比每次写
+ * { type: 'proposition', kind: 'theorem' } 省事），
+ * 不参与运行时，也不代表应用还接受旧类型。
  */
-const LEGACY: Record<string, { type: NodeType; kind?: string }> = {
+const ALIAS: Record<string, { type: NodeType; kind?: string }> = {
   chapter: { type: 'section', kind: 'chapter' },
   section: { type: 'section', kind: 'section' },
   theorem: { type: 'proposition', kind: 'theorem' },
@@ -24,7 +26,7 @@ export function mkNode(
   order: number,
   extra: Partial<Node> = {},
 ): Node {
-  const mapped = LEGACY[type] ?? { type: type as NodeType };
+  const mapped = ALIAS[type] ?? { type: type as NodeType };
   return {
     id,
     type: mapped.type,

@@ -13,17 +13,14 @@ import {
 } from '../lib/graph';
 import { canonicalizePair } from '../lib/predicates';
 import {
-  NODE_TYPE_META,
   isContextNode,
   type AiOperation,
-  type AnyNode,
   type Edge,
   type GraphJSON,
   type InferenceStep,
   type Node,
 } from '../lib/schema';
 import { parseGraph, serializeGraph } from '../lib/serialize';
-import { migrateToV5, summarizeMigration, type MigrationReport } from '../lib/migrate';
 import { simulateOperations, type DraftDiff } from '../lib/draft';
 import {
   ValidationError,
@@ -138,45 +135,7 @@ export const useGraphStore = create<GraphState>()((set, get) => {
       initStarted = true;
       try {
         const data = await db.loadAll();
-        const storedVersion = await db.readMeta('schemaVersion');
-        const hasLegacy = data.nodes.some(
-          (node) =>
-            !((node.type as string) in NODE_TYPE_META) ||
-            // v4 的 section 没有 kind，v5 的同名类型一定有
-            (node.type === 'section' && node.kind === undefined),
-        );
-
-        let nodes: Node[] = data.nodes;
-        let edges = data.edges;
-        let steps = data.steps;
-        let report: MigrationReport | null = null;
-
-        if (hasLegacy && storedVersion !== '5') {
-          // 本地库升级：先整份备份，再单事务替换，任何失败都不会留下半成品
-          const backup = JSON.stringify({
-            schemaVersion: 4,
-            exportedAt: Date.now(),
-            nodes: data.nodes,
-            edges: data.edges,
-            steps: data.steps,
-          });
-          await db.saveBackup(`before-v5-${Date.now()}`, backup);
-
-          const migrated = migrateToV5(
-            { nodes: data.nodes as unknown as AnyNode[], edges, steps },
-            4,
-          );
-          await db.replaceAll(migrated.graph);
-          await db.writeMeta('schemaVersion', '5');
-          nodes = migrated.graph.nodes;
-          edges = migrated.graph.edges;
-          steps = migrated.graph.steps;
-          report = migrated.report;
-        } else if (storedVersion === null) {
-          await db.writeMeta('schemaVersion', '5');
-        }
-
-        const index = buildIndex(nodes, edges, steps);
+        const index = buildIndex(data.nodes, data.edges, data.steps);
         const firstBranch = index.roots[0] ?? null;
         set({
           index,
@@ -188,10 +147,6 @@ export const useGraphStore = create<GraphState>()((set, get) => {
           expandedIds: new Set(firstBranch ? [firstBranch] : []),
           selectedId: firstBranch,
         });
-
-        if (report) {
-          toast.success(`数据已升级到 v5：${summarizeMigration(report)}。原始数据已备份。`);
-        }
       } catch (error) {
         initStarted = false;
         set({ status: 'error', error: describeError(error) });
@@ -600,7 +555,6 @@ export const useGraphStore = create<GraphState>()((set, get) => {
     importGraph: async (json) => {
       const parsed = parseGraph(json);
       await db.replaceAll({ nodes: parsed.nodes, edges: parsed.edges, steps: parsed.steps });
-      await db.writeMeta('schemaVersion', '5');
       const index = buildIndex(parsed.nodes, parsed.edges, parsed.steps);
       set({
         index,
@@ -613,9 +567,7 @@ export const useGraphStore = create<GraphState>()((set, get) => {
         expandedIds: new Set(index.roots.slice(0, 1)),
         editingId: null,
       });
-      if (parsed.migration) {
-        toast.success(`导入并迁移到 v5：${summarizeMigration(parsed.migration)}。`);
-      }
+
     },
 
     loadSnapshot: async (json, label) => {

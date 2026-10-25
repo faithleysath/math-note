@@ -15,52 +15,19 @@ export class MathNoteDB extends Dexie {
   nodes!: Table<Node, string>;
   edges!: Table<Edge, string>;
   steps!: Table<InferenceStep, string>;
-  meta!: Table<{ key: string; value: string }, string>;
-  backups!: Table<{ id: string; createdAt: number; json: string }, string>;
 
   constructor() {
-    super('math-note-graph');
+    // 只有一种数据格式（v5），这里不再维护历史版本或是迁移用的辅助表
+    super('math-note-graph-v5');
     this.version(1).stores({
       nodes: '&id, type, key, parentId',
       edges: '&id, from, to, predicate',
-    });
-    // v2：新增推理步骤（超边）表
-    this.version(2).stores({
-      nodes: '&id, type, key, parentId',
-      edges: '&id, from, to, predicate',
       steps: '&id, conclusionId, *premiseIds',
-    });
-    // v3：元数据（数据格式版本）与迁移前备份
-    this.version(3).stores({
-      nodes: '&id, type, key, parentId',
-      edges: '&id, from, to, predicate',
-      steps: '&id, conclusionId, *premiseIds',
-      meta: '&key',
-      backups: '&id, createdAt',
     });
   }
 }
 
 export const db = new MathNoteDB();
-
-export async function readMeta(key: string): Promise<string | null> {
-  const row = await db.meta.get(key);
-  return row?.value ?? null;
-}
-
-export async function writeMeta(key: string, value: string): Promise<void> {
-  await db.meta.put({ key, value });
-}
-
-/** 迁移前把原始数据整份存进 IndexedDB，随时可以取回 */
-export async function saveBackup(id: string, json: string): Promise<void> {
-  await db.backups.put({ id, createdAt: Date.now(), json });
-}
-
-export async function readBackup(id: string): Promise<string | null> {
-  const row = await db.backups.get(id);
-  return row?.json ?? null;
-}
 
 export async function loadAll(): Promise<{
   nodes: Node[];

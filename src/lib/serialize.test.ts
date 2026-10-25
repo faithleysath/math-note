@@ -43,15 +43,16 @@ describe('导入导出', () => {
     expect(parsed.steps[0].premiseIds).toEqual(['t2']);
   });
 
-  it('旧版本（没有 steps 字段）导入后 steps 为空', () => {
-    const v3 = {
-      ...toJson(serializeGraph(nodes, [])),
-      schemaVersion: 3,
-      nodes: nodes.map((item) => ({ ...item, type: item.type === 'section' ? 'chapter' : item.type })),
-    };
-    delete (v3 as { steps?: unknown }).steps;
-    const parsed = parseGraph(v3);
+  it('没有 steps 字段时按空数组处理', () => {
+    const withoutSteps = toJson(serializeGraph(nodes, []));
+    delete (withoutSteps as { steps?: unknown }).steps;
+    const parsed = parseGraph(withoutSteps);
     expect(parsed.steps).toEqual([]);
+  });
+
+  it('拒绝非 v5 的备份', () => {
+    const v4 = { ...toJson(serializeGraph(nodes, [])), schemaVersion: 4 };
+    expect(() => parseGraph(v4)).toThrowError(/数据结构不对/);
   });
 
   it('推理步骤引用不存在的节点会被拒绝', () => {
@@ -67,70 +68,6 @@ describe('导入导出', () => {
 
     expect(after.numbering.get('t')).toBe(before.numbering.get('t'));
     expect(after.roots).toEqual(before.roots);
-    expect(parsed.migration).toBeNull();
-  });
-
-  it('v2 数据导入时把 solution 迁移成证明节点', () => {
-    // v2 的节点类型是旧名字，必须原样构造
-    const legacy = toJson({
-      schemaVersion: 2,
-      exportedAt: 0,
-      nodes: [
-        { id: 'b', type: 'branch', title: 'b', content: '', parentId: null, order: 1024, createdAt: 0, updatedAt: 0 },
-        { id: 'c', type: 'chapter', title: 'c', content: '', parentId: 'b', order: 1024, createdAt: 0, updatedAt: 0 },
-        { id: 's', type: 'section', title: 's', content: '', parentId: 'c', order: 1024, createdAt: 0, updatedAt: 0 },
-        {
-          id: 't',
-          type: 'theorem',
-          title: '定理甲',
-          content: '陈述',
-          solution: '设 x 为任意实数，则……',
-          parentId: 's',
-          order: 1024,
-          createdAt: 0,
-          updatedAt: 0,
-        },
-      ],
-      edges: [],
-    });
-    const parsed = parseGraph(legacy);
-
-    expect(parsed.migration?.from).toBe(2);
-    expect(parsed.migration?.proofsCreated).toBe(1);
-
-    const proof = parsed.nodes.find((item) => item.type === 'proof');
-    expect(proof).toBeTruthy();
-    expect(proof?.parentId).toBe('t');
-    expect(proof?.content).toBe('设 x 为任意实数，则……');
-
-    // 原始 solution 保留，可以回滚
-    expect(parsed.nodes.find((item) => item.id === 't')?.solution).toBe('设 x 为任意实数，则……');
-
-    const provesEdge = parsed.edges.find((item) => item.predicate === 'proves');
-    expect(provesEdge?.from).toBe(proof?.id);
-    expect(provesEdge?.to).toBe('t');
-    expect(provesEdge?.reviewState).toBe('unreviewed');
-  });
-
-  it('v2 迁移后再导出导入不会重复生成证明', () => {
-    const legacy = toJson({
-      schemaVersion: 2,
-      exportedAt: 0,
-      nodes: [
-        { id: 'b', type: 'branch', title: 'b', content: '', parentId: null, order: 1024, createdAt: 0, updatedAt: 0 },
-        { id: 'c', type: 'chapter', title: 'c', content: '', parentId: 'b', order: 1024, createdAt: 0, updatedAt: 0 },
-        { id: 's', type: 'section', title: 's', content: '', parentId: 'c', order: 1024, createdAt: 0, updatedAt: 0 },
-        { id: 't', type: 'theorem', title: '定理甲', content: '陈述', solution: '证明正文', parentId: 's', order: 1024, createdAt: 0, updatedAt: 0 },
-      ],
-      edges: [],
-    });
-    const first = parseGraph(legacy);
-    const exported = serializeGraph(first.nodes, first.edges);
-    const second = parseGraph(toJson(exported));
-
-    expect(second.migration).toBeNull();
-    expect(second.nodes.filter((item) => item.type === 'proof')).toHaveLength(1);
-    expect(second.edges.filter((item) => item.predicate === 'proves')).toHaveLength(1);
   });
 
   it('拒绝父节点不存在的节点', () => {
