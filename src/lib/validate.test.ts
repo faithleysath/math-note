@@ -403,6 +403,20 @@ describe('冲突提示', () => {
     expect(findConflictHints(index).some((hint) => hint.code === 'mutual-generalization')).toBe(true);
   });
 
+  it('同端点有多条不同前提时不会漏报', () => {
+    const index = buildIndex(base, [
+      edge('e1', 't1', 't2', 'implies', { condition: 'x>0' }),
+      edge('e2', 't1', 't2', 'implies', { condition: 'x<0' }),
+      edge('e3', 't2', 't1', 'implies', { condition: 'x>=0' }),
+    ]);
+    const hints = findConflictHints(index).filter(
+      (hint) => hint.code === 'mutual-implication-different-conditions',
+    );
+    // 反向边要和两条正向边分别比较，不能被索引覆盖掉
+    expect(hints).toHaveLength(2);
+    expect(hints.flatMap((hint) => hint.edgeIds).sort()).toEqual(['e1', 'e2', 'e3', 'e3']);
+  });
+
   it('不同前提的双向蕴含不会被当成无条件等价', () => {
     const index = buildIndex(base, [
       edge('e1', 't1', 't2', 'implies', { condition: 'x>0' }),

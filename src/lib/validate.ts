@@ -997,10 +997,16 @@ export interface ConflictHint {
 export function findConflictHints(index: GraphIndex): ConflictHint[] {
   const hints: ConflictHint[] = [];
 
-  /** predicate|from|to → 边，避免两两比较 */
-  const byEndpoint = new Map<string, Edge>();
+  /**
+   * predicate|from|to → 边列表。
+   * 同端点可以有多条不同前提的关系，不能只保留最后一条。
+   */
+  const byEndpoint = new Map<string, Edge[]>();
   for (const edge of index.edges) {
-    byEndpoint.set(`${edge.predicate}|${edge.from}|${edge.to}`, edge);
+    const key = `${edge.predicate}|${edge.from}|${edge.to}`;
+    const list = byEndpoint.get(key);
+    if (list) list.push(edge);
+    else byEndpoint.set(key, [edge]);
   }
 
   for (const edge of index.edges) {
@@ -1013,8 +1019,8 @@ export function findConflictHints(index: GraphIndex): ConflictHint[] {
     }
 
     if (edge.predicate === 'generalizes') {
-      const reverse = byEndpoint.get(`generalizes|${edge.to}|${edge.from}`);
-      if (reverse && edge.id < reverse.id) {
+      for (const reverse of byEndpoint.get(`generalizes|${edge.to}|${edge.from}`) ?? []) {
+        if (edge.id >= reverse.id) continue;
         hints.push({
           code: 'mutual-generalization',
           message: '两个结论互为推广，可能只是同一件事的不同说法，请人工核查。',
@@ -1024,12 +1030,9 @@ export function findConflictHints(index: GraphIndex): ConflictHint[] {
     }
 
     if (edge.predicate === 'implies') {
-      const reverse = byEndpoint.get(`implies|${edge.to}|${edge.from}`);
-      if (
-        reverse &&
-        edge.id < reverse.id &&
-        normalizeCondition(edge.condition) !== normalizeCondition(reverse.condition)
-      ) {
+      for (const reverse of byEndpoint.get(`implies|${edge.to}|${edge.from}`) ?? []) {
+        if (edge.id >= reverse.id) continue;
+        if (normalizeCondition(edge.condition) === normalizeCondition(reverse.condition)) continue;
         hints.push({
           code: 'mutual-implication-different-conditions',
           message: '两个方向的蕴含前提不同，不能直接当成无条件等价。',

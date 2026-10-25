@@ -851,7 +851,7 @@ function normalizeConditionText(condition?: string): string {
 /**
  * iff 连通分量。
  *
- * 只有「无前提 + 语境明确 + 断言成立 + 通过审核标准」的边才合并成已确认等价类；
+ * 只有「无前提 + 语境明确 + 断言成立 + 已审核」的边才合并成已确认等价类；
  * 带前提的边按「语境 + 前提」分组，作为条件等价候选返回。
  * 不同语境的等价关系永远不会并在一起。
  */
@@ -894,8 +894,12 @@ export function equivalenceClasses(
 
     const conditions = normalizeConditionText(edge.condition);
     const assumptions = [...(edge.assumptionIds ?? [])].sort();
+    // 未审核的等价边只能是候选：没人确认过，不能当成已确认等价
     const conditional =
-      conditions.length > 0 || assumptions.length > 0 || edge.contextId === undefined;
+      conditions.length > 0 ||
+      assumptions.length > 0 ||
+      edge.contextId === undefined ||
+      edgeReviewState(edge) === 'unreviewed';
 
     if (conditional && !options.includeConditional) continue;
 

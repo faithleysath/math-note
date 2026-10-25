@@ -103,6 +103,38 @@ describe('AI 批次提交到数据库', () => {
     expect(issues.filter((issue) => issue.severity === 'error')).toEqual([]);
   });
 
+  it('删除子树与引用清理在同一个事务里完成', async () => {
+    const result = await db.loadAll();
+    const idSet = new Set(['ctx']);
+    const edgeIds = result.edges
+      .filter((edge) => idSet.has(edge.from) || idSet.has(edge.to))
+      .map((edge) => edge.id);
+
+    const patchedEdges = result.edges
+      .filter((edge) => !edgeIds.includes(edge.id))
+      .map((edge) =>
+        edge.contextId === 'ctx'
+          ? { ...edge, contextId: undefined, assumptionIds: undefined, updatedAt: 1 }
+          : edge,
+      );
+
+    const patchedSteps = result.steps.map((step) =>
+      step.contextId === 'ctx' ? { ...step, contextId: undefined, updatedAt: 1 } : step,
+    );
+
+    await db.deleteNodesCascade(['ctx'], edgeIds, {
+      putEdges: patchedEdges.filter((edge) => edge.id === 'e1'),
+      putSteps: patchedSteps,
+    });
+
+    const after = await db.loadAll();
+    expect(after.nodes.some((node) => node.id === 'ctx')).toBe(false);
+    expect(after.edges.find((edge) => edge.id === 'e1')?.contextId).toBeUndefined();
+    expect(after.steps.find((step) => step.id === 's1')?.contextId).toBeUndefined();
+    // 无关的边（证明 → 命题）不受影响
+    expect(after.edges.some((edge) => edge.id === 'e2')).toBe(true);
+  });
+
   it('失败的批次不写入任何内容', async () => {
     const before = await db.loadAll();
     const index = buildIndex(nodes, edges, steps);

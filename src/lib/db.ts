@@ -73,10 +73,21 @@ export async function removeSteps(ids: string[]): Promise<void> {
 }
 
 /** 级联删除：节点 + 它牵连的所有边，同一个事务里完成 */
-export async function deleteNodesCascade(ids: string[], edgeIds: string[]): Promise<void> {
+/**
+ * 删除子树：删节点、删两端命中的边、删失效的推理步骤，
+ * 并在**同一个事务**里写回被清理了引用（contextId / assumptionIds / proofId）的关系。
+ *
+ * 拆成两个事务的话，第一步提交后第二步失败就会留下悬空引用。
+ */
+export async function deleteNodesCascade(
+  ids: string[],
+  edgeIds: string[],
+  followUp: { putEdges?: Edge[]; putSteps?: InferenceStep[] } = {},
+): Promise<void> {
   const idSet = new Set(ids);
   await db.transaction('rw', db.nodes, db.edges, db.steps, async () => {
     await db.nodes.bulkDelete(ids);
+
     const todo = new Set(edgeIds);
     // 兜底：库里任何一端命中的边都删掉，防止调用方算漏
     await db.edges.each((edge) => {
@@ -92,6 +103,10 @@ export async function deleteNodesCascade(ids: string[], edgeIds: string[]): Prom
       }
     });
     await db.steps.bulkDelete(stepIds);
+
+    // 同事务写回清理过引用的关系
+    if (followUp.putEdges?.length) await db.edges.bulkPut(followUp.putEdges);
+    if (followUp.putSteps?.length) await db.steps.bulkPut(followUp.putSteps);
   });
 }
 

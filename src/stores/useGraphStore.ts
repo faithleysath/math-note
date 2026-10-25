@@ -288,8 +288,6 @@ export const useGraphStore = create<GraphState>()((set, get) => {
         .filter((edge) => idSet.has(edge.from) || idSet.has(edge.to))
         .map((edge) => edge.id);
 
-      await db.deleteNodesCascade(ids, edgeIds);
-
       const nodes = new Map(state.index.nodes);
       for (const nodeId of ids) nodes.delete(nodeId);
       const edges = state.index.edges.filter((edge) => !idSet.has(edge.from) && !idSet.has(edge.to));
@@ -330,9 +328,11 @@ export const useGraphStore = create<GraphState>()((set, get) => {
         return next;
       });
 
-      if (changedEdges.length > 0 || changedSteps.length > 0) {
-        await db.applyBatch({ putEdges: changedEdges, putSteps: changedSteps });
-      }
+      // 删除 + 引用清理放在同一个事务里
+      await db.deleteNodesCascade(ids, edgeIds, {
+        putEdges: changedEdges,
+        putSteps: changedSteps,
+      });
 
       const expanded = new Set(get().expandedIds);
       for (const nodeId of ids) expanded.delete(nodeId);

@@ -260,9 +260,9 @@ describe('等价类', () => {
 
   it('同语境下的三方等价合成一类', () => {
     const index = buildIndex(nodes, [
-      edge('a', 'b', 'iff', { contextId: 'ctx1' }),
-      edge('b', 'c', 'iff', { contextId: 'ctx1' }),
-      edge('c', 'a', 'iff', { contextId: 'ctx1' }),
+      edge('a', 'b', 'iff', { contextId: 'ctx1', reviewState: 'human-reviewed' }),
+      edge('b', 'c', 'iff', { contextId: 'ctx1', reviewState: 'human-reviewed' }),
+      edge('c', 'a', 'iff', { contextId: 'ctx1', reviewState: 'human-reviewed' }),
     ]);
     const classes = equivalenceClasses(index);
     expect(classes).toHaveLength(1);
@@ -271,8 +271,8 @@ describe('等价类', () => {
 
   it('不同语境的等价关系不并在一起', () => {
     const index = buildIndex(nodes, [
-      edge('a', 'b', 'iff', { contextId: 'ctx1' }),
-      edge('b', 'c', 'iff', { contextId: 'ctx2' }),
+      edge('a', 'b', 'iff', { contextId: 'ctx1', reviewState: 'human-reviewed' }),
+      edge('b', 'c', 'iff', { contextId: 'ctx2', reviewState: 'human-reviewed' }),
     ]);
     const classes = equivalenceClasses(index);
     expect(classes).toHaveLength(2);
@@ -297,8 +297,8 @@ describe('等价类', () => {
   it('前提不同的等价关系不能被并成一个无条件等价类', () => {
     // A: x=1, B: x^2=1, C: x=-1；A⇔B 在 x>0 下，B⇔C 在 x<0 下
     const index = buildIndex(nodes, [
-      edge('a', 'b', 'iff', { contextId: 'ctx1', condition: 'x>0' }),
-      edge('b', 'c', 'iff', { contextId: 'ctx1', condition: 'x<0' }),
+      edge('a', 'b', 'iff', { contextId: 'ctx1', condition: 'x>0', reviewState: 'human-reviewed' }),
+      edge('b', 'c', 'iff', { contextId: 'ctx1', condition: 'x<0', reviewState: 'human-reviewed' }),
     ]);
     expect(equivalenceClasses(index)).toHaveLength(0);
 
@@ -308,11 +308,22 @@ describe('等价类', () => {
     expect(candidates.map((item) => item.conditions.join()).sort()).toEqual(['x<0', 'x>0']);
   });
 
-  it('无前提、语境明确的等价关系才是已确认的', () => {
-    const index = buildIndex(nodes, [edge('a', 'b', 'iff', { contextId: 'ctx1' })]);
+  it('无前提、语境明确且已审核的等价关系才是已确认的', () => {
+    const index = buildIndex(nodes, [
+      edge('a', 'b', 'iff', { contextId: 'ctx1', reviewState: 'human-reviewed' }),
+    ]);
     const classes = equivalenceClasses(index);
     expect(classes).toHaveLength(1);
     expect(classes[0]).toMatchObject({ contextId: 'ctx1', conditional: false });
+  });
+
+  it('未审核的等价关系只能算候选', () => {
+    const index = buildIndex(nodes, [edge('a', 'b', 'iff', { contextId: 'ctx1' })]);
+    expect(equivalenceClasses(index)).toHaveLength(0);
+
+    const candidates = equivalenceClasses(index, 'iff', { includeConditional: true });
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0].conditional).toBe(true);
   });
 });
 
