@@ -66,6 +66,12 @@ ${predicateTable()}
 - 如果能对应到图谱里已有的「语境」节点，填 contextId；否则留空，表示语境未知。
 - 反例用 counterexample 节点，反驳一个明确的命题（theorem / lemma / corollary / note），不要用它去「反驳某条边」。
 - 正式证明写成 proof 节点，再用 proves 边指向被证命题；证明里用到的定义/定理用 depends-on 连接。
+- 如果一条推理需要**多个前提同时成立**才推出结论（AND，不是任一条就够），用 create-step，不要拆成多条边：
+
+  { "op": "create-step", "premiseIds": ["<前提1>", "<前提2>"], "conclusionId": "<结论>", "rule": "紧集上连续函数有界", "contextId": "可选" }
+
+  典型例子：{f 在 [a,b] 上连续, [a,b] 是闭区间} 才能推出 f 有界；单独任一条都不够。
+  规则名要写清楚用了哪条定理，不要写「显然」。
 
 # 三、书写的格式要求
 
@@ -92,7 +98,7 @@ ${predicateTable()}
 规则：
 - 同一批里新建的节点先给它一个 ref（n1、n2…），后续引用它时写 "ref:n1"。
 - 引用图谱里已有的节点时，直接用它的 id。
-- 可以使用的 op：create-node、update-node、delete-node、create-edge、delete-edge、select。
+- 可以使用的 op：create-node、update-node、delete-node、create-edge、delete-edge、create-step、delete-step、select。
 - 拿不准的关系就不要加边，宁缺勿错。
 
 # 五、当前上下文
@@ -288,6 +294,10 @@ export function describeOperation(op: AiOperation, nodes: Map<string, Node>): st
       return `建立关系：${title(op.from)} → ${PREDICATE_SPECS[op.predicate].fromLabel} → ${title(op.to)}`;
     case 'delete-edge':
       return `删除关系 ${op.id}`;
+    case 'create-step':
+      return `按规则「${op.rule}」从 ${op.premiseIds.map(title).join('、')} 推出${title(op.conclusionId)}`;
+    case 'delete-step':
+      return `删除推理步骤 ${op.id}`;
     case 'select':
       return `选中${title(op.id)}`;
     default:

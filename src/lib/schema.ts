@@ -202,11 +202,42 @@ export interface Edge {
   updatedAt: number;
 }
 
+/**
+ * 推理步骤（超边）。
+ *
+ * 二元边只能表达「任一前提足够」（OR）。数学里大量推理是
+ * 「{A, B} 同时成立才推出 C」（AND），例如：
+ *   {f 在 [a,b] 上连续, [a,b] 是闭区间} ⇒ f 在 [a,b] 上有界
+ * 拆成 A⇒C 和 B⇒C 两条二元边就都是假命题。
+ *
+ * 所以单独存一个对象：至少一个前提、一个结论、一个规则名。
+ * 它不参与目录树、没有位置、也没有编号。
+ */
+export interface InferenceStep {
+  id: string;
+  /** 前提节点 id，至少一个；全部成立才能推出结论 */
+  premiseIds: string[];
+  conclusionId: string;
+  /** 用了哪条规则/定理，例如「紧集上连续函数有界」 */
+  rule: string;
+  contextId?: string;
+  /** 这条推导属于哪个证明节点 */
+  proofId?: string;
+  status?: EdgeStatus;
+  reviewState?: ReviewState;
+  note?: string;
+  assertedBy: 'manual' | 'ai' | 'import';
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface GraphJSON {
-  schemaVersion: 2 | 3;
+  schemaVersion: 2 | 3 | 4;
   exportedAt: number;
   nodes: Node[];
   edges: Edge[];
+  /** v4 起才有；旧数据缺省为空数组 */
+  steps?: InferenceStep[];
 }
 
 // =============================================================================
@@ -259,11 +290,27 @@ export const edgeSchema = z.object({
   updatedAt: z.number(),
 });
 
+export const stepSchema = z.object({
+  id: z.string().min(1),
+  premiseIds: z.array(z.string()).min(1),
+  conclusionId: z.string().min(1),
+  rule: z.string().min(1),
+  contextId: z.string().optional(),
+  proofId: z.string().optional(),
+  status: z.enum(['asserted', 'conjecture', 'disproven']).optional(),
+  reviewState: z.enum(['unreviewed', 'human-reviewed', 'formally-checked']).optional(),
+  note: z.string().optional(),
+  assertedBy: z.enum(['manual', 'ai', 'import']),
+  createdAt: z.number(),
+  updatedAt: z.number(),
+});
+
 export const graphJSONSchema = z.object({
-  schemaVersion: z.union([z.literal(2), z.literal(3)]),
+  schemaVersion: z.union([z.literal(2), z.literal(3), z.literal(4)]),
   exportedAt: z.number(),
   nodes: z.array(nodeSchema),
   edges: z.array(edgeSchema),
+  steps: z.array(stepSchema).optional(),
 });
 
 // =============================================================================
@@ -310,6 +357,18 @@ export const aiOperationSchema = z.discriminatedUnion('op', [
   }),
   z.object({
     op: z.literal('delete-edge'),
+    id: z.string(),
+  }),
+  z.object({
+    op: z.literal('create-step'),
+    premiseIds: z.array(z.string()).min(1),
+    conclusionId: z.string(),
+    rule: z.string(),
+    contextId: z.string().optional(),
+    proofId: z.string().optional(),
+  }),
+  z.object({
+    op: z.literal('delete-step'),
     id: z.string(),
   }),
   z.object({

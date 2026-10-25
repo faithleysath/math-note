@@ -7,6 +7,8 @@ import {
   type AttemptMeta,
   type Citation,
   type Edge,
+  type EdgeStatus,
+  type InferenceStep,
   type Node,
   type NodeType,
   type Predicate,
@@ -400,6 +402,109 @@ export function validateNewEdge(index: GraphIndex, input: NewEdgeInput): EdgeChe
 }
 
 // =============================================================================
+// 推理步骤（超边）校验
+// =============================================================================
+
+/** 结论可以是这些类型：它们才配叫「命题」 */
+const STEP_CONCLUSION_TYPES: NodeType[] = ['definition', 'theorem', 'lemma', 'corollary', 'note'];
+/** 前提不能是纯结构节点 */
+const STEP_PREMISE_EXCLUDED: NodeType[] = ['branch', 'chapter', 'section', 'context'];
+
+export interface NewStepInput {
+  premiseIds: string[];
+  conclusionId: string;
+  rule: string;
+  contextId?: string;
+  proofId?: string;
+  status?: EdgeStatus;
+  reviewState?: ReviewState;
+  note?: string;
+  assertedBy?: InferenceStep['assertedBy'];
+}
+
+function normalizedPremises(premiseIds: string[]): string[] {
+  return [...new Set(premiseIds)].sort();
+}
+
+export function sameStepKey(
+  a: Pick<InferenceStep, 'premiseIds' | 'conclusionId' | 'rule' | 'contextId'>,
+  b: Pick<InferenceStep, 'premiseIds' | 'conclusionId' | 'rule' | 'contextId'>,
+): boolean {
+  if (a.conclusionId !== b.conclusionId) return false;
+  if (a.rule.trim() !== b.rule.trim()) return false;
+  if ((a.contextId ?? '') !== (b.contextId ?? '')) return false;
+  return normalizedPremises(a.premiseIds).join('|') === normalizedPremises(b.premiseIds).join('|');
+}
+
+/**
+ * 校验一个推理步骤：所有前提都成立才能推出结论。
+ * 拆成 A⇒C、B⇒C 两条二元边是错的，所以这里要求前提至少一个、且不能自指。
+ */
+export function validateNewStep(index: GraphIndex, input: NewStepInput): void {
+  if (input.premiseIds.length === 0) {
+    throw errorOf('premiseIds', 'empty-premises', '推理步骤至少需要一个前提。');
+  }
+
+  const premiseIds = normalizedPremises(input.premiseIds);
+  if (premiseIds.length !== input.premiseIds.length) {
+    throw errorOf('premiseIds', 'duplicate-premise', '同一个前提不能重复添加。');
+  }
+
+  for (const premiseId of premiseIds) {
+    const premise = index.nodes.get(premiseId);
+    if (!premise) {
+      throw errorOf('premiseIds', 'missing-premise', `前提节点 ${premiseId} 不存在。`);
+    }
+    if (STEP_PREMISE_EXCLUDED.includes(premise.type)) {
+      throw errorOf(
+        'premiseIds',
+        'invalid-premise-type',
+        `「${NODE_TYPE_META[premise.type].label}」不能作为推理前提。`,
+        { suggestion: '前提应该是定义、命题、笔记或证明这类内容节点。' },
+      );
+    }
+  }
+
+  const conclusion = index.nodes.get(input.conclusionId);
+  if (!conclusion) {
+    throw errorOf('conclusionId', 'missing-conclusion', '结论节点不存在。');
+  }
+  if (!STEP_CONCLUSION_TYPES.includes(conclusion.type)) {
+    throw errorOf(
+      'conclusionId',
+      'invalid-conclusion-type',
+      `结论必须是命题类节点，不能是「${NODE_TYPE_META[conclusion.type].label}」。`,
+    );
+  }
+  if (premiseIds.includes(input.conclusionId)) {
+    throw errorOf('conclusionId', 'self-derivation', '结论不能同时是它的前提。');
+  }
+
+  if (!input.rule.trim()) {
+    throw errorOf('rule', 'empty-rule', '请写清楚这条推理用的是什么规则或定理。');
+  }
+
+  if (input.contextId) {
+    if (index.nodes.get(input.contextId)?.type !== 'context') {
+      throw errorOf('contextId', 'invalid-context', '语境必须指向一个「语境」节点。');
+    }
+  }
+
+  if (input.proofId) {
+    if (index.nodes.get(input.proofId)?.type !== 'proof') {
+      throw errorOf('proofId', 'invalid-proof', '所属证明必须指向一个「证明」节点。');
+    }
+  }
+
+  const duplicate = index.steps.find((step) => sameStepKey(step, input));
+  if (duplicate) {
+    throw errorOf('rule', 'duplicate-step', '同样的推理步骤已经存在了。', {
+      edgeId: duplicate.id,
+    });
+  }
+}
+
+// =============================================================================
 // 全图不变式
 // =============================================================================
 
@@ -424,7 +529,11 @@ function parentChainHasCycle(nodes: Map<string, Node>): string[] {
  * 全图校验：导入、快照加载、迁移、AI 批量提交前都要跑。
  * 纯函数，不修改数据。
  */
-export function validateGraphInvariants(graph: { nodes: Node[]; edges: Edge[] }): ValidationIssue[] {
+export function validateGraphInvariants(graph: {
+  nodes: Node[];
+  edges: Edge[];
+  steps?: InferenceStep[];
+}): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
   const nodes = new Map<string, Node>();
 
@@ -675,6 +784,109 @@ export function validateGraphInvariants(graph: { nodes: Node[]; edges: Edge[] })
     for (const id of adjacency.keys()) {
       if (state.get(id) === undefined) visit(id);
     }
+  }
+
+  // ---- 推理步骤 ----
+  const stepIds = new Set<string>();
+  const steps = graph.steps ?? [];
+
+  for (const step of steps) {
+    if (stepIds.has(step.id)) {
+      issues.push({
+        severity: 'error',
+        code: 'duplicate-step-id',
+        message: `推理步骤 id 重复：${step.id}`,
+      });
+      continue;
+    }
+    stepIds.add(step.id);
+
+    if (step.premiseIds.length === 0) {
+      issues.push({
+        severity: 'error',
+        code: 'empty-premises',
+        message: `推理步骤 ${step.id} 没有前提。`,
+      });
+      continue;
+    }
+
+    for (const premiseId of step.premiseIds) {
+      const premise = nodes.get(premiseId);
+      if (!premise) {
+        issues.push({
+          severity: 'error',
+          code: 'missing-premise',
+          message: `推理步骤 ${step.id} 的前提 ${premiseId} 不存在。`,
+        });
+        continue;
+      }
+      if (STEP_PREMISE_EXCLUDED.includes(premise.type)) {
+        issues.push({
+          severity: 'error',
+          code: 'invalid-premise-type',
+          message: `推理步骤 ${step.id} 把「${NODE_TYPE_META[premise.type].label}」当成前提。`,
+        });
+      }
+    }
+
+    const conclusion = nodes.get(step.conclusionId);
+    if (!conclusion) {
+      issues.push({
+        severity: 'error',
+        code: 'missing-conclusion',
+        message: `推理步骤 ${step.id} 的结论 ${step.conclusionId} 不存在。`,
+      });
+    } else if (!STEP_CONCLUSION_TYPES.includes(conclusion.type)) {
+      issues.push({
+        severity: 'error',
+        code: 'invalid-conclusion-type',
+        message: `推理步骤 ${step.id} 的结论不是命题类节点。`,
+      });
+    }
+
+    if (step.premiseIds.includes(step.conclusionId)) {
+      issues.push({
+        severity: 'error',
+        code: 'self-derivation',
+        message: `推理步骤 ${step.id} 的结论同时是它的前提。`,
+      });
+    }
+
+    if (!step.rule.trim()) {
+      issues.push({
+        severity: 'error',
+        code: 'empty-rule',
+        message: `推理步骤 ${step.id} 没有写规则。`,
+      });
+    }
+
+    if (step.contextId && nodes.get(step.contextId)?.type !== 'context') {
+      issues.push({
+        severity: 'error',
+        code: 'invalid-context',
+        message: `推理步骤 ${step.id} 的语境 ${step.contextId} 不是语境节点。`,
+      });
+    }
+
+    if (step.proofId && nodes.get(step.proofId)?.type !== 'proof') {
+      issues.push({
+        severity: 'error',
+        code: 'invalid-proof',
+        message: `推理步骤 ${step.id} 的所属证明 ${step.proofId} 不是证明节点。`,
+      });
+    }
+  }
+
+  const seenSteps: InferenceStep[] = [];
+  for (const step of steps) {
+    if (seenSteps.some((other) => sameStepKey(step, other))) {
+      issues.push({
+        severity: 'error',
+        code: 'duplicate-step',
+        message: `推理步骤 ${step.id} 与已有步骤完全相同。`,
+      });
+    }
+    seenSteps.push(step);
   }
 
   return issues;

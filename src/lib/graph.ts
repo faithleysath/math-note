@@ -2,6 +2,7 @@ import {
   NODE_TYPE_META,
   type Edge,
   type EdgeStatus,
+  type InferenceStep,
   type Node,
   type Predicate,
   type ReviewState,
@@ -28,9 +29,17 @@ export interface GraphIndex {
   roots: string[];
   /** id → 教科书编号（无编号的节点不在表里） */
   numbering: Map<string, string>;
+  /** 推理步骤（超边） */
+  steps: InferenceStep[];
+  stepsByConclusion: Map<string, InferenceStep[]>;
+  stepsByPremise: Map<string, InferenceStep[]>;
 }
 
-export function buildIndex(nodeIterable: Iterable<Node>, edges: Edge[]): GraphIndex {
+export function buildIndex(
+  nodeIterable: Iterable<Node>,
+  edges: Edge[],
+  steps: InferenceStep[] = [],
+): GraphIndex {
   const nodes = new Map<string, Node>();
   for (const node of nodeIterable) nodes.set(node.id, node);
 
@@ -67,6 +76,20 @@ export function buildIndex(nodeIterable: Iterable<Node>, edges: Edge[]): GraphIn
     return node ? node.type === 'branch' : false;
   });
 
+  const stepsByConclusion = new Map<string, InferenceStep[]>();
+  const stepsByPremise = new Map<string, InferenceStep[]>();
+  for (const step of steps) {
+    const byConclusion = stepsByConclusion.get(step.conclusionId);
+    if (byConclusion) byConclusion.push(step);
+    else stepsByConclusion.set(step.conclusionId, [step]);
+
+    for (const premiseId of step.premiseIds) {
+      const byPremise = stepsByPremise.get(premiseId);
+      if (byPremise) byPremise.push(step);
+      else stepsByPremise.set(premiseId, [step]);
+    }
+  }
+
   return {
     nodes,
     edges,
@@ -75,6 +98,9 @@ export function buildIndex(nodeIterable: Iterable<Node>, edges: Edge[]): GraphIn
     edgesTo,
     roots,
     numbering: computeNumbering(nodes, childrenOf),
+    steps,
+    stepsByConclusion,
+    stepsByPremise,
   };
 }
 
@@ -406,11 +432,11 @@ const REVIEW_ORDER: Record<ReviewState, number> = {
   'formally-checked': 2,
 };
 
-export function edgeReviewState(edge: Edge): ReviewState {
+export function edgeReviewState(edge: { reviewState?: ReviewState }): ReviewState {
   return edge.reviewState ?? 'unreviewed';
 }
 
-export function edgeStatus(edge: Edge): EdgeStatus {
+export function edgeStatus(edge: { status?: EdgeStatus }): EdgeStatus {
   return edge.status ?? 'asserted';
 }
 
@@ -549,6 +575,215 @@ export function findImplicationPaths(
 
   walk(fromId, [], new Set([fromId]));
   return results;
+}
+
+// =============================================================================
+// 推理步骤（超边）
+// =============================================================================
+// 二元边是 OR：任一条成立就够。推理步骤是 AND：所有前提都成立才够。
+// 这里用前向链式推导，天然处理「多个前提共同推出结论」。
+
+export type DerivationVia =
+  | { type: 'source' }
+  | { type: 'edges'; from: string; edgeIds: string[] }
+  | { type: 'step'; stepId: string; rule: string; premises: DerivationTrace[] };
+
+export interface DerivationTrace {
+  nodeId: string;
+  via: DerivationVia;
+  /** 这条推导路径上累积的未决前提 */
+  unresolvedConditions: string[];
+  requiredAssumptions: string[];
+  /** 所有环节提出的语境；混合或缺失时为 undefined */
+  contexts: (string | undefined)[];
+  contextId?: string;
+  verification: ReviewState;
+  /** 所有环节都是 asserted（没有猜想/已推翻） */
+  asserted: boolean;
+  unconditional: boolean;
+  depth: number;
+}
+
+/** 所有环节的语境必须唯一且明确，才算有语境 */
+function sharedContext(contexts: (string | undefined)[]): string | undefined {
+  if (contexts.length === 0) return undefined;
+  const defined = contexts.filter((context): context is string => Boolean(context));
+  if (defined.length !== contexts.length) return undefined;
+  const unique = new Set(defined);
+  return unique.size === 1 ? [...unique][0] : undefined;
+}
+
+function weakestOf(states: ReviewState[]): ReviewState {
+  let weakest: ReviewState = 'formally-checked';
+  for (const state of states) {
+    if (REVIEW_ORDER[state] < REVIEW_ORDER[weakest]) weakest = state;
+  }
+  return weakest;
+}
+
+export function passesStepFilter(step: InferenceStep, options: LogicalQueryOptions = {}): boolean {
+  if (edgeStatus(step) === 'disproven') return false;
+  if (edgeStatus(step) === 'conjecture' && !options.includeConjectures) return false;
+  if (options.mode === 'reviewed-only' && edgeReviewState(step) === 'unreviewed') return false;
+  if (options.contextId !== undefined && step.contextId !== options.contextId) return false;
+  return true;
+}
+
+function finalizeTrace(
+  base: Omit<DerivationTrace, 'contextId' | 'unconditional'>,
+): DerivationTrace {
+  const contextId = sharedContext(base.contexts);
+  return {
+    ...base,
+    contextId,
+    unconditional:
+      base.unresolvedConditions.length === 0 &&
+      base.requiredAssumptions.length === 0 &&
+      contextId !== undefined &&
+      base.asserted &&
+      base.verification !== 'unreviewed',
+  };
+}
+
+function sourceTrace(nodeId: string): DerivationTrace {
+  return finalizeTrace({
+    nodeId,
+    via: { type: 'source' },
+    unresolvedConditions: [],
+    requiredAssumptions: [],
+    contexts: [],
+    verification: 'formally-checked',
+    asserted: true,
+    depth: 0,
+  });
+}
+
+function extendByEdge(trace: DerivationTrace, edge: Edge, nextId: string): DerivationTrace {
+  const conditions = [...trace.unresolvedConditions];
+  if (edge.condition?.trim()) conditions.push(edge.condition.trim());
+  const assumptions = new Set(trace.requiredAssumptions);
+  for (const assumptionId of edge.assumptionIds ?? []) assumptions.add(assumptionId);
+
+  return finalizeTrace({
+    nodeId: nextId,
+    via: { type: 'edges', from: trace.nodeId, edgeIds: [edge.id] },
+    unresolvedConditions: conditions,
+    requiredAssumptions: [...assumptions],
+    contexts: [...trace.contexts, edge.contextId],
+    verification: weakestOf([trace.verification, edgeReviewState(edge)]),
+    asserted: trace.asserted && edgeStatus(edge) === 'asserted',
+    depth: trace.depth + 1,
+  });
+}
+
+function extendByStep(step: InferenceStep, premises: DerivationTrace[]): DerivationTrace {
+  const conditions = premises.flatMap((premise) => premise.unresolvedConditions);
+  const assumptions = new Set(premises.flatMap((premise) => premise.requiredAssumptions));
+
+  return finalizeTrace({
+    nodeId: step.conclusionId,
+    via: { type: 'step', stepId: step.id, rule: step.rule, premises },
+    unresolvedConditions: [...new Set(conditions)],
+    requiredAssumptions: [...assumptions],
+    contexts: [...premises.flatMap((premise) => premise.contexts), step.contextId],
+    verification: weakestOf([
+      ...premises.map((premise) => premise.verification),
+      edgeReviewState(step),
+    ]),
+    asserted: premises.every((premise) => premise.asserted) && edgeStatus(step) === 'asserted',
+    depth: Math.max(...premises.map((premise) => premise.depth), 0) + 1,
+  });
+}
+
+/** 无条件优先；同等条件下审核级别高的优先 */
+function isBetterTrace(candidate: DerivationTrace, existing: DerivationTrace): boolean {
+  if (candidate.unconditional !== existing.unconditional) return candidate.unconditional;
+  return REVIEW_ORDER[candidate.verification] > REVIEW_ORDER[existing.verification];
+}
+
+/**
+ * 从起点出发能推出的所有结论（含推理步骤的多前提推导）。
+ *
+ * 前向链式：先跑蕴含/等价边，再看哪些步骤的所有前提都已成立。
+ * 每一步都带着整条推导链的前提、语境与最弱审核级别。
+ */
+export function deriveWithSteps(
+  index: GraphIndex,
+  startId: string,
+  options: LogicalQueryOptions = {},
+): DerivationTrace[] {
+  const known = new Map<string, DerivationTrace>();
+  known.set(startId, sourceTrace(startId));
+
+  const maxRounds = index.nodes.size + index.steps.length + 8;
+
+  for (let round = 0; round < maxRounds; round += 1) {
+    let changed = false;
+
+    // 1) 蕴含 / 等价边
+    for (const trace of [...known.values()]) {
+      const outgoing = [
+        ...(index.edgesFrom.get(trace.nodeId) ?? []),
+        ...(index.edgesTo.get(trace.nodeId) ?? []).filter(
+          (edge) => PREDICATE_SPECS[edge.predicate].symmetric,
+        ),
+      ];
+      for (const edge of outgoing) {
+        if (!passesLogicalFilter(edge, options)) continue;
+        const next = edge.from === trace.nodeId ? edge.to : edge.from;
+        const candidate = extendByEdge(trace, edge, next);
+        const existing = known.get(next);
+        if (!existing || isBetterTrace(candidate, existing)) {
+          known.set(next, candidate);
+          changed = true;
+        }
+      }
+    }
+
+    // 2) 推理步骤：所有前提都成立时，结论成立
+    for (const step of index.steps) {
+      if (!passesStepFilter(step, options)) continue;
+      const premises = step.premiseIds.map((premiseId) => known.get(premiseId));
+      if (premises.some((premise) => premise === undefined)) continue;
+      const candidate = extendByStep(step, premises as DerivationTrace[]);
+      const existing = known.get(step.conclusionId);
+      if (!existing || isBetterTrace(candidate, existing)) {
+        known.set(step.conclusionId, candidate);
+        changed = true;
+      }
+    }
+
+    if (!changed) break;
+  }
+
+  known.delete(startId);
+  return [...known.values()].sort(
+    (a, b) => Number(b.unconditional) - Number(a.unconditional) || a.depth - b.depth,
+  );
+}
+
+/** 涉及某个节点的推理步骤 */
+export function stepsForNode(
+  index: GraphIndex,
+  nodeId: string,
+): { asConclusion: InferenceStep[]; asPremise: InferenceStep[] } {
+  return {
+    asConclusion: index.stepsByConclusion.get(nodeId) ?? [],
+    asPremise: index.stepsByPremise.get(nodeId) ?? [],
+  };
+}
+
+/** 用一句话解释这条推导是怎么来的 */
+export function explainTrace(index: GraphIndex, trace: DerivationTrace): string {
+  if (trace.via.type === 'source') return '起点';
+  if (trace.via.type === 'edges') {
+    const fromTitle = index.nodes.get(trace.via.from)?.title ?? trace.via.from;
+    return `由「${fromTitle}」沿蕴含关系推出`;
+  }
+  const names = trace.via.premises
+    .map((premise) => index.nodes.get(premise.nodeId)?.title ?? premise.nodeId)
+    .join('、');
+  return `按规则「${trace.via.rule}」推出（前提：${names}）`;
 }
 
 // =============================================================================

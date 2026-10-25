@@ -1,8 +1,8 @@
-import { graphJSONSchema, type Edge, type GraphJSON, type Node } from './schema';
+import { graphJSONSchema, type Edge, type GraphJSON, type InferenceStep, type Node } from './schema';
 import { ValidationError, validateGraphInvariants, type ValidationIssue } from './validate';
 import { migrateV2ToV3 } from './migrate';
 
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 function messageOf(error: unknown): string {
   if (error && typeof error === 'object' && 'issues' in error) {
@@ -12,18 +12,24 @@ function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-export function serializeGraph(nodes: Node[], edges: Edge[]): GraphJSON {
+export function serializeGraph(
+  nodes: Node[],
+  edges: Edge[],
+  steps: InferenceStep[] = [],
+): GraphJSON {
   return {
     schemaVersion: SCHEMA_VERSION,
     exportedAt: Date.now(),
     nodes,
     edges,
+    steps,
   };
 }
 
 export interface ParsedGraph {
   nodes: Node[];
   edges: Edge[];
+  steps: InferenceStep[];
   /** v2 数据被迁移时给出的说明，用于 UI 提示 / 日志 */
   migration: { from: 2; proofsCreated: number } | null;
   warnings: ValidationIssue[];
@@ -45,16 +51,19 @@ export function parseGraph(json: unknown): ParsedGraph {
 
   let nodes = parsed.nodes;
   let edges = parsed.edges;
+  let steps: InferenceStep[] = parsed.steps ?? [];
   let migration: ParsedGraph['migration'] = null;
 
   if (parsed.schemaVersion === 2) {
     const migrated = migrateV2ToV3({ nodes, edges });
     nodes = migrated.graph.nodes;
     edges = migrated.graph.edges;
+    // v2 里没有推理步骤
+    steps = [];
     migration = { from: 2, proofsCreated: migrated.report.proofsCreated };
   }
 
-  const issues = validateGraphInvariants({ nodes, edges });
+  const issues = validateGraphInvariants({ nodes, edges, steps });
   const errors = issues.filter((issue) => issue.severity === 'error');
   if (errors.length > 0) {
     const head = errors.slice(0, 3).map((issue) => issue.message).join('；');
@@ -68,6 +77,7 @@ export function parseGraph(json: unknown): ParsedGraph {
   return {
     nodes,
     edges,
+    steps,
     migration,
     warnings: issues.filter((issue) => issue.severity === 'warning'),
   };

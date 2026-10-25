@@ -12,19 +12,22 @@ import {
   type GraphIndex,
 } from '../lib/graph';
 import { canonicalizePair } from '../lib/predicates';
-import type { AiOperation, Edge, GraphJSON, Node } from '../lib/schema';
+import type { AiOperation, Edge, GraphJSON, InferenceStep, Node } from '../lib/schema';
 import { parseGraph, serializeGraph } from '../lib/serialize';
 import { simulateOperations, type DraftDiff } from '../lib/draft';
 import {
   ValidationError,
   validateNewEdge,
   validateNewNode,
+  validateNewStep,
   validateNodePatch,
   validateGraphInvariants,
   sameRelationKey,
+  sameStepKey,
   findConflictHints,
   type NewEdgeInput,
   type NewNodeInput,
+  type NewStepInput,
   type NodePatch,
 } from '../lib/validate';
 
@@ -61,6 +64,13 @@ export interface GraphState {
   ) => Promise<void>;
   deleteEdge: (id: string) => Promise<void>;
 
+  createStep: (input: NewStepInput) => Promise<InferenceStep>;
+  updateStep: (
+    id: string,
+    patch: Partial<Pick<InferenceStep, 'rule' | 'note' | 'status' | 'reviewState' | 'contextId' | 'proofId'>>,
+  ) => Promise<void>;
+  deleteStep: (id: string) => Promise<void>;
+
   exportGraph: () => GraphJSON;
   importGraph: (json: unknown) => Promise<void>;
   loadSnapshot: (json: unknown, label: string) => Promise<void>;
@@ -74,7 +84,7 @@ export interface GraphState {
   diagnose: () => { errors: string[]; warnings: string[] };
 }
 
-const emptyIndex = (): GraphIndex => buildIndex([], []);
+const emptyIndex = (): GraphIndex => buildIndex([], [], []);
 
 function assertWritable(state: GraphState) {
   if (state.readOnly) {
@@ -89,12 +99,12 @@ function describeError(error: unknown): string {
 }
 
 export const useGraphStore = create<GraphState>()((set, get) => {
-  const commit = (nodes: Iterable<Node>, edges: Edge[]) => {
-    set({ index: buildIndex(nodes, edges) });
+  const commit = (nodes: Iterable<Node>, edges: Edge[], steps: InferenceStep[]) => {
+    set({ index: buildIndex(nodes, edges, steps) });
   };
 
   const commitNodes = (nodes: Map<string, Node>) => {
-    commit(nodes.values(), get().index.edges);
+    commit(nodes.values(), get().index.edges, get().index.steps);
   };
 
   return {
@@ -112,7 +122,7 @@ export const useGraphStore = create<GraphState>()((set, get) => {
     init: async () => {
       try {
         const data = await db.loadAll();
-        const index = buildIndex(data.nodes, data.edges);
+        const index = buildIndex(data.nodes, data.edges, data.steps);
         const firstBranch = index.roots[0] ?? null;
         set({
           index,
@@ -190,7 +200,7 @@ export const useGraphStore = create<GraphState>()((set, get) => {
       let toPersist: Node[] = [node];
       if (position.rebalance) {
         // 间隙用尽：把这一组兄弟重新等距排布（含新节点）
-        const probe = buildIndex(nodes.values(), state.index.edges);
+        const probe = buildIndex(nodes.values(), state.index.edges, state.index.steps);
         const orders = rebalancedOrders(probe, input.parentId);
         const updated: Node[] = [];
         for (const [id, order] of orders) {
@@ -205,7 +215,7 @@ export const useGraphStore = create<GraphState>()((set, get) => {
 
       await db.putNodes(toPersist);
       set({
-        index: buildIndex(nodes.values(), state.index.edges),
+        index: buildIndex(nodes.values(), state.index.edges, state.index.steps),
         editingId: node.id,
         selectedId: node.id,
       });
@@ -267,11 +277,14 @@ export const useGraphStore = create<GraphState>()((set, get) => {
       const nodes = new Map(state.index.nodes);
       for (const nodeId of ids) nodes.delete(nodeId);
       const edges = state.index.edges.filter((edge) => !idSet.has(edge.from) && !idSet.has(edge.to));
+      const steps = state.index.steps.filter(
+        (step) => !idSet.has(step.conclusionId) && !step.premiseIds.some((id) => idSet.has(id)),
+      );
 
       const expanded = new Set(get().expandedIds);
       for (const nodeId of ids) expanded.delete(nodeId);
 
-      const nextIndex = buildIndex(nodes.values(), edges);
+      const nextIndex = buildIndex(nodes.values(), edges, steps);
       const selectedId = get().selectedId;
       set({
         index: nextIndex,
@@ -361,7 +374,9 @@ export const useGraphStore = create<GraphState>()((set, get) => {
       };
 
       await db.putEdges([edge]);
-      set({ index: buildIndex(state.index.nodes.values(), [...state.index.edges, edge]) });
+      set({
+        index: buildIndex(state.index.nodes.values(), [...state.index.edges, edge], state.index.steps),
+      });
 
       if (warnings.length > 0) {
         toast.warning(warnings[0].message);
@@ -387,7 +402,7 @@ export const useGraphStore = create<GraphState>()((set, get) => {
 
       await db.putEdges([next]);
       const edges = state.index.edges.map((edge) => (edge.id === id ? next : edge));
-      set({ index: buildIndex(state.index.nodes.values(), edges) });
+      set({ index: buildIndex(state.index.nodes.values(), edges, state.index.steps) });
     },
 
     deleteEdge: async (id) => {
@@ -395,18 +410,98 @@ export const useGraphStore = create<GraphState>()((set, get) => {
       assertWritable(state);
       await db.removeEdges([id]);
       const edges = state.index.edges.filter((edge) => edge.id !== id);
-      set({ index: buildIndex(state.index.nodes.values(), edges) });
+      set({ index: buildIndex(state.index.nodes.values(), edges, state.index.steps) });
+    },
+
+    // -------------------------------------------------------------------------
+    // 推理步骤（超边）
+    // -------------------------------------------------------------------------
+    createStep: async (input) => {
+      const state = get();
+      assertWritable(state);
+      validateNewStep(state.index, input);
+
+      const now = Date.now();
+      const step: InferenceStep = {
+        id: crypto.randomUUID(),
+        premiseIds: [...input.premiseIds],
+        conclusionId: input.conclusionId,
+        rule: input.rule.trim(),
+        contextId: input.contextId || undefined,
+        proofId: input.proofId || undefined,
+        status: input.status ?? 'asserted',
+        reviewState: input.reviewState ?? 'unreviewed',
+        note: input.note || undefined,
+        assertedBy: input.assertedBy ?? 'manual',
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      await db.putSteps([step]);
+      set({
+        index: buildIndex(
+          state.index.nodes.values(),
+          state.index.edges,
+          [...state.index.steps, step],
+        ),
+      });
+      return step;
+    },
+
+    updateStep: async (id, patch) => {
+      const state = get();
+      assertWritable(state);
+      const existing = state.index.steps.find((step) => step.id === id);
+      if (!existing) throw new ValidationError('id', '推理步骤不存在。');
+
+      const next: InferenceStep = { ...existing, ...patch, updatedAt: Date.now() };
+
+      if (patch.contextId) {
+        if (state.index.nodes.get(patch.contextId)?.type !== 'context') {
+          throw new ValidationError('contextId', '语境必须指向一个「语境」节点。');
+        }
+      }
+      if (patch.proofId) {
+        if (state.index.nodes.get(patch.proofId)?.type !== 'proof') {
+          throw new ValidationError('proofId', '所属证明必须指向一个「证明」节点。');
+        }
+      }
+      const duplicate = state.index.steps.find(
+        (step) => step.id !== id && sameStepKey(step, next),
+      );
+      if (duplicate) throw new ValidationError('rule', '这个推理步骤已经存在了。');
+
+      await db.putSteps([next]);
+      const steps = state.index.steps.map((step) => (step.id === id ? next : step));
+      set({
+        index: buildIndex(state.index.nodes.values(), state.index.edges, steps),
+      });
+    },
+
+    deleteStep: async (id) => {
+      const state = get();
+      assertWritable(state);
+      await db.removeSteps([id]);
+      const steps = state.index.steps.filter((step) => step.id !== id);
+      set({
+        index: buildIndex(state.index.nodes.values(), state.index.edges, steps),
+      });
     },
 
     // -------------------------------------------------------------------------
     // 导入 / 导出 / 快照
     // -------------------------------------------------------------------------
-    exportGraph: () => serializeGraph([...get().index.nodes.values()], get().index.edges),
+    exportGraph: () =>
+      serializeGraph(
+        [...get().index.nodes.values()],
+        get().index.edges,
+        get().index.steps,
+      ),
 
     importGraph: async (json) => {
       const parsed = parseGraph(json);
-      await db.replaceAll({ nodes: parsed.nodes, edges: parsed.edges });
-      const index = buildIndex(parsed.nodes, parsed.edges);
+      await db.replaceAll({ nodes: parsed.nodes, edges: parsed.edges, steps: parsed.steps });
+      const index = buildIndex(parsed.nodes, parsed.edges, parsed.steps);
       set({
         index,
         status: 'ready',
@@ -427,7 +522,7 @@ export const useGraphStore = create<GraphState>()((set, get) => {
 
     loadSnapshot: async (json, label) => {
       const parsed = parseGraph(json);
-      const index = buildIndex(parsed.nodes, parsed.edges);
+      const index = buildIndex(parsed.nodes, parsed.edges, parsed.steps);
       set({
         index,
         status: 'ready',
@@ -467,6 +562,7 @@ export const useGraphStore = create<GraphState>()((set, get) => {
       const issues = validateGraphInvariants({
         nodes: [...simulation.nodes.values()],
         edges: simulation.edges,
+        steps: simulation.steps,
       });
       const errors = issues.filter((issue) => issue.severity === 'error').map((issue) => issue.message);
       const warnings = issues
@@ -496,6 +592,7 @@ export const useGraphStore = create<GraphState>()((set, get) => {
       const issues = validateGraphInvariants({
         nodes: [...simulation.nodes.values()],
         edges: simulation.edges,
+        steps: simulation.steps,
       });
       const errors = issues.filter((issue) => issue.severity === 'error');
       if (errors.length > 0) {
@@ -511,6 +608,8 @@ export const useGraphStore = create<GraphState>()((set, get) => {
           deleteNodeIds: diff.deletedNodeIds,
           putEdges: diff.createdEdges,
           deleteEdgeIds: diff.deletedEdgeIds,
+          putSteps: diff.createdSteps,
+          deleteStepIds: diff.deletedStepIds,
         });
       } catch (error) {
         const message = describeError(error);
@@ -518,7 +617,9 @@ export const useGraphStore = create<GraphState>()((set, get) => {
         return { applied: 0, errors: [message] };
       }
 
-      set({ index: buildIndex(simulation.nodes.values(), simulation.edges) });
+      set({
+        index: buildIndex(simulation.nodes.values(), simulation.edges, simulation.steps),
+      });
 
       // select 是纯 UI 操作，事务成功之后才应用
       const lastSelect = diff.selects.at(-1);
@@ -535,6 +636,7 @@ export const useGraphStore = create<GraphState>()((set, get) => {
       const issues = validateGraphInvariants({
         nodes: [...state.index.nodes.values()],
         edges: state.index.edges,
+        steps: state.index.steps,
       });
       const hints = findConflictHints(state.index);
       return {

@@ -1,7 +1,13 @@
 import { buildIndex, collectSubtree, computeInsertOrder, ORDER_GAP, type GraphIndex } from './graph';
 import { canonicalizePair } from './predicates';
-import type { AiOperation, Edge, Node } from './schema';
-import { ValidationError, validateNewEdge, validateNewNode, validateNodePatch } from './validate';
+import type { AiOperation, Edge, InferenceStep, Node } from './schema';
+import {
+  ValidationError,
+  validateNewEdge,
+  validateNewNode,
+  validateNewStep,
+  validateNodePatch,
+} from './validate';
 
 export interface DraftDiff {
   createdNodes: Node[];
@@ -9,6 +15,8 @@ export interface DraftDiff {
   deletedNodeIds: string[];
   createdEdges: Edge[];
   deletedEdgeIds: string[];
+  createdSteps: InferenceStep[];
+  deletedStepIds: string[];
   /** 事务提交后要执行的纯 UI 操作 */
   selects: string[];
 }
@@ -17,6 +25,7 @@ export interface SimulationResult {
   diff: DraftDiff;
   nodes: Map<string, Node>;
   edges: Edge[];
+  steps: InferenceStep[];
   errors: string[];
 }
 
@@ -24,6 +33,7 @@ function diffOf(
   original: GraphIndex,
   nodes: Map<string, Node>,
   edges: Edge[],
+  steps: InferenceStep[],
   selects: string[],
 ): DraftDiff {
   const createdNodes: Node[] = [];
@@ -41,6 +51,8 @@ function diffOf(
   const deletedNodeIds = [...original.nodes.keys()].filter((id) => !nodes.has(id));
   const originalEdgeIds = new Set(original.edges.map((edge) => edge.id));
   const nextEdgeIds = new Set(edges.map((edge) => edge.id));
+  const originalStepIds = new Set(original.steps.map((step) => step.id));
+  const nextStepIds = new Set(steps.map((step) => step.id));
 
   return {
     createdNodes,
@@ -48,6 +60,8 @@ function diffOf(
     deletedNodeIds,
     createdEdges: edges.filter((edge) => !originalEdgeIds.has(edge.id)),
     deletedEdgeIds: original.edges.filter((edge) => !nextEdgeIds.has(edge.id)).map((edge) => edge.id),
+    createdSteps: steps.filter((step) => !originalStepIds.has(step.id)),
+    deletedStepIds: original.steps.filter((step) => !nextStepIds.has(step.id)).map((step) => step.id),
     selects,
   };
 }
@@ -67,6 +81,7 @@ export function simulateOperations(
   const newId = options.newId ?? (() => crypto.randomUUID());
   const nodes = new Map(original.nodes);
   const edges = [...original.edges];
+  const steps = [...original.steps];
   const refs = new Map<string, string>();
   const selects: string[] = [];
   const errors: string[] = [];
@@ -78,7 +93,7 @@ export function simulateOperations(
     return resolved;
   };
 
-  const draftIndex = (): GraphIndex => buildIndex(nodes.values(), edges);
+  const draftIndex = (): GraphIndex => buildIndex(nodes.values(), edges, steps);
 
   for (const [position, op] of operations.entries()) {
     try {
@@ -154,6 +169,11 @@ export function simulateOperations(
           for (let i = edges.length - 1; i >= 0; i -= 1) {
             if (idSet.has(edges[i].from) || idSet.has(edges[i].to)) edges.splice(i, 1);
           }
+          for (let i = steps.length - 1; i >= 0; i -= 1) {
+            if (idSet.has(steps[i].conclusionId) || steps[i].premiseIds.some((id) => idSet.has(id))) {
+              steps.splice(i, 1);
+            }
+          }
           break;
         }
 
@@ -196,6 +216,40 @@ export function simulateOperations(
           break;
         }
 
+        case 'create-step': {
+          const premiseIds = op.premiseIds.map(resolve);
+          const conclusionId = resolve(op.conclusionId);
+          const index = draftIndex();
+          validateNewStep(index, {
+            premiseIds,
+            conclusionId,
+            rule: op.rule,
+            contextId: op.contextId,
+            proofId: op.proofId,
+          });
+          steps.push({
+            id: newId(),
+            premiseIds,
+            conclusionId,
+            rule: op.rule.trim(),
+            contextId: op.contextId,
+            proofId: op.proofId,
+            status: 'asserted',
+            reviewState: 'unreviewed',
+            assertedBy: 'ai',
+            createdAt: now,
+            updatedAt: now,
+          });
+          break;
+        }
+
+        case 'delete-step': {
+          const positionOfStep = steps.findIndex((step) => step.id === op.id);
+          if (positionOfStep === -1) throw new ValidationError('id', '推理步骤不存在。');
+          steps.splice(positionOfStep, 1);
+          break;
+        }
+
         case 'select': {
           selects.push(resolve(op.id));
           break;
@@ -217,18 +271,22 @@ export function simulateOperations(
         deletedNodeIds: [],
         createdEdges: [],
         deletedEdgeIds: [],
+        createdSteps: [],
+        deletedStepIds: [],
         selects: [],
       },
       nodes: new Map(original.nodes),
       edges: original.edges,
+      steps: original.steps,
       errors,
     };
   }
 
   return {
-    diff: diffOf(original, nodes, edges, selects),
+    diff: diffOf(original, nodes, edges, steps, selects),
     nodes,
     edges,
+    steps,
     errors: [],
   };
 }

@@ -5,8 +5,9 @@ import { useRelatedNodes } from '../../hooks/useRelatedNodes';
 import RelationshipGraph from '../RelationshipGraph';
 import { Button } from '../ui/button';
 import AddEdgeDialog from '../AddEdgeDialog';
+import StepDialog from '../StepDialog';
 import { Link, ChevronRight, X } from 'lucide-react';
-import { ancestorNodes, inferLogicalRelations } from '../../lib/graph';
+import { ancestorNodes, deriveWithSteps, explainTrace, stepsForNode } from '../../lib/graph';
 import { NODE_TYPE_META, REVIEW_STATE_LABEL } from '../../lib/schema';
 import { useWindowSize } from '@/hooks/useWindowSize';
 
@@ -18,6 +19,7 @@ const RightSidebar = () => {
   const { width } = useWindowSize();
   const isMobile = width <= 768;
   const [isAddEdgeOpen, setIsAddEdgeOpen] = useState(false);
+  const [isStepOpen, setIsStepOpen] = useState(false);
   const [reasonMode, setReasonMode] = useState<'navigation' | 'reviewed-only'>('navigation');
 
   const selectedNode = selectedId ? index.nodes.get(selectedId) : undefined;
@@ -26,8 +28,28 @@ const RightSidebar = () => {
 
   const derived = useMemo(() => {
     if (!selectedId) return [];
-    return inferLogicalRelations(index, selectedId, { mode: reasonMode });
+    return deriveWithSteps(index, selectedId, { mode: reasonMode });
   }, [index, selectedId, reasonMode]);
+
+  const relatedSteps = useMemo(() => {
+    if (!selectedId) return [];
+    const { asConclusion, asPremise } = stepsForNode(index, selectedId);
+    const seen = new Set<string>();
+    const merged: { step: (typeof asConclusion)[number]; role: 'conclusion' | 'premise' }[] = [];
+    for (const step of asConclusion) {
+      if (seen.has(step.id)) continue;
+      seen.add(step.id);
+      merged.push({ step, role: 'conclusion' });
+    }
+    for (const step of asPremise) {
+      if (seen.has(step.id)) continue;
+      seen.add(step.id);
+      merged.push({ step, role: 'premise' });
+    }
+    return merged;
+  }, [index, selectedId]);
+
+  const deleteStep = useGraphStore((state) => state.deleteStep);
 
   const ancestors = useMemo(
     () => (selectedNode ? [...ancestorNodes(index, selectedNode.id), selectedNode] : []),
@@ -147,6 +169,61 @@ const RightSidebar = () => {
 
           <div className="mt-6">
             <div className="flex items-center justify-between mb-2 border-b pb-2">
+              <h3 className="text-md font-semibold">推理步骤</h3>
+              <Button variant="ghost" size="sm" onClick={() => setIsStepOpen(true)}>
+                <Link className="h-4 w-4 mr-2" />
+                新建步骤
+              </Button>
+            </div>
+            <p className="mb-2 text-xs text-muted-foreground">
+              多个前提必须同时成立才能推出结论。单个前提就够的情况请用关系边。
+            </p>
+            {relatedSteps.length === 0 ? (
+              <p className="text-sm text-muted-foreground">还没有涉及这个节点的推理步骤。</p>
+            ) : (
+              <ul className="space-y-2">
+                {relatedSteps.map(({ step, role }) => {
+                  const premiseTitles = step.premiseIds
+                    .map((id) => index.nodes.get(id)?.title ?? id)
+                    .join(' + ');
+                  const conclusionTitle = index.nodes.get(step.conclusionId)?.title ?? step.conclusionId;
+                  return (
+                    <li key={step.id} className="text-sm flex items-start group">
+                      <div className="flex-1">
+                        <p className="text-xs text-muted-foreground">
+                          {role === 'conclusion' ? '作为结论' : '作为前提'}
+                        </p>
+                        <p>
+                          {premiseTitles} ⇒ {conclusionTitle}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {[
+                            `规则：${step.rule}`,
+                            step.status === 'conjecture' ? '猜想' : step.status === 'disproven' ? '已推翻' : '确定',
+                            REVIEW_STATE_LABEL[step.reviewState ?? 'unreviewed'],
+                            step.contextId
+                              ? `语境：${index.nodes.get(step.contextId)?.title ?? step.contextId}`
+                              : '语境未知',
+                          ].join(' · ')}
+                        </p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={() => void deleteStep(step.id)}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+
+          <div className="mt-6">
+            <div className="flex items-center justify-between mb-2 border-b pb-2">
               <h3 className="text-md font-semibold">推理</h3>
               <div className="flex items-center space-x-1">
                 <Button
@@ -168,25 +245,25 @@ const RightSidebar = () => {
               </div>
             </div>
             <p className="mb-2 text-xs text-muted-foreground">
-              只列能沿蕴含关系推到的结论；括号里是尚未满足的前提，不代表无条件成立。
+              只列能推到的结论；未决前提和审核级别会一起显示，未满足时不会说成无条件成立。
             </p>
             {derived.length === 0 ? (
               <p className="text-sm text-muted-foreground">没有可推导的结论。</p>
             ) : (
               <ul className="space-y-2">
                 {derived.map((relation) => {
-                  const target = index.nodes.get(relation.to);
+                  const target = index.nodes.get(relation.nodeId);
                   return (
-                    <li key={`${relation.to}-${relation.edgePath.join('-')}`} className="text-sm">
+                    <li key={relation.nodeId} className="text-sm">
                       <span
                         className="text-primary hover:underline cursor-pointer"
-                        onClick={() => select(relation.to)}
+                        onClick={() => select(relation.nodeId)}
                       >
-                        {target?.title ?? relation.to}
+                        {target?.title ?? relation.nodeId}
                       </span>
                       <p className="text-xs text-muted-foreground">
                         {[
-                          relation.predicate === 'iff' ? '等价' : '推导',
+                          explainTrace(index, relation),
                           REVIEW_STATE_LABEL[relation.verification],
                           relation.unconditional ? '无条件' : '有前提',
                           relation.unresolvedConditions.length > 0
@@ -208,6 +285,13 @@ const RightSidebar = () => {
               </ul>
             )}
           </div>
+          {isStepOpen && (
+            <StepDialog
+              isOpen={isStepOpen}
+              onClose={() => setIsStepOpen(false)}
+              defaultConclusionId={selectedNode.id}
+            />
+          )}
           {isAddEdgeOpen && (
             <AddEdgeDialog
               sourceNode={selectedNode}

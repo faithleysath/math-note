@@ -54,10 +54,33 @@
 **目录不是逻辑**：`parentId` 只决定笔记排在哪里，不代表数学依赖。
 **引用不是依赖**：`cites` 只是提到，`depends-on` 才是学习前置。
 
+### 推理步骤（超边）
+
+二元边只能表达「任一前提足够」（OR）。数学里大量推理是「几个前提同时成立才够」（AND）：
+
+> {f 在 [a,b] 上连续, [a,b] 是闭区间} ⇒ f 在 [a,b] 上有界
+
+拆成 `A⇒C`、`B⇒C` 两条边都是假命题。所以另外存一类对象：
+
+```jsonc
+{
+  "id": "uuid",
+  "premiseIds": ["uuid-a", "uuid-b"],   // 至少一个，全部成立才够
+  "conclusionId": "uuid-c",
+  "rule": "紧集上连续函数有界",
+  "contextId": "uuid-context",          // 可选
+  "proofId": "uuid-proof",              // 这条推导属于哪个证明，可选
+  "status": "asserted",
+  "reviewState": "human-reviewed"
+}
+```
+
+推理步骤不参与目录树、没有位置和编号。推导引擎是前向链式：先跑蕴含/等价边，再看哪些步骤的**所有**前提都已经成立；每一步累积前提、语境和最弱审核级别，右侧「推理」面板会写出「按规则『…』推出（前提：…）」。
+
 ### 结构遍历 vs 数学推理
 
 - 结构遍历（导航）：只看存了哪些边，不判断真假。`iff` 在结构上双向可达。
-- 数学推理：只走 `implies` / `iff`，逐条检查状态、语境、前提与审核级别，输出**结论 + 路径 + 未决前提 + 最弱审核级别**。只要路径上有未决前提、语境未知或未审核，就标成「有前提的候选」，不会说成无条件的定理。
+- 数学推理：走 `implies` / `iff` 和推理步骤，逐条检查状态、语境、前提与审核级别，输出**结论 + 依据（边路径或多前提规则）+ 未决前提 + 最弱审核级别**。只要有一条未决前提、语境未知或未审核，就标成「有前提的候选」，不会说成无条件的定理。
 
 由此得到的查询：
 
@@ -89,6 +112,7 @@
 
 - 全部存在浏览器 IndexedDB（数据库 `math-note-graph`），不联网、不登录。
 - 导入 v2 备份时会自动迁移：定理/引理/推论上的 `solution` 会复制成独立的「证明」节点并建立 `proves` 边，原字段保留可回滚。
+- v2/v3 备份没有 `steps` 字段，导入后按空数组处理。
 - 「导出」下载一份 JSON，「导入」会覆盖当前数据（会二次确认）。
 - 「分享」把快照传到 Vercel Blob，生成只读链接 `?note_url=…`，打开后所有写操作被禁用。
 
@@ -96,7 +120,7 @@
 
 ```jsonc
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "nodes": [
     {
       "id": "uuid",
@@ -124,6 +148,19 @@
       "status": "asserted",
       "reviewState": "unreviewed",
       "contextId": "uuid-of-context",
+      "assertedBy": "manual",
+      "createdAt": 0,
+      "updatedAt": 0
+    }
+  ],
+  "steps": [
+    {
+      "id": "uuid",
+      "premiseIds": ["uuid-theorem-a", "uuid-theorem-b"],
+      "conclusionId": "uuid-theorem-c",
+      "rule": "紧集上连续函数有界",
+      "status": "asserted",
+      "reviewState": "human-reviewed",
       "assertedBy": "manual",
       "createdAt": 0,
       "updatedAt": 0

@@ -1,5 +1,5 @@
 import Dexie, { type Table } from 'dexie';
-import type { Edge, Node } from './schema';
+import type { Edge, InferenceStep, Node } from './schema';
 
 /**
  * 持久化层。
@@ -14,6 +14,7 @@ import type { Edge, Node } from './schema';
 export class MathNoteDB extends Dexie {
   nodes!: Table<Node, string>;
   edges!: Table<Edge, string>;
+  steps!: Table<InferenceStep, string>;
 
   constructor() {
     super('math-note-graph');
@@ -21,14 +22,28 @@ export class MathNoteDB extends Dexie {
       nodes: '&id, type, key, parentId',
       edges: '&id, from, to, predicate',
     });
+    // v2：新增推理步骤（超边）表
+    this.version(2).stores({
+      nodes: '&id, type, key, parentId',
+      edges: '&id, from, to, predicate',
+      steps: '&id, conclusionId, *premiseIds',
+    });
   }
 }
 
 export const db = new MathNoteDB();
 
-export async function loadAll(): Promise<{ nodes: Node[]; edges: Edge[] }> {
-  const [nodes, edges] = await Promise.all([db.nodes.toArray(), db.edges.toArray()]);
-  return { nodes, edges };
+export async function loadAll(): Promise<{
+  nodes: Node[];
+  edges: Edge[];
+  steps: InferenceStep[];
+}> {
+  const [nodes, edges, steps] = await Promise.all([
+    db.nodes.toArray(),
+    db.edges.toArray(),
+    db.steps.toArray(),
+  ]);
+  return { nodes, edges, steps };
 }
 
 export async function putNodes(nodes: Node[]): Promise<void> {
@@ -51,10 +66,20 @@ export async function removeEdges(ids: string[]): Promise<void> {
   await db.edges.bulkDelete(ids);
 }
 
+export async function putSteps(steps: InferenceStep[]): Promise<void> {
+  if (steps.length === 0) return;
+  await db.steps.bulkPut(steps);
+}
+
+export async function removeSteps(ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  await db.steps.bulkDelete(ids);
+}
+
 /** 级联删除：节点 + 它牵连的所有边，同一个事务里完成 */
 export async function deleteNodesCascade(ids: string[], edgeIds: string[]): Promise<void> {
   const idSet = new Set(ids);
-  await db.transaction('rw', db.nodes, db.edges, async () => {
+  await db.transaction('rw', db.nodes, db.edges, db.steps, async () => {
     await db.nodes.bulkDelete(ids);
     const todo = new Set(edgeIds);
     // 兜底：库里任何一端命中的边都删掉，防止调用方算漏
@@ -62,6 +87,15 @@ export async function deleteNodesCascade(ids: string[], edgeIds: string[]): Prom
       if (idSet.has(edge.from) || idSet.has(edge.to)) todo.add(edge.id);
     });
     await db.edges.bulkDelete([...todo]);
+
+    // 推理步骤只要有一端被删掉就整体失效
+    const stepIds: string[] = [];
+    await db.steps.each((step) => {
+      if (idSet.has(step.conclusionId) || step.premiseIds.some((premiseId) => idSet.has(premiseId))) {
+        stepIds.push(step.id);
+      }
+    });
+    await db.steps.bulkDelete(stepIds);
   });
 }
 
@@ -70,6 +104,8 @@ export interface GraphBatch {
   deleteNodeIds?: string[];
   putEdges?: Edge[];
   deleteEdgeIds?: string[];
+  putSteps?: InferenceStep[];
+  deleteStepIds?: string[];
 }
 
 /**
@@ -77,26 +113,35 @@ export interface GraphBatch {
  * AI 批量写入 / 迁移 / 级联删除都走这里。
  */
 export async function applyBatch(batch: GraphBatch): Promise<void> {
-  await db.transaction('rw', db.nodes, db.edges, async () => {
+  await db.transaction('rw', db.nodes, db.edges, db.steps, async () => {
     if (batch.putNodes?.length) await db.nodes.bulkPut(batch.putNodes);
     if (batch.deleteNodeIds?.length) await db.nodes.bulkDelete(batch.deleteNodeIds);
     if (batch.putEdges?.length) await db.edges.bulkPut(batch.putEdges);
     if (batch.deleteEdgeIds?.length) await db.edges.bulkDelete(batch.deleteEdgeIds);
+    if (batch.putSteps?.length) await db.steps.bulkPut(batch.putSteps);
+    if (batch.deleteStepIds?.length) await db.steps.bulkDelete(batch.deleteStepIds);
   });
 }
 
-export async function replaceAll(data: { nodes: Node[]; edges: Edge[] }): Promise<void> {
-  await db.transaction('rw', db.nodes, db.edges, async () => {
+export async function replaceAll(data: {
+  nodes: Node[];
+  edges: Edge[];
+  steps?: InferenceStep[];
+}): Promise<void> {
+  await db.transaction('rw', db.nodes, db.edges, db.steps, async () => {
     await db.nodes.clear();
     await db.edges.clear();
+    await db.steps.clear();
     await db.nodes.bulkAdd(data.nodes);
     await db.edges.bulkAdd(data.edges);
+    if (data.steps?.length) await db.steps.bulkAdd(data.steps);
   });
 }
 
 export async function clearAll(): Promise<void> {
-  await db.transaction('rw', db.nodes, db.edges, async () => {
+  await db.transaction('rw', db.nodes, db.edges, db.steps, async () => {
     await db.nodes.clear();
     await db.edges.clear();
+    await db.steps.clear();
   });
 }

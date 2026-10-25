@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildIndex } from './graph';
 import { parseGraph, serializeGraph } from './serialize';
-import type { Edge, Node, NodeType } from './schema';
+import type { Edge, InferenceStep, Node, NodeType } from './schema';
 
 function node(
   id: string,
@@ -33,7 +33,40 @@ const nodes = [
 
 const toJson = (value: unknown) => JSON.parse(JSON.stringify(value));
 
+const aStep: InferenceStep = {
+  id: 'step-1',
+  premiseIds: ['t', 't2'],
+  conclusionId: 't2',
+  rule: '测试规则',
+  assertedBy: 'manual',
+  createdAt: 1,
+  updatedAt: 1,
+};
+
 describe('导入导出', () => {
+  it('推理步骤能完整导出再导入', () => {
+    const steps: InferenceStep[] = [
+      { ...aStep, id: 'step-1', premiseIds: ['t2'], conclusionId: 't' },
+    ];
+    const parsed = parseGraph(toJson(serializeGraph(nodes, [], steps)));
+    expect(parsed.steps).toHaveLength(1);
+    expect(parsed.steps[0].rule).toBe('测试规则');
+    expect(parsed.steps[0].premiseIds).toEqual(['t2']);
+  });
+
+  it('旧版本（没有 steps 字段）导入后 steps 为空', () => {
+    const v3 = { ...toJson(serializeGraph(nodes, [])), schemaVersion: 3 };
+    delete (v3 as { steps?: unknown }).steps;
+    const parsed = parseGraph(v3);
+    expect(parsed.steps).toEqual([]);
+  });
+
+  it('推理步骤引用不存在的节点会被拒绝', () => {
+    const broken = serializeGraph(nodes, [], [{ ...aStep, premiseIds: ['ghost'] }]);
+    expect(() => parseGraph(toJson(broken))).toThrowError(/前提 ghost 不存在|没通过校验/);
+  });
+
+
   it('导出再导入，树和编号完全一致', () => {
     const before = buildIndex(nodes, []);
     const parsed = parseGraph(toJson(serializeGraph(nodes, [])));

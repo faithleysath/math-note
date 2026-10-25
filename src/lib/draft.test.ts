@@ -102,6 +102,43 @@ describe('AI 批量操作模拟', () => {
     expect(result.diff.deletedEdgeIds.sort()).toEqual(['e1', 'e2']);
   });
 
+  it('可以创建推理步骤，前提由 ref 解析', () => {
+    counter = 0;
+    const index = buildIndex(base, []);
+    const result = simulateOperations(
+      index,
+      [
+        { op: 'create-node', ref: 'p1', parentId: 's1', type: 'theorem', title: '前提一', content: '' },
+        { op: 'create-node', ref: 'p2', parentId: 's1', type: 'theorem', title: '前提二', content: '' },
+        { op: 'create-edge', from: 't1', to: 'ref:p1', predicate: 'implies' },
+        { op: 'create-edge', from: 't1', to: 'ref:p2', predicate: 'implies' },
+        { op: 'create-step', premiseIds: ['ref:p1', 'ref:p2'], conclusionId: 't2', rule: '两前提规则' },
+      ],
+      { now: 1, newId },
+    );
+    expect(result.errors).toEqual([]);
+    expect(result.diff.createdSteps).toHaveLength(1);
+    expect(result.diff.createdSteps[0].premiseIds).toEqual(['new-1', 'new-2']);
+    expect(result.diff.createdSteps[0].reviewState).toBe('unreviewed');
+  });
+
+  it('非法的推理步骤会让整批失败', () => {
+    counter = 0;
+    const index = buildIndex(base, []);
+    const result = simulateOperations(
+      index,
+      [
+        { op: 'create-node', ref: 'p1', parentId: 's1', type: 'theorem', title: '前提一', content: '' },
+        // 前提为空
+        { op: 'create-step', premiseIds: [], conclusionId: 't2', rule: '规则' },
+      ],
+      { now: 1, newId },
+    );
+    expect(result.errors[0]).toMatch(/至少需要一个前提/);
+    expect(result.diff.createdNodes).toEqual([]);
+    expect(result.diff.createdSteps).toEqual([]);
+  });
+
   it('select 是纯 UI 操作，记录在 diff 里', () => {
     const index = buildIndex(base, []);
     const result = simulateOperations(index, [{ op: 'select', id: 't2' }], { now: 1, newId });
