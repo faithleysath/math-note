@@ -830,23 +830,47 @@ export interface EquivalenceClass {
   /** 同一语境下的等价类；undefined 表示语境未知 */
   contextId?: string;
   members: string[];
+  /**
+   * false = 已确认的等价（无前提、语境明确、断言成立、通过所选审核标准）
+   * true  = 条件等价候选，不能当作无条件等价使用
+   */
+  conditional: boolean;
+  /** 合并这一类用到的条件文本（已确认的类为空） */
+  conditions: string[];
+}
+
+export interface EquivalenceOptions extends LogicalQueryOptions {
+  /** 是否把条件等价候选也返回（默认只返回已确认的等价类） */
+  includeConditional?: boolean;
+}
+
+function normalizeConditionText(condition?: string): string {
+  return (condition ?? '').replace(/\s+/g, ' ').trim();
 }
 
 /**
- * iff 连通分量。按语境分组：不同语境的等价关系不能被并成一个「已证等价类」。
+ * iff 连通分量。
+ *
+ * 只有「无前提 + 语境明确 + 断言成立 + 通过审核标准」的边才合并成已确认等价类；
+ * 带前提的边按「语境 + 前提」分组，作为条件等价候选返回。
+ * 不同语境的等价关系永远不会并在一起。
  */
 export function equivalenceClasses(
   index: GraphIndex,
   predicate: Predicate = 'iff',
-  options: LogicalQueryOptions = {},
+  options: EquivalenceOptions = {},
 ): EquivalenceClass[] {
-  const buckets = new Map<string, Map<string, string>>();
+  const buckets = new Map<string, { contextId?: string; conditions: string[]; conditional: boolean; parent: Map<string, string> }>();
 
-  const bucketOf = (contextId?: string) => {
-    const key = contextId ?? '__unknown__';
+  const bucketOf = (
+    contextId: string | undefined,
+    conditions: string[],
+    conditional: boolean,
+  ) => {
+    const key = `${conditional ? 'x' : 'c'}|${contextId ?? '__unknown__'}|${conditions.join(' && ')}`;
     let bucket = buckets.get(key);
     if (!bucket) {
-      bucket = new Map<string, string>();
+      bucket = { contextId, conditions, conditional, parent: new Map() };
       buckets.set(key, bucket);
     }
     return bucket;
@@ -867,7 +891,20 @@ export function equivalenceClasses(
   for (const edge of index.edges) {
     if (edge.predicate !== predicate) continue;
     if (!passesLogicalFilter(edge, options)) continue;
-    const parent = bucketOf(edge.contextId);
+
+    const conditions = normalizeConditionText(edge.condition);
+    const assumptions = [...(edge.assumptionIds ?? [])].sort();
+    const conditional =
+      conditions.length > 0 || assumptions.length > 0 || edge.contextId === undefined;
+
+    if (conditional && !options.includeConditional) continue;
+
+    const conditionList = [
+      ...(conditions ? [conditions] : []),
+      ...assumptions.map((id) => `assumption:${id}`),
+    ];
+    const bucket = bucketOf(edge.contextId, conditionList, conditional);
+    const parent = bucket.parent;
     if (!parent.has(edge.from)) parent.set(edge.from, edge.from);
     if (!parent.has(edge.to)) parent.set(edge.to, edge.to);
     const rootA = find(parent, edge.from);
@@ -876,10 +913,10 @@ export function equivalenceClasses(
   }
 
   const classes: EquivalenceClass[] = [];
-  for (const [key, parent] of buckets) {
+  for (const bucket of buckets.values()) {
     const groups = new Map<string, string[]>();
-    for (const id of parent.keys()) {
-      const root = find(parent, id);
+    for (const id of bucket.parent.keys()) {
+      const root = find(bucket.parent, id);
       const group = groups.get(root);
       if (group) group.push(id);
       else groups.set(root, [id]);
@@ -887,12 +924,18 @@ export function equivalenceClasses(
     for (const members of groups.values()) {
       if (members.length < 2) continue;
       classes.push({
-        contextId: key === '__unknown__' ? undefined : key,
+        contextId: bucket.contextId,
         members,
+        conditional: bucket.conditional,
+        conditions: bucket.conditions,
       });
     }
   }
-  return classes;
+
+  // 已确认的排前面，同类的按人数多的排前面
+  return classes.sort(
+    (a, b) => Number(a.conditional) - Number(b.conditional) || b.members.length - a.members.length,
+  );
 }
 
 // =============================================================================

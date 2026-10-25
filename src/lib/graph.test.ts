@@ -285,6 +285,35 @@ describe('等价类', () => {
     ]);
     expect(equivalenceClasses(index)).toHaveLength(0);
   });
+
+  it('没有明确语境的等价关系只算候选', () => {
+    const index = buildIndex(nodes, [edge('a', 'b', 'iff')]);
+    expect(equivalenceClasses(index)).toHaveLength(0);
+    const withCandidates = equivalenceClasses(index, 'iff', { includeConditional: true });
+    expect(withCandidates).toHaveLength(1);
+    expect(withCandidates[0].conditional).toBe(true);
+  });
+
+  it('前提不同的等价关系不能被并成一个无条件等价类', () => {
+    // A: x=1, B: x^2=1, C: x=-1；A⇔B 在 x>0 下，B⇔C 在 x<0 下
+    const index = buildIndex(nodes, [
+      edge('a', 'b', 'iff', { contextId: 'ctx1', condition: 'x>0' }),
+      edge('b', 'c', 'iff', { contextId: 'ctx1', condition: 'x<0' }),
+    ]);
+    expect(equivalenceClasses(index)).toHaveLength(0);
+
+    const candidates = equivalenceClasses(index, 'iff', { includeConditional: true });
+    expect(candidates).toHaveLength(2);
+    expect(candidates.every((item) => item.conditional)).toBe(true);
+    expect(candidates.map((item) => item.conditions.join()).sort()).toEqual(['x<0', 'x>0']);
+  });
+
+  it('无前提、语境明确的等价关系才是已确认的', () => {
+    const index = buildIndex(nodes, [edge('a', 'b', 'iff', { contextId: 'ctx1' })]);
+    const classes = equivalenceClasses(index);
+    expect(classes).toHaveLength(1);
+    expect(classes[0]).toMatchObject({ contextId: 'ctx1', conditional: false });
+  });
 });
 
 describe('拓扑排序与环诊断', () => {

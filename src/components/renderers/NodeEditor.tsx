@@ -52,7 +52,7 @@ const NodeEditor = ({ node }: NodeEditorProps) => {
       document.removeEventListener('keydown', handleKeyDown);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, content, solution, key, aliases, method, duration, correct]); // Re-bind when content changes to save the latest state
+  }, [title, content, solution, key, aliases, kind, tags, source, method, duration, correct]); // Re-bind when content changes to save the latest state
 
   useEffect(() => {
     setTitle(node.title);
@@ -80,7 +80,8 @@ const NodeEditor = ({ node }: NodeEditorProps) => {
         tags: tagsArray,
         aliases: aliasesArray,
         key: key.trim() || null,
-        citation: source.trim() ? { source: source.trim() } : undefined,
+        // null 表示「清空」，undefined 表示「不修改」
+        citation: source.trim() ? { source: source.trim() } : null,
         kind: kind || undefined,
         attempt:
           node.type === 'attempt'

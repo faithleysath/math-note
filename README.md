@@ -121,7 +121,7 @@
 ```bash
 bun install
 bun dev          # http://localhost:5173
-bun test         # 编号、图算法、校验、推理
+bun run test     # 编号、图算法、校验、推理（vitest）
 bun run lint
 bun run build
 ```

@@ -21,7 +21,7 @@ import {
   type Node,
 } from '../lib/schema';
 import { parseGraph, serializeGraph } from '../lib/serialize';
-import { simulateOperations, type DraftDiff } from '../lib/draft';
+import { diffToBatch, simulateOperations, type DraftDiff } from '../lib/draft';
 import {
   ValidationError,
   validateNewEdge,
@@ -255,7 +255,7 @@ export const useGraphStore = create<GraphState>()((set, get) => {
         key: patch.key !== undefined ? (patch.key === null ? undefined : patch.key) : node.key,
         aliases: patch.aliases !== undefined ? patch.aliases : node.aliases,
         tags: patch.tags !== undefined ? patch.tags : node.tags,
-        citation: patch.citation !== undefined ? patch.citation : node.citation,
+        citation: patch.citation !== undefined ? (patch.citation ?? undefined) : node.citation,
         attempt: patch.attempt !== undefined ? patch.attempt : node.attempt,
         updatedAt: now,
       });
@@ -653,14 +653,7 @@ export const useGraphStore = create<GraphState>()((set, get) => {
       const { diff } = simulation;
       try {
         // 单事务：任何一步失败都整体回滚，不留半成品
-        await db.applyBatch({
-          putNodes: [...diff.createdNodes, ...diff.updatedNodes],
-          deleteNodeIds: diff.deletedNodeIds,
-          putEdges: diff.createdEdges,
-          deleteEdgeIds: diff.deletedEdgeIds,
-          putSteps: diff.createdSteps,
-          deleteStepIds: diff.deletedStepIds,
-        });
+        await db.applyBatch(diffToBatch(diff));
       } catch (error) {
         const message = describeError(error);
         toast.error(`写入失败，未做任何修改：${message}`);

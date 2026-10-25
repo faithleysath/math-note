@@ -1,4 +1,5 @@
 import { buildIndex, collectSubtree, computeInsertOrder, ORDER_GAP, type GraphIndex } from './graph';
+import type { GraphBatch } from './db';
 import { canonicalizePair } from './predicates';
 import type { AiOperation, Edge, InferenceStep, Node } from './schema';
 import {
@@ -14,8 +15,12 @@ export interface DraftDiff {
   updatedNodes: Node[];
   deletedNodeIds: string[];
   createdEdges: Edge[];
+  /** 已存在但被改写的边（例如删除语境节点后清空 contextId） */
+  updatedEdges: Edge[];
   deletedEdgeIds: string[];
   createdSteps: InferenceStep[];
+  /** 已存在但被改写的推理步骤 */
+  updatedSteps: InferenceStep[];
   deletedStepIds: string[];
   /** 事务提交后要执行的纯 UI 操作 */
   selects: string[];
@@ -49,20 +54,55 @@ function diffOf(
   }
 
   const deletedNodeIds = [...original.nodes.keys()].filter((id) => !nodes.has(id));
-  const originalEdgeIds = new Set(original.edges.map((edge) => edge.id));
+
+  const originalEdgesById = new Map(original.edges.map((edge) => [edge.id, edge]));
+  const createdEdges: Edge[] = [];
+  const updatedEdges: Edge[] = [];
+  for (const edge of edges) {
+    const before = originalEdgesById.get(edge.id);
+    if (!before) createdEdges.push(edge);
+    else if (JSON.stringify(before) !== JSON.stringify(edge)) updatedEdges.push(edge);
+  }
   const nextEdgeIds = new Set(edges.map((edge) => edge.id));
-  const originalStepIds = new Set(original.steps.map((step) => step.id));
+  const deletedEdgeIds = original.edges.filter((edge) => !nextEdgeIds.has(edge.id)).map((edge) => edge.id);
+
+  const originalStepsById = new Map(original.steps.map((step) => [step.id, step]));
+  const createdSteps: InferenceStep[] = [];
+  const updatedSteps: InferenceStep[] = [];
+  for (const step of steps) {
+    const before = originalStepsById.get(step.id);
+    if (!before) createdSteps.push(step);
+    else if (JSON.stringify(before) !== JSON.stringify(step)) updatedSteps.push(step);
+  }
   const nextStepIds = new Set(steps.map((step) => step.id));
+  const deletedStepIds = original.steps.filter((step) => !nextStepIds.has(step.id)).map((step) => step.id);
 
   return {
     createdNodes,
     updatedNodes,
     deletedNodeIds,
-    createdEdges: edges.filter((edge) => !originalEdgeIds.has(edge.id)),
-    deletedEdgeIds: original.edges.filter((edge) => !nextEdgeIds.has(edge.id)).map((edge) => edge.id),
-    createdSteps: steps.filter((step) => !originalStepIds.has(step.id)),
-    deletedStepIds: original.steps.filter((step) => !nextStepIds.has(step.id)).map((step) => step.id),
+    createdEdges,
+    updatedEdges,
+    deletedEdgeIds,
+    createdSteps,
+    updatedSteps,
+    deletedStepIds,
     selects,
+  };
+}
+
+/**
+ * 把 diff 翻译成一次事务要写的批次。
+ * 新建和改写放在同一个 put 里，避免调用方漏掉 updated*。
+ */
+export function diffToBatch(diff: DraftDiff): GraphBatch {
+  return {
+    putNodes: [...diff.createdNodes, ...diff.updatedNodes],
+    deleteNodeIds: diff.deletedNodeIds,
+    putEdges: [...diff.createdEdges, ...diff.updatedEdges],
+    deleteEdgeIds: diff.deletedEdgeIds,
+    putSteps: [...diff.createdSteps, ...diff.updatedSteps],
+    deleteStepIds: diff.deletedStepIds,
   };
 }
 
@@ -301,8 +341,10 @@ export function simulateOperations(
         updatedNodes: [],
         deletedNodeIds: [],
         createdEdges: [],
+        updatedEdges: [],
         deletedEdgeIds: [],
         createdSteps: [],
+        updatedSteps: [],
         deletedStepIds: [],
         selects: [],
       },

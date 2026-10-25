@@ -29,7 +29,10 @@ export function AiHandwritingDialog() {
     updatedNodes: number;
     deletedNodes: number;
     createdEdges: number;
+    updatedEdges: number;
     deletedEdges: number;
+    updatedSteps: number;
+    deletedSteps: number;
   } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -110,7 +113,10 @@ export function AiHandwritingDialog() {
         updatedNodes: preview.diff.updatedNodes.length,
         deletedNodes: preview.diff.deletedNodeIds.length,
         createdEdges: preview.diff.createdEdges.length,
+        updatedEdges: preview.diff.updatedEdges.length,
         deletedEdges: preview.diff.deletedEdgeIds.length,
+        updatedSteps: preview.diff.updatedSteps.length,
+        deletedSteps: preview.diff.deletedStepIds.length,
       });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '识别失败。');
@@ -220,10 +226,14 @@ export function AiHandwritingDialog() {
               )}
               {plan && (
                 <p className="mt-2 text-xs text-muted-foreground">
-                  新增 {plan.createdNodes} 个节点、{plan.createdEdges} 条关系；修改 {plan.updatedNodes} 个；
-                  {plan.deletedNodes + plan.deletedEdges > 0 ? (
+                  新增 {plan.createdNodes} 个节点、{plan.createdEdges} 条关系；修改 {plan.updatedNodes} 个节点
+                  {plan.updatedEdges + plan.updatedSteps > 0
+                    ? `、改写 ${plan.updatedEdges} 条关系、${plan.updatedSteps} 个步骤`
+                    : ''}
+                  ；
+                  {plan.deletedNodes + plan.deletedEdges + plan.deletedSteps > 0 ? (
                     <span className="text-destructive">
-                      删除 {plan.deletedNodes} 个节点、{plan.deletedEdges} 条关系
+                      删除 {plan.deletedNodes} 个节点、{plan.deletedEdges} 条关系、{plan.deletedSteps} 个步骤
                     </span>
                   ) : (
                     '不删除任何内容'

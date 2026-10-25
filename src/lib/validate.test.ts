@@ -5,6 +5,7 @@ import {
   sameRelationKey,
   subtreeSize,
   validateCanReparent,
+  validateNodePatch,
   validateGraphInvariants,
   validateNewEdge,
   validateNewNode,
@@ -305,6 +306,39 @@ describe('全图不变式', () => {
       ],
     });
     expect(logical.filter((issue) => issue.severity === 'error')).toEqual([]);
+  });
+
+  it('generalizes 的端点组合在导入时同样受约束', () => {
+    // definition → proposition 在手动建边时会被拒绝，导入也必须拒绝
+    const issues = validateGraphInvariants({
+      nodes: base,
+      edges: [edge('e1', 'd1', 't1', 'generalizes')],
+    });
+    expect(issues.some((issue) => issue.code === 'invalid-endpoint-type')).toBe(true);
+
+    // 直接新增也要拒绝，两边的约束必须一致
+    const index = buildIndex(base, []);
+    expect(() =>
+      validateNewEdge(index, { from: 'd1', to: 't1', predicate: 'generalizes' }),
+    ).toThrowError(/不能用在/);
+
+    const legal = validateGraphInvariants({
+      nodes: base,
+      edges: [edge('e2', 't1', 't2', 'generalizes')],
+    });
+    expect(legal.filter((issue) => issue.severity === 'error')).toEqual([]);
+    expect(() =>
+      validateNewEdge(index, { from: 't1', to: 't2', predicate: 'generalizes' }),
+    ).not.toThrow();
+  });
+
+  it('被当作语境引用的节点不能改 kind', () => {
+    const edges = [edge('e1', 't1', 't2', 'implies', { contextId: 'ctx1' })];
+    const index = buildIndex(base, edges);
+    expect(() => validateNodePatch(index, 'ctx1', { kind: 'method' })).toThrowError(/当作语境引用/);
+    // 没有引用时可以改
+    const free = buildIndex(base, []);
+    expect(() => validateNodePatch(free, 'ctx1', { kind: 'method' })).not.toThrow();
   });
 
   it('语境引用不存在会被发现', () => {

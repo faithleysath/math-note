@@ -81,7 +81,8 @@ export interface NodePatch {
   key?: string | null;
   aliases?: string[];
   tags?: string[];
-  citation?: Citation;
+  /** null 表示清空，undefined 表示不修改 */
+  citation?: Citation | null;
   attempt?: AttemptMeta;
   parentId?: string | null;
 }
@@ -195,7 +196,10 @@ export function validateNodePatch(index: GraphIndex, id: string, patch: NodePatc
   if (!node) throw errorOf('id', 'missing-node', '节点不存在。');
 
   if (patch.title !== undefined) assertTitle(patch.title);
-  if (patch.kind !== undefined) assertKind(node.type, patch.kind);
+  if (patch.kind !== undefined) {
+    assertKind(node.type, patch.kind);
+    assertKindChangeKeepsReferences(index, node, patch.kind);
+  }
 
   if (patch.key) {
     if (!/^[a-z0-9][a-z0-9-]*$/.test(patch.key)) {
@@ -207,6 +211,28 @@ export function validateNodePatch(index: GraphIndex, id: string, patch: NodePatc
   if (patch.parentId !== undefined && patch.parentId !== node.parentId) {
     validateCanReparent(index, id, patch.parentId);
   }
+}
+
+/**
+ * note(kind='context') 可能被关系和推理步骤当作语境引用。
+ * 把它改成别的 kind 会让这些引用悬空，所以必须先解开引用。
+ */
+function assertKindChangeKeepsReferences(index: GraphIndex, node: Node, nextKind: string) {
+  if (!isContextNode(node) || nextKind === 'context') return;
+
+  const edgeCount = index.edges.filter((edge) => edge.contextId === node.id).length;
+  const stepCount = index.steps.filter((step) => step.contextId === node.id).length;
+  if (edgeCount === 0 && stepCount === 0) return;
+
+  throw errorOf(
+    'kind',
+    'context-in-use',
+    `「${node.title}」还被 ${edgeCount} 条关系、${stepCount} 个推理步骤当作语境引用，不能改成别的类型。`,
+    {
+      nodeId: node.id,
+      suggestion: '先把这些关系的语境清空或换成别的语境节点，再修改 kind。',
+    },
+  );
 }
 
 export function validateCanReparent(index: GraphIndex, id: string, newParentId: string | null): void {
@@ -717,7 +743,7 @@ export function validateGraphInvariants(graph: {
     }
 
     const spec = PREDICATE_SPECS[edge.predicate];
-    if (!spec.from.includes(fromNode.type) || !spec.to.includes(toNode.type)) {
+    if (!isDirectionAllowed(edge.predicate, fromNode.type, toNode.type)) {
       issues.push({
         severity: 'error',
         code: 'invalid-endpoint-type',
@@ -971,6 +997,12 @@ export interface ConflictHint {
 export function findConflictHints(index: GraphIndex): ConflictHint[] {
   const hints: ConflictHint[] = [];
 
+  /** predicate|from|to → 边，避免两两比较 */
+  const byEndpoint = new Map<string, Edge>();
+  for (const edge of index.edges) {
+    byEndpoint.set(`${edge.predicate}|${edge.from}|${edge.to}`, edge);
+  }
+
   for (const edge of index.edges) {
     if (edge.predicate === 'implies' && edge.status === 'disproven') {
       hints.push({
@@ -979,50 +1011,43 @@ export function findConflictHints(index: GraphIndex): ConflictHint[] {
         edgeIds: [edge.id],
       });
     }
-  }
 
-  for (const a of index.edges) {
-    if (a.predicate !== 'generalizes') continue;
-    for (const b of index.edges) {
-      if (b.predicate !== 'generalizes') continue;
-      if (a.id >= b.id) continue;
-      if (a.from === b.to && a.to === b.from) {
+    if (edge.predicate === 'generalizes') {
+      const reverse = byEndpoint.get(`generalizes|${edge.to}|${edge.from}`);
+      if (reverse && edge.id < reverse.id) {
         hints.push({
           code: 'mutual-generalization',
           message: '两个结论互为推广，可能只是同一件事的不同说法，请人工核查。',
-          edgeIds: [a.id, b.id],
+          edgeIds: [edge.id, reverse.id],
         });
       }
     }
-  }
 
-  for (const a of index.edges) {
-    if (a.predicate !== 'implies') continue;
-    for (const b of index.edges) {
-      if (b.predicate !== 'implies') continue;
-      if (a.id >= b.id) continue;
-      if (a.from === b.to && a.to === b.from) {
-        const conditions = [normalizeCondition(a.condition), normalizeCondition(b.condition)];
-        if (conditions[0] !== conditions[1]) {
-          hints.push({
-            code: 'mutual-implication-different-conditions',
-            message: '两个方向的蕴含前提不同，不能直接当成无条件等价。',
-            edgeIds: [a.id, b.id],
-          });
-        }
+    if (edge.predicate === 'implies') {
+      const reverse = byEndpoint.get(`implies|${edge.to}|${edge.from}`);
+      if (
+        reverse &&
+        edge.id < reverse.id &&
+        normalizeCondition(edge.condition) !== normalizeCondition(reverse.condition)
+      ) {
+        hints.push({
+          code: 'mutual-implication-different-conditions',
+          message: '两个方向的蕴含前提不同，不能直接当成无条件等价。',
+          edgeIds: [edge.id, reverse.id],
+        });
       }
     }
-  }
 
-  for (const edge of index.edges) {
-    if (edge.predicate !== 'refutes') continue;
-    const target = index.nodes.get(edge.to);
-    if (!target) continue;
-    hints.push({
-      code: 'counterexample-target',
-      message: `反例反驳的是命题「${target.title}」本身；如果要反驳某条蕴含，请在对应关系上标注状态。`,
-      edgeIds: [edge.id],
-    });
+    if (edge.predicate === 'refutes') {
+      const target = index.nodes.get(edge.to);
+      if (target) {
+        hints.push({
+          code: 'counterexample-target',
+          message: `反例反驳的是命题「${target.title}」本身；如果要反驳某条蕴含，请在对应关系上标注状态。`,
+          edgeIds: [edge.id],
+        });
+      }
+    }
   }
 
   return hints;
