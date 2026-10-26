@@ -63,7 +63,7 @@ export function parseGraph(json: unknown): ParsedGraph {
     if (version === 7) {
       throw new ValidationError(
         'schema',
-        '这是 v7 备份。当前版本只接受 v8（含 book 教材元信息），旧数据不会自动迁移；请保留原文件，用对应版本的 Math Note 打开或重新导出。',
+        '这是 v7 备份。当前版本只接受 v8（含 book 教材元信息），旧数据不会自动迁移；请保留原文件，用对应版本的教材图谱打开或重新导出。',
       );
     }
     throw new ValidationError(

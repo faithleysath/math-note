@@ -86,7 +86,7 @@ const LeftSidebar = () => {
       const link = document.createElement("a");
       link.href = jsonString;
       const safeTitle = (book?.title ?? 'backup').replace(/[\\/:*?"<>|\s]+/g, '-');
-      link.download = `math-note-${safeTitle}-${new Date().toISOString().slice(0, 10)}.json`;
+      link.download = `textbook-graph-${safeTitle}-${new Date().toISOString().slice(0, 10)}.json`;
       link.click();
       toast.success('数据已成功导出。');
     } catch (error) {

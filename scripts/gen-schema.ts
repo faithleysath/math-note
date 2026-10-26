@@ -12,10 +12,10 @@ const schema = z.toJSONSchema(graphJSONSchema, { io: 'input', target: 'draft-202
 
 const out = {
   $schema: 'https://json-schema.org/draft/2020-12/schema',
-  $id: 'https://github.com/faithleysath/math-note/examples/v8.schema.json',
-  title: 'Math Note v8 导入格式',
+  $id: 'https://github.com/faithleysath/textbook-graph/examples/v8.schema.json',
+  title: '教材图谱 v8 导入格式',
   description:
-    'Math Note 知识图谱 v8 的导入/导出格式。约束的权威定义在 src/lib/schema.ts 与 src/lib/validate.ts；本文件由 scripts/gen-schema.ts 生成。',
+    '教材图谱知识图谱 v8 的导入/导出格式。约束的权威定义在 src/lib/schema.ts 与 src/lib/validate.ts；本文件由 scripts/gen-schema.ts 生成。',
   ...schema,
 };
 

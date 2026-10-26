@@ -20,7 +20,7 @@ class MathNoteDB extends Dexie {
 
   constructor() {
     // 只有一种数据格式（v8），这里不再维护历史版本或是迁移用的辅助表
-    super('math-note-graph-v8');
+    super('textbook-graph-v8');
     this.version(1).stores({
       nodes: '&id, type, key, parentId',
       edges: '&id, from, to, predicate',
