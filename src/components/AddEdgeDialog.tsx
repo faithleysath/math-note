@@ -178,9 +178,6 @@ const AddEdgeDialog = ({ sourceNode, isOpen, onClose }: AddEdgeDialogProps) => {
                       </Select>
                     </div>
                   </div>
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    录入的关系一律标记为「未审核」，审核状态请到右侧关系列表查看。
-                  </p>
                 </>
               )}
             </div>

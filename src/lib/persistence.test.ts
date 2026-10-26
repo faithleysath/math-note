@@ -21,7 +21,6 @@ const edges: Edge[] = [
     to: 't2',
     predicate: 'implies',
     contextId: 'ctx',
-    assumptionIds: ['ctx'],
     assertedBy: 'manual',
     createdAt: 0,
     updatedAt: 0,
@@ -82,7 +81,6 @@ describe('AI 批次提交到数据库', () => {
     const step = reloaded.steps.find((item) => item.id === 's1');
 
     expect(edge?.contextId).toBeUndefined();
-    expect(edge?.assumptionIds).toBeUndefined();
     expect(step?.contextId).toBeUndefined();
     // 证明还在，所以 proofId 保留
     expect(step?.proofId).toBe('pf');
@@ -114,7 +112,7 @@ describe('AI 批次提交到数据库', () => {
       .filter((edge) => !edgeIds.includes(edge.id))
       .map((edge) =>
         edge.contextId === 'ctx'
-          ? { ...edge, contextId: undefined, assumptionIds: undefined, updatedAt: 1 }
+          ? { ...edge, contextId: undefined, updatedAt: 1 }
           : edge,
       );
 

@@ -15,7 +15,6 @@ import {
   type Node,
   type NodeType,
   type Predicate,
-  type ReviewState,
 } from './schema';
 
 // =============================================================================
@@ -94,9 +93,7 @@ export interface NewEdgeInput {
   condition?: string;
   note?: string;
   status?: Edge['status'];
-  reviewState?: ReviewState;
   contextId?: string;
-  assumptionIds?: string[];
   assertedBy?: Edge['assertedBy'];
   model?: string;
 }
@@ -286,23 +283,19 @@ function normalizeCondition(condition?: string): string {
  * 只有谓词、端点、语境、前提全都相同才算重复；
  * 相同端点但前提不同是两条不同的数学断言，必须都保留。
  */
-type RelationKeyFields = Pick<Edge, 'predicate' | 'from' | 'to' | 'contextId' | 'condition'> & {
-  assumptionIds?: string[];
-};
+type RelationKeyFields = Pick<Edge, 'predicate' | 'from' | 'to' | 'contextId' | 'condition'>;
 
-/** 去重键：谓词 + 端点（对称谓词无序）+ 语境 + 规范化条件 + 前提集合 */
+/** 去重键：谓词 + 端点（对称谓词无序）+ 语境 + 规范化条件 */
 export function relationKey(edge: RelationKeyFields): string {
   const spec = PREDICATE_SPECS[edge.predicate];
   const endpoints = spec.symmetric
     ? [edge.from, edge.to].sort().join('|')
     : `${edge.from}|${edge.to}`;
-  const assumptions = [...(edge.assumptionIds ?? [])].sort().join(',');
   return [
     edge.predicate,
     endpoints,
     edge.contextId ?? '',
     normalizeCondition(edge.condition),
-    assumptions,
   ].join('::');
 }
 
@@ -357,12 +350,6 @@ export function validateNewEdge(index: GraphIndex, input: NewEdgeInput): EdgeChe
       throw errorOf('contextId', 'invalid-context', '语境必须指向一个「语境」节点（note, kind=context）。', {
         field: 'contextId',
       });
-    }
-  }
-
-  for (const assumptionId of input.assumptionIds ?? []) {
-    if (!index.nodes.has(assumptionId)) {
-      throw errorOf('assumptionIds', 'missing-assumption', `前提节点 ${assumptionId} 不存在。`);
     }
   }
 
@@ -463,7 +450,6 @@ export interface NewStepInput {
   contextId?: string;
   proofId?: string;
   status?: EdgeStatus;
-  reviewState?: ReviewState;
   note?: string;
   assertedBy?: InferenceStep['assertedBy'];
 }
@@ -761,18 +747,6 @@ export function validateGraphInvariants(graph: {
         edgeId: edge.id,
         field: 'contextId',
       });
-    }
-
-    for (const assumptionId of edge.assumptionIds ?? []) {
-      if (!nodes.has(assumptionId)) {
-        issues.push({
-          severity: 'error',
-          code: 'missing-assumption',
-          message: `关系 ${edge.id} 引用了不存在的前提 ${assumptionId}。`,
-          edgeId: edge.id,
-          field: 'assumptionIds',
-        });
-      }
     }
 
     if (spec.symmetric) {

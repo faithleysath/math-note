@@ -6,7 +6,6 @@ import {
   type Node,
   type NodeType,
   type Predicate,
-  type ReviewState,
 } from './schema';
 import { PREDICATE_SPECS, isLogicalPredicate } from './predicates';
 
@@ -398,44 +397,29 @@ export function findPath(
 // 图查询：数学推理
 // =============================================================================
 // 只有 qualifies 的边才能参与推理：disproven 永不参与，conjecture 默认不参与，
-// reviewed-only 模式下未审核的边不参与，指定语境时语境不同的边不参与。
-// 路径上任何未满足的前提 / 未知语境 / 未审核都会让结论变成「有条件的候选」。
-
-export type QueryMode = 'navigation' | 'reviewed-only';
+// 指定语境时语境不同的边不参与；路径上的文字条件会被带出来，不会被抹掉。
 
 export interface LogicalQueryOptions {
-  mode?: QueryMode;
   includeConjectures?: boolean;
-  /** 指定语境：只接受该语境的边；不指定表示语境未知，不能当作全局成立 */
+  /** 指定语境：只接受该语境的边；不指定表示不限定语境 */
   contextId?: string;
   maxDepth?: number;
   maxPaths?: number;
 }
 
+/**
+ * 一条「可推导的候选关联」。
+ * 只描述图上怎么走到这里、路上有哪些文字条件，不代表数学上已证明。
+ */
 export interface DerivedRelation {
   from: string;
   to: string;
   predicate: 'implies' | 'iff';
   /** 源边 id 的路径，便于解释 */
   edgePath: string[];
-  /** 路径上累积的结构化前提 */
-  requiredAssumptions: string[];
-  /** 自由文本前提：无法自动判定是否满足 */
+  /** 路径上累积的文字前提：必须原样展示，不能抹掉 */
   unresolvedConditions: string[];
   contextId?: string;
-  verification: ReviewState;
-  /** 只有无未决前提、语境明确且全部已审核时才为 true */
-  unconditional: boolean;
-}
-
-const REVIEW_ORDER: Record<ReviewState, number> = {
-  unreviewed: 0,
-  'human-reviewed': 1,
-  'formally-checked': 2,
-};
-
-export function edgeReviewState(edge: { reviewState?: ReviewState }): ReviewState {
-  return edge.reviewState ?? 'unreviewed';
 }
 
 export function edgeStatus(edge: { status?: EdgeStatus }): EdgeStatus {
@@ -446,18 +430,8 @@ export function passesLogicalFilter(edge: Edge, options: LogicalQueryOptions = {
   if (isLogicalPredicate(edge.predicate) === false) return false;
   if (edgeStatus(edge) === 'disproven') return false;
   if (edgeStatus(edge) === 'conjecture' && !options.includeConjectures) return false;
-  if (options.mode === 'reviewed-only' && edgeReviewState(edge) === 'unreviewed') return false;
   if (options.contextId !== undefined && edge.contextId !== options.contextId) return false;
   return true;
-}
-
-function weakestReview(edges: Edge[]): ReviewState {
-  let weakest: ReviewState = 'formally-checked';
-  for (const edge of edges) {
-    const state = edgeReviewState(edge);
-    if (REVIEW_ORDER[state] < REVIEW_ORDER[weakest]) weakest = state;
-  }
-  return weakest;
 }
 
 function buildDerivedRelation(
@@ -471,17 +445,14 @@ function buildDerivedRelation(
     .filter((edge): edge is Edge => Boolean(edge));
 
   const conditions: string[] = [];
-  const assumptions = new Set<string>();
   const contexts = new Set<string | undefined>();
   for (const edge of edges) {
     if (edge.condition && edge.condition.trim()) conditions.push(edge.condition.trim());
-    for (const assumptionId of edge.assumptionIds ?? []) assumptions.add(assumptionId);
     contexts.add(edge.contextId);
   }
 
   const singleContext = contexts.size === 1 ? [...contexts][0] : undefined;
   const contextId = singleContext && singleContext.length > 0 ? singleContext : undefined;
-  const allAsserted = edges.every((edge) => edgeStatus(edge) === 'asserted');
   const allPredicate = edges.every((edge) => edge.predicate === 'iff');
 
   return {
@@ -489,16 +460,8 @@ function buildDerivedRelation(
     to: toId,
     predicate: allPredicate ? 'iff' : 'implies',
     edgePath: edgeIds,
-    requiredAssumptions: [...assumptions],
-    unresolvedConditions: conditions,
+    unresolvedConditions: [...new Set(conditions)],
     contextId,
-    verification: weakestReview(edges),
-    unconditional:
-      conditions.length === 0 &&
-      assumptions.size === 0 &&
-      contextId !== undefined &&
-      allAsserted &&
-      edges.every((edge) => edgeReviewState(edge) !== 'unreviewed'),
   };
 }
 
@@ -593,16 +556,11 @@ export type DerivationVia =
 export interface DerivationTrace {
   nodeId: string;
   via: DerivationVia;
-  /** 这条推导路径上累积的未决前提 */
+  /** 这条推导路径上累积的文字前提，必须原样展示 */
   unresolvedConditions: string[];
-  requiredAssumptions: string[];
   /** 所有环节提出的语境；混合或缺失时为 undefined */
   contexts: (string | undefined)[];
   contextId?: string;
-  verification: ReviewState;
-  /** 所有环节都是 asserted（没有猜想/已推翻） */
-  asserted: boolean;
-  unconditional: boolean;
   depth: number;
 }
 
@@ -615,36 +573,15 @@ function sharedContext(contexts: (string | undefined)[]): string | undefined {
   return unique.size === 1 ? [...unique][0] : undefined;
 }
 
-function weakestOf(states: ReviewState[]): ReviewState {
-  let weakest: ReviewState = 'formally-checked';
-  for (const state of states) {
-    if (REVIEW_ORDER[state] < REVIEW_ORDER[weakest]) weakest = state;
-  }
-  return weakest;
-}
-
 export function passesStepFilter(step: InferenceStep, options: LogicalQueryOptions = {}): boolean {
   if (edgeStatus(step) === 'disproven') return false;
   if (edgeStatus(step) === 'conjecture' && !options.includeConjectures) return false;
-  if (options.mode === 'reviewed-only' && edgeReviewState(step) === 'unreviewed') return false;
   if (options.contextId !== undefined && step.contextId !== options.contextId) return false;
   return true;
 }
 
-function finalizeTrace(
-  base: Omit<DerivationTrace, 'contextId' | 'unconditional'>,
-): DerivationTrace {
-  const contextId = sharedContext(base.contexts);
-  return {
-    ...base,
-    contextId,
-    unconditional:
-      base.unresolvedConditions.length === 0 &&
-      base.requiredAssumptions.length === 0 &&
-      contextId !== undefined &&
-      base.asserted &&
-      base.verification !== 'unreviewed',
-  };
+function finalizeTrace(base: Omit<DerivationTrace, 'contextId'>): DerivationTrace {
+  return { ...base, contextId: sharedContext(base.contexts) };
 }
 
 function sourceTrace(nodeId: string): DerivationTrace {
@@ -652,10 +589,7 @@ function sourceTrace(nodeId: string): DerivationTrace {
     nodeId,
     via: { type: 'source' },
     unresolvedConditions: [],
-    requiredAssumptions: [],
     contexts: [],
-    verification: 'formally-checked',
-    asserted: true,
     depth: 0,
   });
 }
@@ -663,51 +597,41 @@ function sourceTrace(nodeId: string): DerivationTrace {
 function extendByEdge(trace: DerivationTrace, edge: Edge, nextId: string): DerivationTrace {
   const conditions = [...trace.unresolvedConditions];
   if (edge.condition?.trim()) conditions.push(edge.condition.trim());
-  const assumptions = new Set(trace.requiredAssumptions);
-  for (const assumptionId of edge.assumptionIds ?? []) assumptions.add(assumptionId);
 
   return finalizeTrace({
     nodeId: nextId,
     via: { type: 'edges', from: trace.nodeId, edgeIds: [edge.id] },
     unresolvedConditions: conditions,
-    requiredAssumptions: [...assumptions],
     contexts: [...trace.contexts, edge.contextId],
-    verification: weakestOf([trace.verification, edgeReviewState(edge)]),
-    asserted: trace.asserted && edgeStatus(edge) === 'asserted',
     depth: trace.depth + 1,
   });
 }
 
 function extendByStep(step: InferenceStep, premises: DerivationTrace[]): DerivationTrace {
   const conditions = premises.flatMap((premise) => premise.unresolvedConditions);
-  const assumptions = new Set(premises.flatMap((premise) => premise.requiredAssumptions));
 
   return finalizeTrace({
     nodeId: step.conclusionId,
     via: { type: 'step', stepId: step.id, rule: step.rule, premises },
     unresolvedConditions: [...new Set(conditions)],
-    requiredAssumptions: [...assumptions],
     contexts: [...premises.flatMap((premise) => premise.contexts), step.contextId],
-    verification: weakestOf([
-      ...premises.map((premise) => premise.verification),
-      edgeReviewState(step),
-    ]),
-    asserted: premises.every((premise) => premise.asserted) && edgeStatus(step) === 'asserted',
     depth: Math.max(...premises.map((premise) => premise.depth), 0) + 1,
   });
 }
 
-/** 无条件优先；同等条件下审核级别高的优先 */
+/** 未决条件少的优先，其次路径短的优先；不比较真假或审核级别 */
 function isBetterTrace(candidate: DerivationTrace, existing: DerivationTrace): boolean {
-  if (candidate.unconditional !== existing.unconditional) return candidate.unconditional;
-  return REVIEW_ORDER[candidate.verification] > REVIEW_ORDER[existing.verification];
+  const candidateConditions = new Set(candidate.unresolvedConditions).size;
+  const existingConditions = new Set(existing.unresolvedConditions).size;
+  if (candidateConditions !== existingConditions) return candidateConditions < existingConditions;
+  return candidate.depth < existing.depth;
 }
 
 /**
  * 从起点出发能推出的所有结论（含推理步骤的多前提推导）。
  *
  * 前向链式：先跑蕴含/等价边，再看哪些步骤的所有前提都已成立。
- * 每一步都带着整条推导链的前提、语境与最弱审核级别。
+ * 输出只是「可推导的候选关联」，每一步都带着路径上的文字条件与语境。
  */
 export function deriveWithSteps(
   index: GraphIndex,
@@ -760,7 +684,9 @@ export function deriveWithSteps(
 
   known.delete(startId);
   return [...known.values()].sort(
-    (a, b) => Number(b.unconditional) - Number(a.unconditional) || a.depth - b.depth,
+    (a, b) =>
+      new Set(a.unresolvedConditions).size - new Set(b.unresolvedConditions).size ||
+      a.depth - b.depth,
   );
 }
 
@@ -893,20 +819,12 @@ export function equivalenceClasses(
     if (!passesLogicalFilter(edge, options)) continue;
 
     const conditions = normalizeConditionText(edge.condition);
-    const assumptions = [...(edge.assumptionIds ?? [])].sort();
-    // 未审核的等价边只能是候选：没人确认过，不能当成已确认等价
-    const conditional =
-      conditions.length > 0 ||
-      assumptions.length > 0 ||
-      edge.contextId === undefined ||
-      edgeReviewState(edge) === 'unreviewed';
+    // 带文字前提或语境未说明的，只能算候选分组，不能当成同语境等价
+    const conditional = conditions.length > 0 || edge.contextId === undefined;
 
     if (conditional && !options.includeConditional) continue;
 
-    const conditionList = [
-      ...(conditions ? [conditions] : []),
-      ...assumptions.map((id) => `assumption:${id}`),
-    ];
+    const conditionList = conditions ? [conditions] : [];
     const bucket = bucketOf(edge.contextId, conditionList, conditional);
     const parent = bucket.parent;
     if (!parent.has(edge.from)) parent.set(edge.from, edge.from);

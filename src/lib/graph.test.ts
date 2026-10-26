@@ -184,26 +184,24 @@ describe('数学推理', () => {
     node('ctx', 'context', null, 4096, { title: '实数域' }),
   ];
 
-  it('带前提的路径不能变成无条件结论', () => {
+  it('路径上的文字条件不会被丢掉', () => {
     const index = buildIndex(nodes, [
       edge('a', 'b', 'implies', { condition: 'x>0' }),
       edge('b', 'c', 'implies'),
     ]);
     const derived = findImplicationPaths(index, 'a', 'c');
     expect(derived.length).toBeGreaterThan(0);
-    expect(derived[0].unconditional).toBe(false);
     expect(derived[0].unresolvedConditions).toEqual(['x>0']);
   });
 
-  it('语境明确、无前提、已审核才算无条件', () => {
+  it('语境一致时路径共享同一个语境', () => {
     const index = buildIndex(nodes, [
-      edge('a', 'b', 'implies', { contextId: 'ctx', reviewState: 'human-reviewed' }),
-      edge('b', 'c', 'implies', { contextId: 'ctx', reviewState: 'human-reviewed' }),
+      edge('a', 'b', 'implies', { contextId: 'ctx' }),
+      edge('b', 'c', 'implies', { contextId: 'ctx' }),
     ]);
     const derived = findImplicationPaths(index, 'a', 'c');
-    expect(derived[0].unconditional).toBe(true);
     expect(derived[0].contextId).toBe('ctx');
-    expect(derived[0].verification).toBe('human-reviewed');
+    expect(derived[0].unresolvedConditions).toEqual([]);
   });
 
   it('语境不同时不能合并', () => {
@@ -213,7 +211,6 @@ describe('数学推理', () => {
     ]);
     const derived = findImplicationPaths(index, 'a', 'c');
     expect(derived[0].contextId).toBeUndefined();
-    expect(derived[0].unconditional).toBe(false);
   });
 
   it('已推翻的边不参与推理', () => {
@@ -230,12 +227,12 @@ describe('数学推理', () => {
     expect(inferLogicalRelations(index, 'a', { includeConjectures: true })).toHaveLength(1);
   });
 
-  it('reviewed-only 过滤掉未审核的边', () => {
+  it('语境筛选：指定语境时只走同语境的边', () => {
     const index = buildIndex(nodes, [
-      edge('a', 'b', 'implies', { reviewState: 'human-reviewed' }),
-      edge('b', 'c', 'implies', { reviewState: 'unreviewed' }),
+      edge('a', 'b', 'implies', { contextId: 'ctx' }),
+      edge('b', 'c', 'implies', { contextId: 'other' }),
     ]);
-    expect(inferLogicalRelations(index, 'a', { mode: 'reviewed-only' }).map((r) => r.to)).toEqual(['b']);
+    expect(inferLogicalRelations(index, 'a', { contextId: 'ctx' }).map((r) => r.to)).toEqual(['b']);
     expect(inferLogicalRelations(index, 'a').map((r) => r.to)).toContain('c');
   });
 
@@ -260,9 +257,9 @@ describe('等价类', () => {
 
   it('同语境下的三方等价合成一类', () => {
     const index = buildIndex(nodes, [
-      edge('a', 'b', 'iff', { contextId: 'ctx1', reviewState: 'human-reviewed' }),
-      edge('b', 'c', 'iff', { contextId: 'ctx1', reviewState: 'human-reviewed' }),
-      edge('c', 'a', 'iff', { contextId: 'ctx1', reviewState: 'human-reviewed' }),
+      edge('a', 'b', 'iff', { contextId: 'ctx1' }),
+      edge('b', 'c', 'iff', { contextId: 'ctx1' }),
+      edge('c', 'a', 'iff', { contextId: 'ctx1' }),
     ]);
     const classes = equivalenceClasses(index);
     expect(classes).toHaveLength(1);
@@ -271,8 +268,8 @@ describe('等价类', () => {
 
   it('不同语境的等价关系不并在一起', () => {
     const index = buildIndex(nodes, [
-      edge('a', 'b', 'iff', { contextId: 'ctx1', reviewState: 'human-reviewed' }),
-      edge('b', 'c', 'iff', { contextId: 'ctx2', reviewState: 'human-reviewed' }),
+      edge('a', 'b', 'iff', { contextId: 'ctx1' }),
+      edge('b', 'c', 'iff', { contextId: 'ctx2' }),
     ]);
     const classes = equivalenceClasses(index);
     expect(classes).toHaveLength(2);
@@ -297,8 +294,8 @@ describe('等价类', () => {
   it('前提不同的等价关系不能被并成一个无条件等价类', () => {
     // A: x=1, B: x^2=1, C: x=-1；A⇔B 在 x>0 下，B⇔C 在 x<0 下
     const index = buildIndex(nodes, [
-      edge('a', 'b', 'iff', { contextId: 'ctx1', condition: 'x>0', reviewState: 'human-reviewed' }),
-      edge('b', 'c', 'iff', { contextId: 'ctx1', condition: 'x<0', reviewState: 'human-reviewed' }),
+      edge('a', 'b', 'iff', { contextId: 'ctx1', condition: 'x>0' }),
+      edge('b', 'c', 'iff', { contextId: 'ctx1', condition: 'x<0' }),
     ]);
     expect(equivalenceClasses(index)).toHaveLength(0);
 
@@ -308,17 +305,17 @@ describe('等价类', () => {
     expect(candidates.map((item) => item.conditions.join()).sort()).toEqual(['x<0', 'x>0']);
   });
 
-  it('无前提、语境明确且已审核的等价关系才是已确认的', () => {
+  it('无前提且语境明确的等价关系进入同语境分组', () => {
     const index = buildIndex(nodes, [
-      edge('a', 'b', 'iff', { contextId: 'ctx1', reviewState: 'human-reviewed' }),
+      edge('a', 'b', 'iff', { contextId: 'ctx1' }),
     ]);
     const classes = equivalenceClasses(index);
     expect(classes).toHaveLength(1);
     expect(classes[0]).toMatchObject({ contextId: 'ctx1', conditional: false });
   });
 
-  it('未审核的等价关系只能算候选', () => {
-    const index = buildIndex(nodes, [edge('a', 'b', 'iff', { contextId: 'ctx1' })]);
+  it('语境未说明的等价关系只算候选分组', () => {
+    const index = buildIndex(nodes, [edge('a', 'b', 'iff')]);
     expect(equivalenceClasses(index)).toHaveLength(0);
 
     const candidates = equivalenceClasses(index, 'iff', { includeConditional: true });

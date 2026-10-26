@@ -217,22 +217,12 @@ export function simulateOperations(
               steps.splice(i, 1);
             }
           }
-          // 清掉指向被删节点的语境 / 前提 / 所属证明，避免悬空引用
+          // 清掉指向被删节点的语境 / 所属证明，避免悬空引用
           for (let i = 0; i < edges.length; i += 1) {
             const edge = edges[i];
-            let next = edge;
             if (edge.contextId && idSet.has(edge.contextId)) {
-              next = { ...next, contextId: undefined, updatedAt: now };
+              edges[i] = { ...edge, contextId: undefined, updatedAt: now };
             }
-            if (edge.assumptionIds?.some((id) => idSet.has(id))) {
-              const remaining = next.assumptionIds?.filter((id) => !idSet.has(id));
-              next = {
-                ...next,
-                assumptionIds: remaining && remaining.length > 0 ? remaining : undefined,
-                updatedAt: now,
-              };
-            }
-            if (next !== edge) edges[i] = next;
           }
           for (let i = 0; i < steps.length; i += 1) {
             const step = steps[i];
@@ -259,7 +249,6 @@ export function simulateOperations(
             predicate: op.predicate,
             condition: op.condition,
             contextId: op.contextId,
-            assumptionIds: op.assumptionIds,
           });
           edges.push({
             id: newId(),
@@ -269,10 +258,7 @@ export function simulateOperations(
             condition: op.condition || undefined,
             note: op.note || undefined,
             status: 'asserted',
-            // AI 产出的数学关系一律未审核，提示词不能充当验证
-            reviewState: 'unreviewed',
             contextId: op.contextId,
-            assumptionIds: op.assumptionIds,
             assertedBy: 'ai',
             createdAt: now,
             updatedAt: now,
@@ -306,7 +292,6 @@ export function simulateOperations(
             contextId: op.contextId,
             proofId: op.proofId,
             status: 'asserted',
-            reviewState: 'unreviewed',
             assertedBy: 'ai',
             createdAt: now,
             updatedAt: now,

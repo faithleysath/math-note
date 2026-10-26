@@ -69,23 +69,20 @@ describe('推理步骤（超边）', () => {
     );
     const derived = deriveWithSteps(index, 's');
     const target = derived.find((item) => item.nodeId === 'c');
-    expect(target?.unconditional).toBe(false);
     expect(target?.unresolvedConditions).toEqual(['n 为自然数']);
   });
 
-  it('语境一致且全部已审核才算无条件', () => {
+  it('语境一致时整条推导共享同一个语境', () => {
     const index = buildIndex(
       nodes,
       [
-        edge('s', 'a', 'implies', { contextId: 'ctx', reviewState: 'human-reviewed' }),
-        edge('s', 'b', 'implies', { contextId: 'ctx', reviewState: 'human-reviewed' }),
+        edge('s', 'a', 'implies', { contextId: 'ctx' }),
+        edge('s', 'b', 'implies', { contextId: 'ctx' }),
       ],
-      [step({ contextId: 'ctx', reviewState: 'human-reviewed' })],
+      [step({ contextId: 'ctx' })],
     );
     const target = deriveWithSteps(index, 's').find((item) => item.nodeId === 'c');
-    expect(target?.unconditional).toBe(true);
     expect(target?.contextId).toBe('ctx');
-    expect(target?.verification).toBe('human-reviewed');
   });
 
   it('语境不一致就不能当成无条件', () => {
@@ -99,20 +96,18 @@ describe('推理步骤（超边）', () => {
     );
     const target = deriveWithSteps(index, 's').find((item) => item.nodeId === 'c');
     expect(target?.contextId).toBeUndefined();
-    expect(target?.unconditional).toBe(false);
   });
 
-  it('reviewed-only 会跳过未审核的推理步骤', () => {
+  it('已推翻的推理步骤不参与推导（重复校验）', () => {
     const index = buildIndex(
       nodes,
-      [
-        edge('s', 'a', 'implies', { reviewState: 'human-reviewed' }),
-        edge('s', 'b', 'implies', { reviewState: 'human-reviewed' }),
-      ],
-      [step()],
+      [edge('s', 'a', 'implies'), edge('s', 'b', 'implies')],
+      [step({ status: 'conjecture' })],
     );
-    expect(deriveWithSteps(index, 's', { mode: 'reviewed-only' }).map((item) => item.nodeId)).not.toContain('c');
-    expect(deriveWithSteps(index, 's').map((item) => item.nodeId)).toContain('c');
+    expect(deriveWithSteps(index, 's').map((item) => item.nodeId)).not.toContain('c');
+    expect(
+      deriveWithSteps(index, 's', { includeConjectures: true }).map((item) => item.nodeId),
+    ).toContain('c');
   });
 
   it('已推翻的推理步骤不参与推导', () => {

@@ -4,6 +4,7 @@ import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import { toast } from 'sonner';
 import { KIND_LABELS, KIND_OPTIONS, type Node } from '../../lib/schema';
+import { mergeCitation } from '../../lib/citation';
 import { useGraphStore } from '../../stores/useGraphStore';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -80,8 +81,8 @@ const NodeEditor = ({ node }: NodeEditorProps) => {
         tags: tagsArray,
         aliases: aliasesArray,
         key: key.trim() || null,
-        // null 表示「清空」，undefined 表示「不修改」
-        citation: source.trim() ? { source: source.trim() } : null,
+        // 只改来源名称，保留 page / originalNumber；全空时清掉 citation
+        citation: mergeCitation(node.citation, source),
         kind: kind || undefined,
         attempt:
           node.type === 'attempt'

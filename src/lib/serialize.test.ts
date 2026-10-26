@@ -50,9 +50,28 @@ describe('导入导出', () => {
     expect(parsed.steps).toEqual([]);
   });
 
-  it('拒绝非 v5 的备份', () => {
-    const v4 = { ...toJson(serializeGraph(nodes, [])), schemaVersion: 4 };
-    expect(() => parseGraph(v4)).toThrowError(/数据结构不对/);
+  it('只接受 v6，v5 及更早的备份直接拒绝', () => {
+    for (const version of [2, 3, 4, 5]) {
+      const older = { ...toJson(serializeGraph(nodes, [])), schemaVersion: version };
+      expect(() => parseGraph(older)).toThrowError(/数据结构不对/);
+    }
+  });
+
+  it('不同知识库可以各自使用同一个 key', () => {
+    // 一教材一图谱：key 只在当前图谱内唯一
+    const build = () =>
+      serializeGraph(
+        [
+          node('b', 'branch', null, 1024),
+          node('ch', 'chapter', 'b', 1024),
+          node('d', 'definition', 'ch', 1024, { key: 'pythagorean-theorem', title: '勾股定理' }),
+        ],
+        [],
+      );
+    const graphA = build();
+    const graphB = build();
+    expect(() => parseGraph(toJson(graphA))).not.toThrow();
+    expect(() => parseGraph(toJson(graphB))).not.toThrow();
   });
 
   it('推理步骤引用不存在的节点会被拒绝', () => {

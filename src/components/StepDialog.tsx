@@ -207,9 +207,6 @@ const StepDialog = ({ isOpen, onClose, defaultConclusionId, defaultPremiseIds }:
             </div>
           </div>
 
-          <p className="text-xs text-muted-foreground">
-            新建的推理步骤一律标记为「未审核」，可以在右侧列表里切换状态。
-          </p>
         </div>
 
         <DialogFooter>

@@ -115,7 +115,7 @@ export function isKnownKind(type: NodeType, kind?: string): boolean {
   return KIND_OPTIONS[type].includes(kind);
 }
 
-/** 是否是「语境」节点：v5 用 note(kind='context') 承担 */
+/** 是否是「语境」节点：用 note(kind='context') 承担 */
 export function isContextNode(node: { type: NodeType; kind?: string }): boolean {
   return node.type === 'note' && node.kind === 'context';
 }
@@ -222,19 +222,8 @@ export interface Node {
 /** 渲染用的节点：附带算好的教科书编号 */
 export type ProcessedNode = Node & { displayNumber: string; isChapter: boolean };
 
+/** 关系被主张的状态；不涉及录入质量或形式化验证 */
 export type EdgeStatus = 'asserted' | 'conjecture' | 'disproven';
-
-/**
- * 审核级别。人工读过不能冒充机器验证：
- * formally-checked 只能由真正的形式化检查器写入。
- */
-export type ReviewState = 'unreviewed' | 'human-reviewed' | 'formally-checked';
-
-export const REVIEW_STATE_LABEL: Record<ReviewState, string> = {
-  unreviewed: '未审核',
-  'human-reviewed': '人工审核',
-  'formally-checked': '形式化验证',
-};
 
 /**
  * 边永远是 from 作为主语、to 作为宾语。
@@ -249,12 +238,8 @@ export interface Edge {
   condition?: string;
   note?: string;
   status?: EdgeStatus;
-  /** 审核状态，缺省视为 unreviewed */
-  reviewState?: ReviewState;
-  /** 语境：必须指向 note(kind='context')；缺省表示「语境未知」，不当作全局成立 */
+  /** 语境：必须指向 note(kind='context')；缺省表示未说明语境 */
   contextId?: string;
-  /** 结构化前提（节点 id 列表） */
-  assumptionIds?: string[];
   assertedBy: 'manual' | 'ai' | 'import';
   model?: string;
   createdAt: number;
@@ -278,7 +263,6 @@ export interface InferenceStep {
   /** 这条推导属于哪个证明节点 */
   proofId?: string;
   status?: EdgeStatus;
-  reviewState?: ReviewState;
   note?: string;
   assertedBy: 'manual' | 'ai' | 'import';
   createdAt: number;
@@ -286,7 +270,7 @@ export interface InferenceStep {
 }
 
 export interface GraphJSON {
-  schemaVersion: 5;
+  schemaVersion: 6;
   exportedAt: number;
   nodes: Node[];
   edges: Edge[];
@@ -336,9 +320,7 @@ export const edgeSchema = z.object({
   condition: z.string().optional(),
   note: z.string().optional(),
   status: z.enum(['asserted', 'conjecture', 'disproven']).optional(),
-  reviewState: z.enum(['unreviewed', 'human-reviewed', 'formally-checked']).optional(),
   contextId: z.string().optional(),
-  assumptionIds: z.array(z.string()).optional(),
   assertedBy: z.enum(['manual', 'ai', 'import']),
   model: z.string().optional(),
   createdAt: z.number(),
@@ -353,7 +335,6 @@ export const stepSchema = z.object({
   contextId: z.string().optional(),
   proofId: z.string().optional(),
   status: z.enum(['asserted', 'conjecture', 'disproven']).optional(),
-  reviewState: z.enum(['unreviewed', 'human-reviewed', 'formally-checked']).optional(),
   note: z.string().optional(),
   assertedBy: z.enum(['manual', 'ai', 'import']),
   createdAt: z.number(),
@@ -361,7 +342,7 @@ export const stepSchema = z.object({
 });
 
 export const graphJSONSchema = z.object({
-  schemaVersion: z.literal(5),
+  schemaVersion: z.literal(6),
   exportedAt: z.number(),
   nodes: z.array(nodeSchema),
   edges: z.array(edgeSchema),
@@ -410,7 +391,6 @@ export const aiOperationSchema = z.discriminatedUnion('op', [
     condition: z.string().optional(),
     note: z.string().optional(),
     contextId: z.string().optional(),
-    assumptionIds: z.array(z.string()).optional(),
   }),
   z.object({
     op: z.literal('delete-edge'),

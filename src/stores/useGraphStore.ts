@@ -67,14 +67,14 @@ export interface GraphState {
   createEdge: (input: NewEdgeInput) => Promise<Edge>;
   updateEdge: (
     id: string,
-    patch: Partial<Pick<Edge, 'condition' | 'note' | 'status' | 'reviewState' | 'contextId' | 'assumptionIds'>>,
+    patch: Partial<Pick<Edge, 'condition' | 'note' | 'status' | 'contextId'>>,
   ) => Promise<void>;
   deleteEdge: (id: string) => Promise<void>;
 
   createStep: (input: NewStepInput) => Promise<InferenceStep>;
   updateStep: (
     id: string,
-    patch: Partial<Pick<InferenceStep, 'rule' | 'note' | 'status' | 'reviewState' | 'contextId' | 'proofId'>>,
+    patch: Partial<Pick<InferenceStep, 'rule' | 'note' | 'status' | 'contextId' | 'proofId'>>,
   ) => Promise<void>;
   deleteStep: (id: string) => Promise<void>;
 
@@ -303,14 +303,6 @@ export const useGraphStore = create<GraphState>()((set, get) => {
         if (edge.contextId && idSet.has(edge.contextId)) {
           next = { ...next, contextId: undefined, updatedAt: now };
         }
-        if (edge.assumptionIds?.some((id) => idSet.has(id))) {
-          const remaining = next.assumptionIds?.filter((id) => !idSet.has(id));
-          next = {
-            ...next,
-            assumptionIds: remaining && remaining.length > 0 ? remaining : undefined,
-            updatedAt: now,
-          };
-        }
         if (next !== edge) changedEdges.push(next);
         return next;
       });
@@ -416,10 +408,7 @@ export const useGraphStore = create<GraphState>()((set, get) => {
         condition: input.condition || undefined,
         note: input.note || undefined,
         status: input.status ?? 'asserted',
-        // 人工录入也只是「未审核」，不能自动升级成已检查
-        reviewState: input.reviewState ?? 'unreviewed',
         contextId: input.contextId || undefined,
-        assumptionIds: input.assumptionIds?.length ? input.assumptionIds : undefined,
         assertedBy: input.assertedBy ?? 'manual',
         model: input.model,
         createdAt: now,
@@ -483,7 +472,6 @@ export const useGraphStore = create<GraphState>()((set, get) => {
         contextId: input.contextId || undefined,
         proofId: input.proofId || undefined,
         status: input.status ?? 'asserted',
-        reviewState: input.reviewState ?? 'unreviewed',
         note: input.note || undefined,
         assertedBy: input.assertedBy ?? 'manual',
         createdAt: now,

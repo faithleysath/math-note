@@ -4,7 +4,7 @@ import type { RelatedNodeInfo } from '../hooks/useRelatedNodes';
 import { Link, X } from 'lucide-react';
 import { Button } from './ui/button';
 import { toast } from 'sonner';
-import { REVIEW_STATE_LABEL, type Edge, type ReviewState } from '../lib/schema';
+import type { Edge } from '../lib/schema';
 
 const RelationGroup = ({ title, relations, viewerId }: { title: string; relations: RelatedNodeInfo[]; viewerId: string }) => {
   const select = useGraphStore(state => state.select);
@@ -23,15 +23,12 @@ const RelationGroup = ({ title, relations, viewerId }: { title: string; relation
     disproven: '已推翻',
   };
 
-  /** 关系自身的事实：前提、状态、审核级别、语境。缺省值不显示，避免噪音 */
+  /** 关系自身的事实：前提、状态、语境。缺省值不显示，避免噪音 */
   const metaOf = (edge: Edge) => {
     const parts: string[] = [];
     if (edge.condition) parts.push(`前提：${edge.condition}`);
     if (edge.status === 'conjecture') parts.push('猜想');
     if (edge.status === 'disproven') parts.push('已推翻');
-    if (edge.reviewState && edge.reviewState !== 'unreviewed') {
-      parts.push(REVIEW_STATE_LABEL[edge.reviewState as ReviewState]);
-    }
     if (edge.contextId) {
       const context = index.nodes.get(edge.contextId);
       parts.push(`语境：${context?.title ?? edge.contextId}`);
@@ -84,22 +81,6 @@ const RelationGroup = ({ title, relations, viewerId }: { title: string; relation
                 }
               >
                 {STATUS_TEXT[edge.status ?? 'asserted']}
-              </button>
-              <button
-                className="mr-1 rounded px-1 text-[11px] text-muted-foreground hover:bg-muted"
-                title="点击切换审核：未审核 / 人工审核（机器验证只能由检查器写入）"
-                onClick={() =>
-                  updateEdge(edge.id, {
-                    reviewState:
-                      edge.reviewState === 'human-reviewed' ? 'unreviewed' : 'human-reviewed',
-                  })
-                }
-              >
-                {edge.reviewState === 'human-reviewed'
-                  ? '已审'
-                  : edge.reviewState === 'formally-checked'
-                    ? '机检'
-                    : '未审'}
               </button>
               <Button
                 variant="ghost"

@@ -18,7 +18,7 @@ export class MathNoteDB extends Dexie {
 
   constructor() {
     // 只有一种数据格式（v5），这里不再维护历史版本或是迁移用的辅助表
-    super('math-note-graph-v5');
+    super('math-note-graph-v6');
     this.version(1).stores({
       nodes: '&id, type, key, parentId',
       edges: '&id, from, to, predicate',
@@ -75,7 +75,7 @@ export async function removeSteps(ids: string[]): Promise<void> {
 /** 级联删除：节点 + 它牵连的所有边，同一个事务里完成 */
 /**
  * 删除子树：删节点、删两端命中的边、删失效的推理步骤，
- * 并在**同一个事务**里写回被清理了引用（contextId / assumptionIds / proofId）的关系。
+ * 并在**同一个事务**里写回被清理了引用（contextId / proofId）的关系。
  *
  * 拆成两个事务的话，第一步提交后第二步失败就会留下悬空引用。
  */

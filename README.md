@@ -1,8 +1,15 @@
 # 数学笔记
 
-一个纯前端的数学知识图谱：按目录组织内容，用带语义的关系把定义、命题、证明、题目连成网，数据存在自己的浏览器里。
+把一本初中/高中数学教材转成一份独立知识图谱的纯前端编辑器：按目录组织内容，用带语义的关系把定义、命题、证明、题目连成网，数据存在自己的浏览器里。
 
 线上示例：<https://math-note-delta.vercel.app>
+
+## 一教材一知识库
+
+- 每本教材 = 一份独立的 JSON / 一套独立的节点、关系、推理步骤。不同教材之间没有共享节点、统一知识 ID 或自动去重。
+- `id` 和 `key` 只在**当前知识库内部**唯一；两本教材各有一个 `pythagorean-theorem` 完全合法。
+- 软件一个数据库只保存一个活动知识库，导入即整库替换；切换教材靠导入各自的 JSON。
+- 所有搜索、编号、校验、推理都只在当前活动知识库内进行。
 
 ## 模型：9 种节点 + 9 种关系 + 可选推理步骤
 
@@ -43,16 +50,15 @@
 
 每条关系还可以带：
 
-- `condition`：文本化前提（LaTeX），推理时只保留和展示，不做语义解析
+- `condition`：文本化前提（LaTeX），推理时原样展示，不做语义解析
 - `status`：确定 / 猜想 / 已推翻。`disproven` 永不参与推理，`conjecture` 默认不参与
-- `reviewState`：未审核 / 人工审核 / 形式化验证（后者只能由真正的检查器写入）
-- `contextId`：指向 `note(kind='context')`；缺省表示语境未知
-- `assumptionIds`：结构化前提
+- `contextId`：指向 `note(kind='context')`，可选；缺省表示未说明语境
+- `note`：给这条关系自己的备注
 
 选中一个定义或命题时，右侧会列出「考查此知识点的题目」（`covers` 反向查询）；选中一道题则列出「本题考查的知识点」。
 搜索框下方可以按类型 / 细分筛选，只选筛选器不输关键词时就是按类型浏览。
 
-去重键是「谓词 + 端点（`iff` 无序）+ 语境 + 规范化条件 + 前提集合」。端点相同但前提不同的两条边是两条断言，都会保留，不会互相删除。
+去重键是「谓词 + 端点（`iff` 无序）+ 语境 + 规范化条件」。端点相同但条件不同的两条边是两条断言，都会保留，不会互相删除。
 
 ### 推理步骤（超边）
 
@@ -69,7 +75,7 @@
 ```
 
 它不参与目录树、没有位置和编号。推理引擎是前向链式：先走 `implies`/`iff`，再看哪些步骤的所有前提都成立；
-每条结论都带「依据 + 未决前提 + 语境 + 最弱审核级别」。前提和结论都必须是 `proposition`。
+每条结果都带「依据 + 路径上的文字条件 + 语境」。前提和结论都必须是 `proposition`。
 
 ### 编号
 
@@ -81,29 +87,30 @@
 
 - **目录不是逻辑**：`parentId` 只决定内容排在哪里，不代表依赖或蕴含。
 - **引用不是依赖**：`cites` 只是提到，`depends-on` 是学习前置，`uses` 才是证明里真正用到。
-- **导航 vs 推理**：结构遍历只看存了哪些边；数学推理只走 `implies` / `iff` / 推理步骤，逐条检查状态、语境、前提与审核级别。
-  只要有一条未决前提、语境未知或未审核，就标成「有前提的候选」，不会说成无条件定理。
+- **导航 vs 推理**：结构遍历只看存了哪些边；「候选关联」只走 `implies` / `iff` / 推理步骤，并把路径上的 `condition`、`contextId`、`status` 一起显示出来。
+  这些结果只是**可解释的候选**，软件不会宣称某条结论「无条件成立」或「已证明」。
 - **证明不是验证**：`proof --proves--> proposition` 只表示存在一份声称证明的文档，不代表证明过程已被机器检查。
 
 ## 数据
 
-- 全部存在浏览器 IndexedDB（数据库 `math-note-graph-v5`），不联网、不登录。
-- 「导出」下载 v5 JSON，「导入」整份替换（二次确认，失败不改动原数据）。
+- 全部存在浏览器 IndexedDB（数据库 `math-note-graph-v6`），不联网、不登录。
+- 「导出」下载 v6 JSON，「导入」整份替换（二次确认，失败不改动原数据）。
 - 「分享」把快照传到 Vercel Blob，生成只读链接 `?note_url=…`。
 
 ### 导入格式
 
-只有 v5 一种格式。`schemaVersion` 不是 5、结构不对或全图校验不通过，导入会被整个拒绝，现有数据不会变。
+只有 v6 一种格式。`schemaVersion` 不是 6、结构不对或全图校验不通过，导入会被整个拒绝，现有数据不会变。
+旧版本（v5 及更早）不做迁移，直接拒绝；旧数据库也不会被读取。
 
 ### 给外部脚本的格式
 
-- `examples/v5.schema.json`：JSON Schema（由 `bun run gen:schema` 从 `src/lib/schema.ts` 生成）
-- `examples/v5-minimal.json`：最小样例
-- `examples/v5-gaokao-sample.json`：覆盖 9 种节点与 9 种关系的完整样例
+- `examples/v6.schema.json`：JSON Schema（由 `bun run gen:schema` 从 `src/lib/schema.ts` 生成）
+- `examples/v6-minimal.json`：最小样例
+- `examples/v6-gaokao-sample.json`：覆盖 9 种节点与 9 种关系的完整样例
 
 ```jsonc
 {
-  "schemaVersion": 5,
+  "schemaVersion": 6,
   "exportedAt": 0,
   "nodes": [],
   "edges": [],
@@ -134,10 +141,11 @@ src/lib/predicates.ts  谓词注册表（方向、传递性、类型白名单、
 src/lib/graph.ts       纯函数：索引、递归编号、遍历、推理、拓扑排序、搜索
 src/lib/validate.ts    全图不变式与单条校验
 src/lib/serialize.ts   导入校验、导出
+src/lib/citation.ts    来源字段合并（只改 source，保留 page / originalNumber）
 src/lib/db.ts          Dexie 持久化
 src/lib/draft.ts       AI 批量操作的草稿预演
 src/stores/useGraphStore.ts  内存图 + 写穿
-examples/              可直接导入的 v5 样例
+examples/              可直接导入的 v6 样例
 ```
 
 ## 性能（本机实测，`bun run bench`）

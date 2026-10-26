@@ -15,7 +15,7 @@ import {
   explainTrace,
   stepsForNode,
 } from '../../lib/graph';
-import { REVIEW_STATE_LABEL, typeLabel, type Node } from '../../lib/schema';
+import { typeLabel, type Node } from '../../lib/schema';
 import { useWindowSize } from '@/hooks/useWindowSize';
 
 const RightSidebar = () => {
@@ -27,7 +27,6 @@ const RightSidebar = () => {
   const isMobile = width <= 768;
   const [isAddEdgeOpen, setIsAddEdgeOpen] = useState(false);
   const [isStepOpen, setIsStepOpen] = useState(false);
-  const [reasonMode, setReasonMode] = useState<'navigation' | 'reviewed-only'>('navigation');
 
   const selectedNode = selectedId ? index.nodes.get(selectedId) : undefined;
 
@@ -35,8 +34,8 @@ const RightSidebar = () => {
 
   const derived = useMemo(() => {
     if (!selectedId) return [];
-    return deriveWithSteps(index, selectedId, { mode: reasonMode });
-  }, [index, selectedId, reasonMode]);
+    return deriveWithSteps(index, selectedId);
+  }, [index, selectedId]);
 
   const relatedSteps = useMemo(() => {
     if (!selectedId) return [];
@@ -241,7 +240,6 @@ const RightSidebar = () => {
                           {[
                             `规则：${step.rule}`,
                             step.status === 'conjecture' ? '猜想' : step.status === 'disproven' ? '已推翻' : '确定',
-                            REVIEW_STATE_LABEL[step.reviewState ?? 'unreviewed'],
                             step.contextId
                               ? `语境：${index.nodes.get(step.contextId)?.title ?? step.contextId}`
                               : '语境未知',
@@ -265,28 +263,10 @@ const RightSidebar = () => {
 
           <div className="mt-6">
             <div className="flex items-center justify-between mb-2 border-b pb-2">
-              <h3 className="text-md font-semibold">推理</h3>
-              <div className="flex items-center space-x-1">
-                <Button
-                  size="sm"
-                  variant={reasonMode === 'navigation' ? 'default' : 'outline'}
-                  className="h-7"
-                  onClick={() => setReasonMode('navigation')}
-                >
-                  全部关联
-                </Button>
-                <Button
-                  size="sm"
-                  variant={reasonMode === 'reviewed-only' ? 'default' : 'outline'}
-                  className="h-7"
-                  onClick={() => setReasonMode('reviewed-only')}
-                >
-                  仅已审核
-                </Button>
-              </div>
+              <h3 className="text-md font-semibold">候选关联</h3>
             </div>
             <p className="mb-2 text-xs text-muted-foreground">
-              只列能推到的结论；未决前提和审核级别会一起显示，未满足时不会说成无条件成立。
+              只列出图上能走到的候选关联；路径上的文字条件与语境会一起显示，不代表已证明。
             </p>
             {derived.length === 0 ? (
               <p className="text-sm text-muted-foreground">没有可推导的结论。</p>
@@ -305,17 +285,12 @@ const RightSidebar = () => {
                       <p className="text-xs text-muted-foreground">
                         {[
                           explainTrace(index, relation),
-                          REVIEW_STATE_LABEL[relation.verification],
-                          relation.unconditional ? '无条件' : '有前提',
                           relation.unresolvedConditions.length > 0
-                            ? `未决：${relation.unresolvedConditions.join('；')}`
-                            : null,
-                          relation.requiredAssumptions.length > 0
-                            ? `${relation.requiredAssumptions.length} 个结构化前提`
+                            ? `条件：${relation.unresolvedConditions.join('；')}`
                             : null,
                           relation.contextId
                             ? `语境：${index.nodes.get(relation.contextId)?.title ?? relation.contextId}`
-                            : '语境未知',
+                            : null,
                         ]
                           .filter(Boolean)
                           .join(' · ')}

@@ -42,12 +42,11 @@ describe('AI 批量操作模拟', () => {
     expect(result.diff.createdEdges[0].predicate).toBe('proves');
   });
 
-  it('AI 生成的关系默认未审核', () => {
+  it('AI 生成的关系默认断言成立、来源标记为 ai', () => {
     counter = 0;
     const index = buildIndex(base, []);
     const result = simulateOperations(index, ops, { now: 1, newId });
     const edge = result.diff.createdEdges[0];
-    expect(edge.reviewState).toBe('unreviewed');
     expect(edge.assertedBy).toBe('ai');
     expect(edge.status).toBe('asserted');
   });
@@ -114,7 +113,6 @@ describe('AI 批量操作模拟', () => {
     expect(result.errors).toEqual([]);
     expect(result.diff.createdSteps).toHaveLength(1);
     expect(result.diff.createdSteps[0].premiseIds).toEqual(['new-1', 'new-2']);
-    expect(result.diff.createdSteps[0].reviewState).toBe('unreviewed');
   });
 
   it('非法的推理步骤会让整批失败', () => {
@@ -165,7 +163,6 @@ describe('AI 批量操作模拟', () => {
         to: 't2',
         predicate: 'implies',
         contextId: 'ctx',
-        assumptionIds: ['ctx'],
         assertedBy: 'manual',
         createdAt: 0,
         updatedAt: 0,
@@ -189,7 +186,6 @@ describe('AI 批量操作模拟', () => {
 
     expect(result.errors).toEqual([]);
     expect(result.edges[0].contextId).toBeUndefined();
-    expect(result.edges[0].assumptionIds).toBeUndefined();
     expect(result.steps[0].contextId).toBeUndefined();
     // 证明还在，所以 proofId 保留
     expect(result.steps[0].proofId).toBe('pf');

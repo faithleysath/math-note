@@ -17,7 +17,7 @@ interface NodeRendererProps {
 }
 
 /**
- * v5 只有 9 种节点类型，显示风格由 type + kind 决定：
+ * 只有 9 种节点类型，显示风格由 type + kind 决定：
  * section(kind=chapter) 用大章节样式，其余 section 用居中节样式；
  * proposition 复用原来的定理排版（编号里已经带上「定理 / 性质 / 公式」）；
  * problem 复用原来的例题/练习卡片。
