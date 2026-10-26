@@ -1,6 +1,7 @@
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { AssetMeta, BookMetaV9, GraphJSONV9 } from './schema';
 import { mkNode } from './test-helpers';
+import { assetCaption, registeredAssetCaptionCount } from './markdown';
 
 /**
  * 「导入 v9 JSON → 载入图片文件夹 → 图片可渲染」这条链的集成测试。
@@ -67,6 +68,52 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await useGraphStore.getState().clearAll();
+});
+
+describe('图注登记（给渲染层用）', () => {
+  it('importGraph 把 AssetMeta.caption 登记起来，没图注的不登记', async () => {
+    await useGraphStore
+      .getState()
+      .importGraph(makeGraph([{ ...assetHello, caption: '图 1-11 激光笔演示声波' }, assetWorld]));
+
+    expect(assetCaption('img-1')).toBe('图 1-11 激光笔演示声波');
+    expect(assetCaption('img-2')).toBeUndefined();
+    expect(registeredAssetCaptionCount()).toBe(1);
+  });
+
+  it('载入图片不会丢掉已登记的图注', async () => {
+    await useGraphStore
+      .getState()
+      .importGraph(makeGraph([{ ...assetHello, caption: '图 1-12' }, assetWorld]));
+
+    await useGraphStore.getState().loadAssetFiles([pngFile('hello', 'hello.png')]);
+
+    expect(assetCaption('img-1')).toBe('图 1-12');
+  });
+
+  it('元信息从库里读回时保留图注（重开页面、载入图片后导出都不丢）', async () => {
+    await useGraphStore
+      .getState()
+      .importGraph(makeGraph([{ ...assetHello, caption: '图 1-11 激光笔演示声波' }, assetWorld]));
+
+    const metas = await db.loadAssetMetas();
+    expect(metas.find((meta) => meta.id === 'img-1')?.caption).toBe('图 1-11 激光笔演示声波');
+    expect(metas.find((meta) => meta.id === 'img-2')?.caption).toBeUndefined();
+
+    // loadAssetFiles 会从库里重读元信息，导出不能因此丢 caption
+    await useGraphStore.getState().loadAssetFiles([pngFile('hello', 'hello.png')]);
+    expect(useGraphStore.getState().exportGraph().assets[0].caption).toBe('图 1-11 激光笔演示声波');
+  });
+
+  it('清空教材后图注一起清掉', async () => {
+    await useGraphStore
+      .getState()
+      .importGraph(makeGraph([{ ...assetHello, caption: '图 1-13' }]));
+    expect(registeredAssetCaptionCount()).toBe(1);
+
+    await useGraphStore.getState().clearAll();
+    expect(registeredAssetCaptionCount()).toBe(0);
+  });
 });
 
 describe('导入保留资源元信息', () => {

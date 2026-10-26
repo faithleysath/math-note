@@ -57,12 +57,12 @@ interface Row {
   problem?: string;
 }
 
-function loadManifests(dir: string): Map<string, ExpectedManifest> {
+function loadManifests(dir: string): ExpectedManifest[] {
   const files = listJsonFiles(dir, '清单目录');
   if (files.length === 0) {
     throw new CliError(`清单目录里没有 *.json：${dir}`);
   }
-  const byChapter = new Map<string, ExpectedManifest>();
+  const manifests: ExpectedManifest[] = [];
   for (const path of files) {
     const raw = readJsonFile(path, '清单');
     // 同一个目录里也可能放着分章 part 或 book.json（冒烟测试就这么用），没 items 的直接跳过
@@ -72,12 +72,50 @@ function loadManifests(dir: string): Map<string, ExpectedManifest> {
     }
     const manifest = asExpectedManifest(raw, path);
     if (!manifest.chapter) continue;
-    byChapter.set(manifest.chapter, manifest);
+    manifests.push(manifest);
   }
-  if (byChapter.size === 0) {
+  if (manifests.length === 0) {
     throw new CliError(`清单目录里没有可用的清单（都要带 chapter 和 items）：${dir}`);
   }
-  return byChapter;
+  return manifests;
+}
+
+/**
+ * 一个章可能被切成多个 part（每 part 对应一份清单）。
+ * 先按 chapter 过滤，再用 pdfPageRange 消除歧义，最后按 srcId 命中数兜底。
+ */
+function pickManifest(part: BookPart, manifests: ExpectedManifest[]): ExpectedManifest | null {
+  const sameChapter = manifests.filter((m) => m.chapter === part.meta.chapter);
+  if (sameChapter.length === 0) return null;
+  if (sameChapter.length === 1) return sameChapter[0];
+
+  const partRange = part.meta.pdfPageRange;
+  const byRange = sameChapter.filter(
+    (m) =>
+      m.pdfPageRange !== undefined &&
+      m.pdfPageRange[0] === partRange[0] &&
+      m.pdfPageRange[1] === partRange[1],
+  );
+  if (byRange.length === 1) return byRange[0];
+
+  // 最后兜底：谁的 srcId 被这个 part 认领得最多就用谁
+  const claimed = new Set<string>();
+  for (const node of part.nodes) {
+    claimed.add(node.id.replace(/@\d+$/, ''));
+    for (const tag of node.tags ?? []) {
+      if (tag.startsWith('src:')) claimed.add(tag.slice(4));
+    }
+  }
+  let best: ExpectedManifest | null = null;
+  let bestHits = -1;
+  for (const manifest of sameChapter) {
+    const hits = manifest.items.filter((item) => claimed.has(item.srcId)).length;
+    if (hits > bestHits) {
+      best = manifest;
+      bestHits = hits;
+    }
+  }
+  return best;
 }
 
 function chapterLabelOf(part: BookPart): string {
@@ -113,6 +151,31 @@ function metaTextOf(raw: unknown, key: string): string | null {
 
 function buildReport(rows: Row[], reviews: Map<string, ReviewState>, reviewDir: string): string {
   const lines: string[] = [];
+  // 一章可能由多个 part 组成（按页切批），报告按章合并，不能一章出现两行
+  const chapterRows: ChapterRow[] = [];
+  const byChapter = new Map<string, ChapterRow>();
+  for (const row of rows) {
+    let merged = byChapter.get(row.chapter);
+    if (!merged) {
+      merged = { chapter: row.chapter, parts: 0, total: 0, mapped: 0, exception: 0, missing: 0, duplicate: 0, undecided: 0, missingSrcIds: [], problems: [] };
+      byChapter.set(row.chapter, merged);
+      chapterRows.push(merged);
+    }
+    merged.parts += 1;
+    if (!row.coverage) {
+      if (row.problem) merged.problems.push(row.problem);
+      continue;
+    }
+    merged.total += row.coverage.total;
+    merged.mapped += row.coverage.mapped;
+    merged.exception += row.coverage.exception;
+    merged.missing += row.coverage.missing;
+    merged.duplicate += row.coverage.duplicate;
+    merged.undecided += row.coverage.undecided;
+    merged.missingSrcIds.push(...row.coverage.missingSrcIds);
+  }
+  chapterRows.sort((left, right) => sortByCodePoint(left.chapter, right.chapter));
+
   lines.push('# 结构覆盖率与视觉复核状态');
   lines.push('');
   lines.push('> 本文件由 `scripts/report-book-coverage.ts` 生成，数字来自 `coverageOf`，不要手改。');
@@ -137,31 +200,30 @@ function buildReport(rows: Row[], reviews: Map<string, ReviewState>, reviewDir: 
   let undecided = 0;
   const missingLines: string[] = [];
 
-  for (const row of rows) {
-    const coverage = row.coverage;
-    if (!coverage) {
-      lines.push(tableRow([row.chapter, '—', '—', '—', '—', '—', '—', row.problem ?? '无数据']));
+  for (const row of chapterRows) {
+    if (row.parts === 0 || (row.total === 0 && row.problems.length > 0)) {
+      lines.push(tableRow([row.chapter, '—', '—', '—', '—', '—', '—', row.problems[0] ?? '无数据']));
       continue;
     }
-    total += coverage.total;
-    mapped += coverage.mapped;
-    exception += coverage.exception;
-    missing += coverage.missing;
-    duplicate += coverage.duplicate;
-    undecided += coverage.undecided;
+    total += row.total;
+    mapped += row.mapped;
+    exception += row.exception;
+    missing += row.missing;
+    duplicate += row.duplicate;
+    undecided += row.undecided;
     lines.push(
       tableRow([
-        row.chapter,
-        coverage.total,
-        coverage.mapped,
-        coverage.exception,
-        coverage.missing,
-        coverage.duplicate,
-        coverage.undecided,
-        formatRate(coverage.mapped + coverage.exception, coverage.total),
+        row.parts > 1 ? `${row.chapter}（${row.parts} 个 part）` : row.chapter,
+        row.total,
+        row.mapped,
+        row.exception,
+        row.missing,
+        row.duplicate,
+        row.undecided,
+        formatRate(row.mapped + row.exception, row.total),
       ]),
     );
-    for (const srcId of coverage.missingSrcIds) missingLines.push(`- ${row.chapter}：${srcId}`);
+    for (const srcId of row.missingSrcIds) missingLines.push(`- ${row.chapter}：${srcId}`);
   }
 
   lines.push(
@@ -180,7 +242,7 @@ function buildReport(rows: Row[], reviews: Map<string, ReviewState>, reviewDir: 
   let unreviewed = 0;
   let spotChecked = 0;
   let fullyReviewed = 0;
-  for (const row of rows) {
+  for (const row of chapterRows) {
     const review = reviews.get(row.chapter) ?? { status: 'unreviewed' as ReviewStatus, spots: [] };
     if (review.status === 'unreviewed') unreviewed += 1;
     else if (review.status === 'spot-checked') spotChecked += 1;
@@ -196,7 +258,7 @@ function buildReport(rows: Row[], reviews: Map<string, ReviewState>, reviewDir: 
   lines.push(`- 已映射 + 例外：${mapped + exception}/${total} (${formatRate(mapped + exception, total)})`);
   lines.push(`- missing：${missing}（另有 duplicate ${duplicate}、undecided ${undecided}）`);
   lines.push(
-    `- 未复核章数：${unreviewed} / ${rows.length} 章（spot-checked ${spotChecked}，fully-reviewed ${fullyReviewed}）`,
+    `- 未复核章数：${unreviewed} / ${chapterRows.length} 章（spot-checked ${spotChecked}，fully-reviewed ${fullyReviewed}）`,
   );
   if (rows.length > 0) lines.push(`- 按 part：${rows.map((row) => row.chapter).join('、')}`);
   lines.push('');
@@ -255,7 +317,7 @@ function main(argv: string[]): number {
     }
 
     const part = parsed.data;
-    const manifest = manifests.get(part.meta.chapter);
+    const manifest = pickManifest(part, manifests);
     reviews.set(part.meta.chapter, readReview(reviewDir, part));
     if (!manifest) {
       rows.push({

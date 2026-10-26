@@ -403,6 +403,134 @@ describe('validateBookPart', () => {
 });
 
 // =============================================================================
+// depends-on 的质量检查（§7）
+// =============================================================================
+
+describe('depends-on 质量检查', () => {
+  /** 合格依据：带引号抄原句，长度也够 */
+  const GOOD_NOTE =
+    '原句：「液体温度计利用热胀冷缩」，逐字用前文定义的「热胀冷缩」，离开它这句不成立。';
+  const OTHER_SECTION_ID = 'phy-b8a-c04-s02';
+
+  /** 往同一小节里塞 n 个节点，各自 depends-on 指向 phy-b8a-p045-02 */
+  function hubPart(n: number): BookPart {
+    const part = basePart();
+    part.edges = [];
+    for (let i = 1; i <= n; i += 1) {
+      const id = `phy-b8a-p047-0${i}`;
+      part.nodes.push(partNode(id, 'proposition', SECTION_ID, { kind: 'claim', title: `断言${i}` }));
+      part.edges.push({ from: id, to: 'phy-b8a-p045-02', predicate: 'depends-on', note: GOOD_NOTE });
+    }
+    return part;
+  }
+
+  describe('depends-on-hub', () => {
+    it('同一个目标被 4 条依赖指向：报 warning，带上标题和条数', () => {
+      const hubs = validateBookPart(hubPart(4)).filter((issue) => issue.code === 'depends-on-hub');
+
+      expect(hubs).toHaveLength(1);
+      expect(hubs[0].severity).toBe('warning');
+      expect(hubs[0].message).toContain('液体温度计利用热胀冷缩');
+      expect(hubs[0].message).toContain('4 条');
+      expect(hubs[0].message).toContain('主题词');
+    });
+
+    it('只被 3 条依赖指向：不报', () => {
+      const hubs = validateBookPart(hubPart(3)).filter((issue) => issue.code === 'depends-on-hub');
+
+      expect(hubs).toEqual([]);
+    });
+  });
+
+  describe('depends-on-same-subsection', () => {
+    it('两端在同一小节内：报 warning', () => {
+      const part = basePart();
+      part.edges = [
+        { from: 'phy-b8a-p045-02', to: 'phy-b8a-p045-01', predicate: 'depends-on', note: GOOD_NOTE },
+      ];
+
+      const sameSection = validateBookPart(part).filter(
+        (issue) => issue.code === 'depends-on-same-subsection',
+      );
+      expect(sameSection).toHaveLength(1);
+      expect(sameSection[0].severity).toBe('warning');
+      expect(sameSection[0].message).toContain('一、温度');
+      expect(sameSection[0].message).toContain('兄弟节点');
+    });
+
+    it('两端跨小节：不报', () => {
+      const part = basePart();
+      part.nodes.push(
+        partNode(OTHER_SECTION_ID, 'section', CHAPTER_ID, { kind: 'section', title: '二、熔化' }),
+        partNode('phy-b8a-p053-01', 'definition', OTHER_SECTION_ID, { title: '熔化的定义' }),
+      );
+      part.edges = [
+        { from: 'phy-b8a-p045-02', to: 'phy-b8a-p053-01', predicate: 'depends-on', note: GOOD_NOTE },
+      ];
+
+      const issues = validateBookPart(part).filter(
+        (issue) => issue.code === 'depends-on-same-subsection',
+      );
+      expect(issues).toEqual([]);
+    });
+  });
+
+  describe('depends-on-weak-evidence', () => {
+    it('note 为空：报 warning，要求抄原句', () => {
+      const part = basePart();
+      part.edges = [{ from: 'phy-b8a-p045-02', to: 'phy-b8a-p045-01', predicate: 'depends-on' }];
+
+      const weak = validateBookPart(part).filter(
+        (issue) => issue.code === 'depends-on-weak-evidence',
+      );
+      expect(weak).toHaveLength(1);
+      expect(weak[0].severity).toBe('warning');
+      expect(weak[0].message).toContain('note 是空的');
+      expect(weak[0].message).toContain('depends-on 必须把依据原句抄进 note');
+    });
+
+    it('note 太短或没有引号引出的原句：都报', () => {
+      const shortNote = basePart();
+      shortNote.edges = [
+        { from: 'phy-b8a-p045-02', to: 'phy-b8a-p045-01', predicate: 'depends-on', note: '原句：「热胀冷缩」' },
+      ];
+      expect(
+        validateBookPart(shortNote)
+          .filter((issue) => issue.code === 'depends-on-weak-evidence')
+          .some((issue) => issue.message.includes('不足')),
+      ).toBe(true);
+
+      const noQuote = basePart();
+      noQuote.edges = [
+        {
+          from: 'phy-b8a-p045-02',
+          to: 'phy-b8a-p045-01',
+          predicate: 'depends-on',
+          note: '液体温度计利用热胀冷缩，这里只是提到前文定义，没有抄原句。',
+        },
+      ];
+      expect(
+        validateBookPart(noQuote)
+          .filter((issue) => issue.code === 'depends-on-weak-evidence')
+          .some((issue) => issue.message.includes('没有引号引出的原句')),
+      ).toBe(true);
+    });
+
+    it('note 带引号且够长：不报', () => {
+      const part = basePart();
+      part.edges = [
+        { from: 'phy-b8a-p045-02', to: 'phy-b8a-p045-01', predicate: 'depends-on', note: GOOD_NOTE },
+      ];
+
+      const weak = validateBookPart(part).filter(
+        (issue) => issue.code === 'depends-on-weak-evidence',
+      );
+      expect(weak).toEqual([]);
+    });
+  });
+});
+
+// =============================================================================
 // 覆盖率（§0.3）
 // =============================================================================
 

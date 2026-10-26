@@ -34,6 +34,7 @@ import {
   type SourceAnchor,
 } from './schema';
 import { validateGraphInvariants, type ValidationIssue } from './validate';
+import { canonicalizePair } from './predicates';
 
 // =============================================================================
 // 分章中间格式（§10）
@@ -178,6 +179,8 @@ export interface ExpectedItem {
   regionOmittedReason?: string;
   /** 跨页内容在后续页上的区域（规约 §3.1） */
   extraRegions?: { pdfPage: number; region: { x: number; y: number; width: number; height: number } }[];
+  /** 印刷图注直接压在图上、裁不掉（规约 §3.1）：Pass 2 不写 caption，避免与 figcaption 重复 */
+  captionOnImage?: boolean;
   originalNumber?: string | null;
   continuesOn?: number | null;
 }
@@ -255,6 +258,8 @@ function structuralStubType(id: string): 'branch' | 'section' | null {
 }
 
 function structuralParentId(id: string): string | null {
+  // 册分支是树的根（phy-b8a 的父就是 null），不能按 lastIndexOf('-') 截成 'phy'
+  if (idFamilyOf(id) === 'branch') return null;
   if (structuralStubType(id) === null) return null;
   const cut = id.lastIndexOf('-');
   return cut > 0 ? id.slice(0, cut) : null;
@@ -483,11 +488,14 @@ function shapedStepsOf(part: BookPart): InferenceStep[] {
  */
 function graphIssuesOf(part: BookPart): ValidationIssue[] {
   const nodes = shapedNodesOf(part);
-  const issues = validateGraphInvariants({
-    nodes,
-    edges: shapedEdgesOf(part),
-    steps: shapedStepsOf(part),
-  });
+  const issues = validateGraphInvariants(
+    {
+      nodes,
+      edges: shapedEdgesOf(part),
+      steps: shapedStepsOf(part),
+    },
+    { allowExternalEndpoints: true },
+  );
 
   // 父节点在本 part 之外、且 ID 推不出类型时，validateGraphInvariants 只能报
   // 「父节点不存在」。补一句说明，避免误导人去改合法的 part。
@@ -643,6 +651,93 @@ function ownershipIssues(part: BookPart): ValidationIssue[] {
       field: `edges.${index}.predicate`,
     });
   });
+
+  return issues;
+}
+
+// =============================================================================
+// 校验：depends-on 的质量（§7）
+// =============================================================================
+
+/** 同一个目标被这么多条 depends-on 指向，就按星形中心报出来（§7） */
+const DEPENDS_ON_HUB_THRESHOLD = 4;
+
+/** note 少于这么多个字，等于没写依据（§7） */
+const DEPENDS_ON_NOTE_MIN_LENGTH = 12;
+
+/** 依据原句必须带引号抄进 note；CJK 引号与西文双引号都算 */
+const DEPENDS_ON_QUOTE_PATTERN = /[「」『』“”"]/;
+
+/** 沿 parentId 链往上找最近的 section 节点（章、节、小节都算），找不到返回 null */
+function nearestSectionAncestorOf(id: string, nodesById: Map<string, Node>): string | null {
+  let cursor = nodesById.get(id)?.parentId ?? null;
+  while (cursor) {
+    const node = nodesById.get(cursor);
+    if (!node) return null;
+    if (node.type === 'section') return node.id;
+    cursor = node.parentId;
+  }
+  return null;
+}
+
+/**
+ * §7 的三条机械判据：星形中心、同小节互连、缺原句依据。一律只告警。
+ *
+ * 主题词（噪声 / 频率 / 振动）靠语义判断拦不住模型，只能靠「同一个目标被多少人依赖」
+ * 「两端是不是同一个 section」「note 里有没有抄原句」这些结构性信号兜底。
+ */
+function dependsOnIssuesOf(part: BookPart): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  const nodesById = new Map(shapedNodesOf(part).map((node) => [node.id, node]));
+  const titleOf = (id: string) => nodesById.get(id)?.title ?? id;
+  const dependsOn = part.edges
+    .map((edge, index) => ({ edge, index }))
+    .filter(({ edge }) => edge.predicate === 'depends-on');
+
+  // ---- 星形中心：同一个目标被 >= 4 条依赖指向（§7） ----
+  const targetCounts = new Map<string, number>();
+  for (const { edge } of dependsOn) {
+    targetCounts.set(edge.to, (targetCounts.get(edge.to) ?? 0) + 1);
+  }
+  for (const [to, count] of targetCounts) {
+    if (count < DEPENDS_ON_HUB_THRESHOLD) continue;
+    issues.push({
+      severity: 'warning',
+      code: 'depends-on-hub',
+      message: `depends-on 目标「${titleOf(to)}」（${to}）被 ${count} 条边指向：同一个目标被 ≥ ${DEPENDS_ON_HUB_THRESHOLD} 条依赖指向，基本可以断定它是主题词而不是真前置，必须逐条复核（§7）。`,
+      nodeId: to,
+    });
+  }
+
+  for (const { edge, index } of dependsOn) {
+    // ---- 同小节互连：两端最近的 section 祖先相同（§7） ----
+    const fromSection = nearestSectionAncestorOf(edge.from, nodesById);
+    const toSection = nearestSectionAncestorOf(edge.to, nodesById);
+    if (fromSection !== null && fromSection === toSection) {
+      issues.push({
+        severity: 'warning',
+        code: 'depends-on-same-subsection',
+        message: `${edge.from} → ${edge.to} 两端的最近 section 祖先都是「${titleOf(fromSection)}」（${fromSection}）：前置依赖通常跨小节，同小节互连多半是同段拆出来的兄弟节点（§7）。`,
+        field: `edges.${index}.from`,
+      });
+    }
+
+    // ---- 依据不足：note 空、太短、没抄原句（§7） ----
+    const note = edge.note?.trim() ?? '';
+    const problems: string[] = [];
+    if (note === '') problems.push('note 是空的');
+    else if (note.length < DEPENDS_ON_NOTE_MIN_LENGTH) {
+      problems.push(`note 只有 ${note.length} 个字（不足 ${DEPENDS_ON_NOTE_MIN_LENGTH} 字）`);
+    }
+    if (!DEPENDS_ON_QUOTE_PATTERN.test(note)) problems.push('note 里没有引号引出的原句');
+    if (problems.length === 0) continue;
+    issues.push({
+      severity: 'warning',
+      code: 'depends-on-weak-evidence',
+      message: `${edge.from} → ${edge.to} 的依据不足（${problems.join('；')}）：depends-on 必须把依据原句抄进 note（§7）。`,
+      field: `edges.${index}.note`,
+    });
+  }
 
   return issues;
 }
@@ -1756,6 +1851,7 @@ export function validateBookPart(part: unknown, expected?: ExpectedManifest): Va
   const value = parsed.data;
   issues.push(...graphIssuesOf(value));
   issues.push(...ownershipIssues(value));
+  issues.push(...dependsOnIssuesOf(value));
   issues.push(...assetIssuesOf(value, shapedNodesOf(value)));
   if (expected) issues.push(...coverageIssuesOf(value, expected));
 
@@ -1933,6 +2029,13 @@ function mergeEntityRegistry(
  * 节点 id 跨 part 重复直接抛错（ID 一旦分配不得改名）；资源文件属性缺失也直接抛错
  * （合并必须发生在资源流水线之后）。
  */
+/** 边去重键：谓词 + 端点（对称谓词规范化）+ 语境 + 规范化条件 */
+function edgeDedupKey(edge: PartEdge): string {
+  const pair = canonicalizePair(edge.predicate, edge.from, edge.to);
+  const condition = (edge.condition ?? '').replace(/\s+/g, '');
+  return [edge.predicate, pair.from, pair.to, edge.contextId ?? '', condition].join('\u0000');
+}
+
 export function mergeBookParts(
   parts: BookPart[],
   book: BookMetaV9,
@@ -1954,6 +2057,7 @@ export function mergeBookParts(
   const chapterOfNode = new Map<string, string>();
   const orderCursors = new Map<string, number>();
   const assetIds = new Set<string>();
+  const edgeOwners = new Map<string, string>();
   let edgeSeq = 0;
   let stepSeq = 0;
 
@@ -1977,6 +2081,23 @@ export function mergeBookParts(
     }
 
     for (const edge of part.edges) {
+      // 多个 part 并行转写时，边界上会各写一份同样的关系。
+      // 去重键与 validateGraphInvariants 一致：谓词 + 端点（对称谓词无序）+ 语境 + 规范化条件。
+      // 同端点不同条件/语境的边是合法的数学断言，必须都留下。
+      const key = edgeDedupKey(edge);
+      const owner = edgeOwners.get(key);
+      if (owner !== undefined) {
+        warnings.push({
+          severity: 'warning',
+          code: 'duplicate-edge-merged',
+          message:
+            `关系 ${edge.from} -[${edge.predicate}]-> ${edge.to} 在 ${owner} 与 ${part.meta.chapter} 里各写了一份，` +
+            '合并时保留前一份（§12）。如果两份的 condition/contextId 不同，它们不会被合并，请核对。',
+          edgeId: undefined,
+        });
+        continue;
+      }
+      edgeOwners.set(key, part.meta.chapter);
       edgeSeq += 1;
       edges.push(asEdge(edge, sequenceId(part.meta.chapter, 'e', edgeSeq), mergedAt));
     }

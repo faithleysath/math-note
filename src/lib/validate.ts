@@ -676,7 +676,7 @@ export function validateGraphInvariants(
     assets?: AssetMeta[];
     anchors?: SourceAnchor[];
   },
-  options: { checkAssets?: boolean } = {},
+  options: { checkAssets?: boolean; allowExternalEndpoints?: boolean } = {},
 ): ValidationIssue[] {
   const issues: ValidationIssue[] = bookIssues(graph.book);
   const nodes = new Map<string, Node>();
@@ -827,10 +827,15 @@ export function validateGraphInvariants(
     const fromNode = nodes.get(edge.from);
     const toNode = nodes.get(edge.to);
     if (!fromNode || !toNode) {
+      // 分章 part 校验时，端点可能在别的 part 里：降级为警告，合并后再整体校验
+      const external = options.allowExternalEndpoints === true;
+      const missing = [!fromNode ? edge.from : null, !toNode ? edge.to : null].filter(Boolean).join('、');
       issues.push({
-        severity: 'error',
-        code: 'missing-endpoint',
-        message: `关系 ${edge.id} 指向不存在的节点。`,
+        severity: external ? 'warning' : 'error',
+        code: external ? 'external-endpoint' : 'missing-endpoint',
+        message: external
+          ? `关系 ${edge.id} 的端点 ${missing} 不在本 part：合并后统一校验，请确认 ID 拼写与命名规约一致。`
+          : `关系 ${edge.id} 指向不存在的节点。`,
         edgeId: edge.id,
       });
       continue;

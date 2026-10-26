@@ -72,6 +72,8 @@ function toAssetMeta(record: AssetRecord): AssetMeta {
     byteLength: record.byteLength,
     sha256: record.sha256,
     alt: record.alt,
+    // 图注是教材内容，重开页面 / 载入图片后再导出都不能丢
+    ...(record.caption === undefined ? {} : { caption: record.caption }),
     originalName: record.originalName,
   };
 }

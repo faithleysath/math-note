@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { toast } from 'sonner';
 import * as db from '../lib/db';
 import { assetFileNames, MAX_ASSET_BYTES, sha256Hex } from '../lib/assets';
-import { registerAssetUrl, releaseAssetUrls } from '../lib/markdown';
+import { registerAssetCaption, registerAssetUrl, releaseAssetUrls } from '../lib/markdown';
 import {
   ancestorIds,
   buildIndex,
@@ -121,9 +121,11 @@ let assetMetas: AssetMeta[] = [];
 /**
  * 释放旧 Blob URL，再给库里所有带二进制的资源建一份新的，
  * 返回「有元信息但没二进制」的 id 列表。换教材时必须先释放，否则 Blob URL 会泄漏。
+ * 图注一并登记：没二进制的图也要能显示 caption（见 rehypeAssetScheme）。
  */
 async function refreshAssetUrls(metas: AssetMeta[]): Promise<string[]> {
   releaseAssetUrls();
+  for (const meta of metas) registerAssetCaption(meta.id, meta.caption);
   const withBinary = new Set<string>();
   for (const record of await db.assetsWithBinary()) {
     registerAssetUrl(record.id, URL.createObjectURL(record.data));
