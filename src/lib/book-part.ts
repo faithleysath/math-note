@@ -99,6 +99,8 @@ export const partAssetSchema = z
     /** PNG 内在像素尺寸，裁图时从 IHDR 读出来回填；渲染时用来提前占位 */
     width: z.number().int().positive().optional(),
     height: z.number().int().positive().optional(),
+    /** 手工装配的图（例如跨书脊拼接），裁图流水线跳过它、不按 region 重裁 */
+    manual: z.boolean().optional(),
   })
   .superRefine((asset, ctx) => {
     const hasRegion = asset.region !== undefined;

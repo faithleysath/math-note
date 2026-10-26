@@ -79,8 +79,11 @@ for (const { file, data } of manifests) {
   const chapter = data.chapter ?? '';
   // 1. 文件名前缀必须与 chapter 一致
   const stem = file.replace(/\.json$/, '');
-  if (!stem.startsWith(`b8a-${chapter.slice(-3)}`) && !stem.startsWith(chapter)) {
-    err('filename-chapter', `${file}：文件名前缀与 chapter「${chapter}」对不上`);
+  // 文件名形如 <册>-<章>-p<起>-<止>.json，从 chapter（phy-<册>-<章>）反推期望前缀
+  const [, volume, chapterCode] = chapter.split('-');
+  const expectedPrefix = volume && chapterCode ? `${volume}-${chapterCode}` : '';
+  if (expectedPrefix && !stem.startsWith(expectedPrefix) && !stem.startsWith(chapter)) {
+    err('filename-chapter', `${file}：文件名前缀与 chapter「${chapter}」对不上（期望以 ${expectedPrefix} 开头）`);
   }
   if (!data.pdfPageRange) warn('no-range', `${file}：没有 pdfPageRange，无法检查批次是否重叠`);
   else {

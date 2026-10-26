@@ -633,6 +633,14 @@ function processAsset(context: ProcessContext): AssetOutcome {
     return { status: 'failed', reason: `坐标换算失败：${error instanceof Error ? error.message : String(error)}` };
   }
 
+  // 手工装配的图（跨书脊拼接等）不走 pdftoppm，按记录原样保留
+  if (asset.manual && asset.path && asset.sha256) {
+    const manualPath = join(SUK, asset.path);
+    if (existsSync(manualPath)) {
+      return { status: 'skipped', width: asset.width ?? 0, height: asset.height ?? 0, bytes: statSync(manualPath).size, jsonDirty: false };
+    }
+  }
+
   const relPath = `assets/${geometry.volume}/${id}.png`;
   const target = join(SUK, relPath);
   const existing = existsSync(target) && statSync(target).isFile() ? statSync(target) : null;
