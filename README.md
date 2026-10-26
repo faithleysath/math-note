@@ -94,24 +94,24 @@
 
 ## 数据
 
-- 全部存在浏览器 IndexedDB（数据库 `math-note-graph-v6`），不联网、不登录。
-- 「导出」下载 v6 JSON，「导入」整份替换（二次确认，失败不改动原数据）。
+- 全部存在浏览器 IndexedDB（数据库 `math-note-graph-v7`），不联网、不登录。
+- 「导出」下载 v7 JSON，「导入」整份替换（二次确认，失败不改动原数据）。
 - 「分享」把快照传到 Vercel Blob，生成只读链接 `?note_url=…`。
 
 ### 导入格式
 
-只有 v6 一种格式。`schemaVersion` 不是 6、结构不对或全图校验不通过，导入会被整个拒绝，现有数据不会变。
+只有 v7 一种格式。`schemaVersion` 不是 7、出现未知字段、结构不对或全图校验不通过，导入会被整个拒绝，现有数据不会变。
 旧版本（v5 及更早）不做迁移，直接拒绝；旧数据库也不会被读取。
 
 ### 给外部脚本的格式
 
-- `examples/v6.schema.json`：JSON Schema（由 `bun run gen:schema` 从 `src/lib/schema.ts` 生成）
-- `examples/v6-minimal.json`：最小样例
-- `examples/v6-gaokao-sample.json`：覆盖 9 种节点与 9 种关系的完整样例
+- `examples/v7.schema.json`：JSON Schema（由 `bun run gen:schema` 从 `src/lib/schema.ts` 生成）
+- `examples/v7-minimal.json`：最小样例
+- `examples/v7-gaokao-sample.json`：覆盖 9 种节点与 9 种关系的完整样例
 
 ```jsonc
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "exportedAt": 0,
   "nodes": [],
   "edges": [],
@@ -145,7 +145,7 @@ src/lib/serialize.ts   导入校验、导出
 src/lib/citation.ts    来源字段合并（只改 source，保留 page / originalNumber）
 src/lib/db.ts          Dexie 持久化
 src/stores/useGraphStore.ts  内存图 + 写穿
-examples/              可直接导入的 v6 样例
+examples/              可直接导入的 v7 样例
 ```
 
 ## 性能（本机实测，`bun run bench`）

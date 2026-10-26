@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/faithleysath/math-note/examples/v6.schema.json",
-  "title": "Math Note v6 导入格式",
-  "description": "Math Note 知识图谱 v6 的导入/导出格式。约束的权威定义在 src/lib/schema.ts 与 src/lib/validate.ts；本文件由 scripts/gen-schema.ts 生成。",
+  "$id": "https://github.com/faithleysath/math-note/examples/v7.schema.json",
+  "title": "Math Note v7 导入格式",
+  "description": "Math Note 知识图谱 v7 的导入/导出格式。约束的权威定义在 src/lib/schema.ts 与 src/lib/validate.ts；本文件由 scripts/gen-schema.ts 生成。",
   "type": "object",
   "properties": {
     "schemaVersion": {
       "type": "number",
-      "const": 6
+      "const": 7
     },
     "exportedAt": {
       "type": "number"
@@ -84,7 +84,8 @@
               "originalNumber": {
                 "type": "string"
               }
-            }
+            },
+            "additionalProperties": false
           },
           "attempt": {
             "type": "object",
@@ -98,7 +99,8 @@
               "method": {
                 "type": "string"
               }
-            }
+            },
+            "additionalProperties": false
           },
           "createdAt": {
             "type": "number"
@@ -116,7 +118,8 @@
           "order",
           "createdAt",
           "updatedAt"
-        ]
+        ],
+        "additionalProperties": false
       }
     },
     "edges": {
@@ -181,7 +184,8 @@
           "assertedBy",
           "createdAt",
           "updatedAt"
-        ]
+        ],
+        "additionalProperties": false
       }
     },
     "steps": {
@@ -240,7 +244,8 @@
           "assertedBy",
           "createdAt",
           "updatedAt"
-        ]
+        ],
+        "additionalProperties": false
       }
     }
   },
@@ -249,5 +254,6 @@
     "exportedAt",
     "nodes",
     "edges"
-  ]
+  ],
+  "additionalProperties": false
 }

@@ -259,7 +259,7 @@ export interface InferenceStep {
 }
 
 export interface GraphJSON {
-  schemaVersion: 6;
+  schemaVersion: 7;
   exportedAt: number;
   nodes: Node[];
   edges: Edge[];
@@ -270,19 +270,19 @@ export interface GraphJSON {
 // 运行时校验（zod）
 // =============================================================================
 
-const citationSchema = z.object({
+const citationSchema = z.strictObject({
   source: z.string().optional(),
   page: z.string().optional(),
   originalNumber: z.string().optional(),
 });
 
-const attemptMetaSchema = z.object({
+const attemptMetaSchema = z.strictObject({
   correct: z.boolean().optional(),
   durationMin: z.number().optional(),
   method: z.string().optional(),
 });
 
-const nodeSchema = z.object({
+const nodeSchema = z.strictObject({
   id: z.string().min(1),
   type: z.enum(NODE_TYPES),
   // 历史数据的未知 kind 允许暂存，校验器会告警
@@ -301,7 +301,7 @@ const nodeSchema = z.object({
   updatedAt: z.number(),
 });
 
-const edgeSchema = z.object({
+const edgeSchema = z.strictObject({
   id: z.string().min(1),
   from: z.string().min(1),
   to: z.string().min(1),
@@ -314,7 +314,7 @@ const edgeSchema = z.object({
   updatedAt: z.number(),
 });
 
-const stepSchema = z.object({
+const stepSchema = z.strictObject({
   id: z.string().min(1),
   premiseIds: z.array(z.string()).min(1),
   conclusionId: z.string().min(1),
@@ -327,8 +327,8 @@ const stepSchema = z.object({
   updatedAt: z.number(),
 });
 
-export const graphJSONSchema = z.object({
-  schemaVersion: z.literal(6),
+export const graphJSONSchema = z.strictObject({
+  schemaVersion: z.literal(7),
   exportedAt: z.number(),
   nodes: z.array(nodeSchema),
   edges: z.array(edgeSchema),

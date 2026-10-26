@@ -7,7 +7,7 @@ import {
 } from './schema';
 import { ValidationError, validateGraphInvariants, type ValidationIssue } from './validate';
 
-const SCHEMA_VERSION = 6;
+const SCHEMA_VERSION = 7;
 
 function messageOf(error: unknown): string {
   if (error && typeof error === 'object' && 'issues' in error) {
@@ -44,7 +44,7 @@ interface ParsedGraph {
 
 /**
  * 解析一份备份 / 快照。
- * 只接受 v6；结构不对或全图不变式不通过就抛错，绝不覆盖现有数据。
+ * 只接受 v7；结构不对或全图不变式不通过就抛错，绝不覆盖现有数据。
  */
 export function parseGraph(json: unknown): ParsedGraph {
   let parsed: GraphJSON;

@@ -50,11 +50,34 @@ describe('导入导出', () => {
     expect(parsed.steps).toEqual([]);
   });
 
-  it('只接受 v6，v5 及更早的备份直接拒绝', () => {
-    for (const version of [2, 3, 4, 5]) {
+  it('只接受 v7，v6 及更早的备份直接拒绝', () => {
+    for (const version of [2, 3, 4, 5, 6]) {
       const older = { ...toJson(serializeGraph(nodes, [])), schemaVersion: version };
       expect(() => parseGraph(older)).toThrowError(/数据结构不对/);
     }
+  });
+
+  it('拒绝带已删除字段的 v7 文件（不静默丢弃 status）', () => {
+    const withStatus = toJson(serializeGraph(nodes, []));
+    withStatus.edges = [
+      {
+        id: 'e1',
+        from: 't',
+        to: 't2',
+        predicate: 'implies',
+        status: 'asserted',
+        assertedBy: 'manual',
+        createdAt: 1,
+        updatedAt: 1,
+      },
+    ];
+    expect(() => parseGraph(withStatus)).toThrowError(/数据结构不对/);
+  });
+
+  it('拒绝未知字段', () => {
+    const withExtra = toJson(serializeGraph(nodes, []));
+    withExtra.mystery = 1;
+    expect(() => parseGraph(withExtra)).toThrowError(/数据结构不对/);
   });
 
   it('不同知识库可以各自使用同一个 key', () => {
