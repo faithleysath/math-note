@@ -96,6 +96,9 @@ export const partAssetSchema = z
     mimeType: z.string().min(1).optional(),
     byteLength: z.number().int().positive().optional(),
     sha256: z.string().regex(ASSET_SHA256_RE).optional(),
+    /** PNG 内在像素尺寸，裁图时从 IHDR 读出来回填；渲染时用来提前占位 */
+    width: z.number().int().positive().optional(),
+    height: z.number().int().positive().optional(),
   })
   .superRefine((asset, ctx) => {
     const hasRegion = asset.region !== undefined;
@@ -191,6 +194,8 @@ export interface ExpectedManifest {
   chapter?: string;
   /** 本章覆盖的 PDF 物理页区间 [起, 止]（闭区间）；只有清单校验器会用到 */
   pdfPageRange?: [number, number];
+  /** PDF 页码 → 印刷页码的偏移（清单里的 `{ offset: 7 }`）；页码校验用 */
+  pageOffset?: { offset?: number };
   items: ExpectedItem[];
 }
 
@@ -807,6 +812,8 @@ function assetIssuesOf(part: BookPart, nodes: Node[]): ValidationIssue[] {
           sha256: asset.sha256 as string,
           alt: asset.alt,
           caption: asset.caption,
+          ...(asset.width === undefined ? {} : { width: asset.width }),
+          ...(asset.height === undefined ? {} : { height: asset.height }),
         }),
       );
     } else if (missing.length < PIPELINE_FIELDS.length) {
@@ -1995,6 +2002,8 @@ function assetMetaOf(asset: PartAsset): AssetMeta {
     sha256: asset.sha256 as string,
     alt: asset.alt,
     ...(asset.caption === undefined ? {} : { caption: asset.caption }),
+    ...(asset.width === undefined ? {} : { width: asset.width }),
+    ...(asset.height === undefined ? {} : { height: asset.height }),
   };
 }
 

@@ -2,6 +2,7 @@ import MDEditor from '@uiw/react-md-editor';
 import type { ProcessedNode } from '../../lib/schema';
 import { NODE_TYPE_META } from '../../lib/schema';
 import { markdownPlugins } from '../../lib/markdown';
+import { markdownComponents } from '../markdownComponents';
 import { titleCarriesNumber } from '../../lib/display';
 import { useMemo } from 'react';
 
@@ -30,7 +31,7 @@ const ProseNodeRenderer = ({ node }: ProseNodeRendererProps) => {
       <MDEditor.Markdown
         source={displayContent}
         style={{ backgroundColor: 'transparent' }}
-        {...markdownPlugins()}
+        {...markdownPlugins()} components={markdownComponents()}
       />
     </div>
   );

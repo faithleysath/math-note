@@ -360,6 +360,9 @@ export interface AssetMeta {
   alt: string;
   /** 原书图注原文；没有图注时不填，不要填空串 */
   caption?: string;
+  /** 图片内在像素尺寸（裁图流水线回填），渲染时用来提前占位，避免加载后行高跳动 */
+  width?: number;
+  height?: number;
   originalName?: string;
 }
 
@@ -497,6 +500,9 @@ export const assetMetaSchema = z.strictObject({
   sha256: z.string().regex(ASSET_SHA256_RE),
   alt: z.string(),
   caption: z.string().optional(),
+  /** 像素尺寸，正整数；老数据没有这两个字段也照常解析 */
+  width: z.number().int().positive().optional(),
+  height: z.number().int().positive().optional(),
   originalName: z.string().optional(),
 });
 

@@ -3,6 +3,7 @@ import MDEditor from '@uiw/react-md-editor';
 import { toast } from 'sonner';
 import { KIND_LABELS, type Node } from '../../lib/schema';
 import { markdownPlugins } from '../../lib/markdown';
+import { markdownComponents } from '../markdownComponents';
 import { mergeCitation } from '../../lib/citation';
 import { kindOptionsFor, subjectProfile } from '../../lib/subjects';
 import { useGraphStore } from '../../stores/useGraphStore';
@@ -321,7 +322,7 @@ const NodeEditor = ({ node }: NodeEditorProps) => {
             value={content}
             onChange={(val) => setContent(val || '')}
             preview="live"
-            previewOptions={markdownPlugins()}
+            previewOptions={{ ...markdownPlugins(), components: markdownComponents() }}
           />
         </div>
 
@@ -336,6 +337,7 @@ const NodeEditor = ({ node }: NodeEditorProps) => {
               preview="live"
               previewOptions={{
                 ...markdownPlugins(),
+                components: markdownComponents(),
               }}
             />
           </div>

@@ -4,9 +4,13 @@ import 'katex/contrib/mhchem';
 import type { Element, ElementContent, Root, RootContent } from 'hast';
 import {
   assetCaption,
+  assetSize,
+  registerAsset,
   registerAssetCaption,
+  registerAssetSize,
   registerAssetUrl,
   registeredAssetCaptionCount,
+  registeredAssetSizeCount,
   releaseAssetUrls,
   rehypeAssetScheme,
 } from './markdown';
@@ -174,6 +178,49 @@ describe('asset:// 渲染', () => {
     } finally {
       releaseAssetUrls();
     }
+  });
+
+  it('登记了内在尺寸：img 带 width/height，并补齐 loading/decoding', () => {
+    try {
+      registerAssetUrl('img-size', 'blob:asset-img-size');
+      registerAssetSize('img-size', 640, 360);
+      const img = renderImg('asset://img-size');
+      expect(img.properties.width).toBe(640);
+      expect(img.properties.height).toBe(360);
+      expect(img.properties.loading).toBe('lazy');
+      expect(img.properties.decoding).toBe('async');
+    } finally {
+      releaseAssetUrls();
+    }
+  });
+
+  it('没尺寸的图不猜，作者写好的属性不覆盖', () => {
+    try {
+      registerAssetUrl('img-nosize', 'blob:asset-img-nosize');
+      // 只有一边的尺寸推不出宽高比 → 当作没有
+      registerAssetSize('img-nosize', 640, undefined);
+      const img = makeImg('asset://img-nosize');
+      img.properties.loading = 'eager';
+      runPlugin([makeParagraph([img])]);
+      expect(img.properties.width).toBeUndefined();
+      expect(img.properties.height).toBeUndefined();
+      expect(img.properties.loading).toBe('eager');
+      expect(img.properties.decoding).toBe('async');
+    } finally {
+      releaseAssetUrls();
+    }
+  });
+
+  it('registerAsset 一次登记 URL / 图注 / 尺寸，release 后清空', () => {
+    releaseAssetUrls();
+    registerAsset('img-all', { url: 'blob:img-all', caption: '图 2-1', width: 320, height: 240 });
+    expect(assetCaption('img-all')).toBe('图 2-1');
+    expect(assetSize('img-all')).toEqual({ width: 320, height: 240 });
+    expect(registeredAssetSizeCount()).toBe(1);
+
+    releaseAssetUrls();
+    expect(registeredAssetSizeCount()).toBe(0);
+    expect(assetSize('img-all')).toBeUndefined();
   });
 
   it('图注登记：空串当没有图注，release 后清空', () => {

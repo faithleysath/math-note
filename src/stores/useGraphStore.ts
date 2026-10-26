@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { toast } from 'sonner';
 import * as db from '../lib/db';
 import { assetFileNames, MAX_ASSET_BYTES, sha256Hex } from '../lib/assets';
-import { registerAssetCaption, registerAssetUrl, releaseAssetUrls } from '../lib/markdown';
+import { registerAsset, registerAssetUrl, releaseAssetUrls } from '../lib/markdown';
 import {
   ancestorIds,
   buildIndex,
@@ -69,11 +69,18 @@ interface GraphState {
   missingAssetIds: string[];
   /** 资源 URL 登记 / 释放的版本号；正文靠它触发重渲染 */
   assetsRevision: number;
+  /**
+   * 正文滚动定位请求。只有「目录点击 / 快捷键 j、k」这类导航会写它，
+   * nonce 自增表示新的一次跳转（同一个节点连点也生效）。
+   * 点正文行只改 selectedId、不动它，所以不会把正文滚走。
+   */
+  reveal: { id: string; nonce: number } | null;
 
   init: () => Promise<void>;
   createBook: (book: BookMeta) => Promise<BookMeta>;
   updateBook: (book: BookMeta) => Promise<BookMeta>;
-  select: (id: string | null) => void;
+  /** scroll 默认 true（目录、搜索、快捷键等导航）；正文行点击传 false，只选中不滚动 */
+  select: (id: string | null, options?: { scroll?: boolean }) => void;
   setEditing: (id: string | null) => void;
   toggleExpanded: (id: string) => void;
   setExpandedBranch: (id: string | null) => void;
@@ -121,11 +128,13 @@ let assetMetas: AssetMeta[] = [];
 /**
  * 释放旧 Blob URL，再给库里所有带二进制的资源建一份新的，
  * 返回「有元信息但没二进制」的 id 列表。换教材时必须先释放，否则 Blob URL 会泄漏。
- * 图注一并登记：没二进制的图也要能显示 caption（见 rehypeAssetScheme）。
+ * 图注与内在尺寸一并登记：没二进制的图也要能显示 caption、占好位置（见 rehypeAssetScheme）。
  */
 async function refreshAssetUrls(metas: AssetMeta[]): Promise<string[]> {
   releaseAssetUrls();
-  for (const meta of metas) registerAssetCaption(meta.id, meta.caption);
+  for (const meta of metas) {
+    registerAsset(meta.id, { caption: meta.caption, width: meta.width, height: meta.height });
+  }
   const withBinary = new Set<string>();
   for (const record of await db.assetsWithBinary()) {
     registerAssetUrl(record.id, URL.createObjectURL(record.data));
@@ -159,6 +168,7 @@ export const useGraphStore = create<GraphState>()((set, get) => {
     assetCount: 0,
     missingAssetIds: [],
     assetsRevision: 0,
+    reveal: null,
 
     init: async () => {
       if (initStarted) return;
@@ -262,7 +272,7 @@ export const useGraphStore = create<GraphState>()((set, get) => {
       return book;
     },
 
-    select: (id) => {
+    select: (id, options) => {
       if (!id) {
         set({ selectedId: null });
         return;
@@ -270,7 +280,15 @@ export const useGraphStore = create<GraphState>()((set, get) => {
       // 选中时自动展开它的祖先链，和原版行为保持一致
       const next = new Set(get().expandedIds);
       for (const ancestorId of ancestorIds(get().index, id)) next.add(ancestorId);
-      set({ selectedId: id, expandedIds: next });
+      if (options?.scroll === false) {
+        set({ selectedId: id, expandedIds: next });
+        return;
+      }
+      set((state) => ({
+        selectedId: id,
+        expandedIds: next,
+        reveal: { id, nonce: (state.reveal?.nonce ?? 0) + 1 },
+      }));
     },
 
     setMobileView: (view) => set({ mobileView: view }),

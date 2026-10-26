@@ -1,6 +1,7 @@
 import MDEditor from '@uiw/react-md-editor';
 import type { ProcessedNode } from '../../lib/schema';
 import { markdownPlugins } from '../../lib/markdown';
+import { markdownComponents } from '../markdownComponents';
 import { useMemo } from 'react';
 import {
   Accordion,
@@ -33,7 +34,7 @@ const ExerciseNodeRenderer = ({ node, solutionLabel = '显示/隐藏题解' }: E
       <MDEditor.Markdown
         source={displayContent}
         style={{ backgroundColor: 'transparent' }}
-        {...markdownPlugins()}
+        {...markdownPlugins()} components={markdownComponents()}
       />
       {solutionContent && (
         <Accordion type="single" collapsible className="w-full">
@@ -45,7 +46,7 @@ const ExerciseNodeRenderer = ({ node, solutionLabel = '显示/隐藏题解' }: E
               <MDEditor.Markdown
                 source={solutionContent}
                 style={{ backgroundColor: 'transparent' }}
-                {...markdownPlugins()}
+                {...markdownPlugins()} components={markdownComponents()}
               />
             </AccordionContent>
           </AccordionItem>

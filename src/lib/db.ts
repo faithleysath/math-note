@@ -74,6 +74,9 @@ function toAssetMeta(record: AssetRecord): AssetMeta {
     alt: record.alt,
     // 图注是教材内容，重开页面 / 载入图片后再导出都不能丢
     ...(record.caption === undefined ? {} : { caption: record.caption }),
+    // 内在尺寸是渲染占位用的，导出后重新导入也得带着
+    ...(record.width === undefined ? {} : { width: record.width }),
+    ...(record.height === undefined ? {} : { height: record.height }),
     originalName: record.originalName,
   };
 }

@@ -4,7 +4,6 @@ import { useGraphStore } from '../../stores/useGraphStore';
 import { subjectProfile } from '../../lib/subjects';
 import { collectSubtree, numberDisplayFor } from '../../lib/graph';
 import type { ProcessedNode } from '../../lib/schema';
-import { useVirtualizer } from '@tanstack/react-virtual';
 import NodeRenderer from '../renderers/NodeRenderer';
 import { Button } from '../ui/button';
 import { Edit2, Plus, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
@@ -22,6 +21,7 @@ const MainContent = () => {
   const selectedId = useGraphStore(state => state.selectedId);
   const editingId = useGraphStore(state => state.editingId);
   const select = useGraphStore(state => state.select);
+  const reveal = useGraphStore(state => state.reveal);
   const setEditing = useGraphStore(state => state.setEditing);
   const moveSibling = useGraphStore(state => state.moveSibling);
   const deleteSubtree = useGraphStore(state => state.deleteSubtree);
@@ -32,6 +32,9 @@ const MainContent = () => {
   const [nodeToDelete, setNodeToDelete] = useState<Node | null>(null);
   const [insertAfterNodeId, setInsertAfterNodeId] = useState<string | null>(null);
   const parentRef = useRef<HTMLDivElement>(null);
+  // 正文行不再虚拟化：行节点直接按 id 记一份，供「目录 / 快捷键」跳转时定位
+  const rowRefs = useRef(new Map<string, HTMLDivElement>());
+  const handledRevealNonce = useRef(0);
 
   const handleAddClick = (nodeId: string) => {
     const fullParentNode = index.nodes.get(nodeId);
@@ -131,6 +134,17 @@ const MainContent = () => {
     });
   }, [nodes, index, book]);
 
+  // 同一父节点下的兄弟分组：行工具栏的「上移 / 下移」禁用状态要用，避免每行都扫一遍全表
+  const siblingsByParent = useMemo(() => {
+    const map = new Map<string | null, Node[]>();
+    for (const node of nodes) {
+      const list = map.get(node.parentId);
+      if (list) list.push(node);
+      else map.set(node.parentId, [node]);
+    }
+    return map;
+  }, [nodes]);
+
   // Hotkeys for navigation
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -157,28 +171,23 @@ const MainContent = () => {
     };
   }, [selectedId, processedNodes, editingId, select]);
 
-  // TanStack Virtual 返回的函数无法被 React Compiler 安全 memo；跳过该组件是预期行为
-  // eslint-disable-next-line react-hooks/incompatible-library
-  const rowVirtualizer = useVirtualizer({
-    count: processedNodes.length,
-    getScrollElement: () => parentRef.current,
-    estimateSize: () => 200,
-    overscan: 5,
-  });
-
-  // Scroll to the selected node
+  // 只有目录点击 / j·k 这类导航会写 store.reveal；正文行点击只选中、不写，
+  // 所以点正文不会把视图滚走。
+  // 落点用 align:start + 瞬时滚动（不用 smooth）：smooth 跑到一半还会被后续
+  // 布局变化改目标，长行（几百上千 px）下看起来就是「跳到别的地方」。
   useEffect(() => {
-    if (selectedId) {
-      const position = processedNodes.findIndex(node => node.id === selectedId);
-      if (position !== -1) {
-        rowVirtualizer.scrollToIndex(position, { align: 'center', behavior: 'smooth' });
-      }
-    }
-  }, [selectedId, processedNodes, rowVirtualizer]);
+    if (!reveal || reveal.nonce === handledRevealNonce.current) return;
+    const container = parentRef.current;
+    const row = rowRefs.current.get(reveal.id);
+    if (!container || !row) return;
+    handledRevealNonce.current = reveal.nonce;
+    const offset = row.getBoundingClientRect().top - container.getBoundingClientRect().top;
+    container.scrollTop = Math.max(0, container.scrollTop + offset);
+  }, [reveal]);
 
   return (
     <>
-      <div ref={parentRef} className="h-full overflow-y-auto">
+      <div ref={parentRef} data-scroll-root className="h-full overflow-y-auto">
         {!expandedBranchId ? (
           <div className="h-full flex items-center justify-center p-4">
             <p className="text-muted-foreground">展开一个分支以查看其内容</p>
@@ -192,10 +201,9 @@ const MainContent = () => {
             </Button>
           </div>
         ) : (
-          <div style={{ height: `${rowVirtualizer.getTotalSize()}px`, width: '100%', position: 'relative' }}>
-            {rowVirtualizer.getVirtualItems().map((virtualItem) => {
-              const node = processedNodes[virtualItem.index];
-              const siblings = nodes.filter(n => n.parentId === node.parentId);
+          <div className="w-full">
+            {processedNodes.map((node) => {
+              const siblings = siblingsByParent.get(node.parentId) ?? [];
               const nodeIndexWithinSiblings = siblings.findIndex(n => n.id === node.id);
               // 编辑中的节点不再显示悬浮工具栏和行间插入线，避免挡住编辑框
               const isEditing = editingId === node.id;
@@ -203,17 +211,12 @@ const MainContent = () => {
               return (
                 <div
                   key={node.id}
-                  ref={rowVirtualizer.measureElement}
-                  data-index={virtualItem.index}
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: '100%',
-                    transform: `translateY(${virtualItem.start}px)`,
+                  ref={(el) => {
+                    if (el) rowRefs.current.set(node.id, el);
+                    else rowRefs.current.delete(node.id);
                   }}
                   className="group/item relative px-4 py-1.5 transition-colors duration-200 hover:bg-slate-100 dark:hover:bg-slate-800"
-                  onClick={() => select(node.id)}
+                  onClick={() => select(node.id, { scroll: false })}
                 >
                   <NodeRenderer node={node} />
                   {!isEditing && (

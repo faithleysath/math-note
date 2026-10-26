@@ -189,6 +189,12 @@
 
 .asset-figure > img {
   display: block;
+  /*
+   * 图片带 width/height 属性（rehypeAssetScheme 从 AssetMeta 写上）时，浏览器解码前就能
+   * 按宽高比留出准确高度。这里 width / height 都交给比例决定：哪一边都不拉伸，
+   * max-width 管住窄屏，height:auto 保证缩放后不变形。
+   */
+  width: auto;
   max-width: 100%;
   height: auto;
   margin-inline: auto;
@@ -208,4 +214,59 @@
   text-align: center;
   white-space: normal;
   overflow-wrap: anywhere;
+}
+
+/*
+ * 正文里的 ```mermaid 代码块（MermaidBlock）。
+ * 图本身是 mermaid 生成的 svg：限宽、居中、长图允许横向滚动。
+ */
+.mermaid-block {
+  display: flex;
+  justify-content: center;
+  margin: 1rem 0;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.mermaid-block svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.mermaid-block-pending {
+  color: var(--muted-foreground);
+  font-size: 0.8125rem;
+  font-style: italic;
+}
+
+/* 降级：源码用等宽字体原样显示，错误提示单独一行，不影响正文其他内容 */
+.mermaid-block-error {
+  display: block;
+  border-left: 3px solid var(--destructive);
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklch, var(--muted) 60%, transparent);
+  padding: 0.5rem 0.75rem;
+}
+
+.wmde-markdown .mermaid-block-error .mermaid-source {
+  margin: 0;
+  background: transparent;
+  font-size: 0.8125rem;
+}
+
+.mermaid-block-error .mermaid-error-message {
+  margin: 0.375rem 0 0;
+  color: var(--destructive);
+  font-size: 0.8125rem;
+}
+
+.mermaid-block-error .mermaid-retry {
+  margin-top: 0.375rem;
+  padding: 0.125rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--background);
+  color: var(--foreground);
+  font-size: 0.75rem;
+  cursor: pointer;
 }

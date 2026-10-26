@@ -15,6 +15,7 @@
     "check:examples": "bun run scripts/check-examples.ts",
     "render:pages": "bun run scripts/render-book-pages.ts",
     "crop:figures": "bun run scripts/crop-figures.ts",
+    "backfill:asset-size": "bun run scripts/backfill-asset-size.ts",
     "draw:boxes": "bun run scripts/draw-expected-boxes.ts",
     "check:part": "bun run scripts/check-book-part.ts",
     "check:expected": "bun run scripts/check-expected.ts",

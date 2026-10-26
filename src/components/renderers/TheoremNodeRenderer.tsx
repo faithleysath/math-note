@@ -1,6 +1,7 @@
 import MDEditor from '@uiw/react-md-editor';
 import { typeLabel, type ProcessedNode } from '../../lib/schema';
 import { markdownPlugins } from '../../lib/markdown';
+import { markdownComponents } from '../markdownComponents';
 import { contentWithNumber } from '../../lib/display';
 import { useMemo, useState } from 'react';
 
@@ -50,7 +51,7 @@ const TheoremNodeRenderer = ({ node }: TheoremNodeRendererProps) => {
       <MDEditor.Markdown
         source={displayContent}
         style={{ backgroundColor: 'transparent' }}
-        {...markdownPlugins()}
+        {...markdownPlugins()} components={markdownComponents()}
       />
     </div>
   );

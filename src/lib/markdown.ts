@@ -17,8 +17,46 @@ const assetUrls = new Map<string, string>();
  */
 const assetCaptions = new Map<string, string>();
 
+/**
+ * 已注册的 asset id → 图的像素尺寸（AssetMeta.width / height，裁图时从 PNG 读出）。
+ * 渲染时写进 <img width height>，浏览器在解码前就能按宽高比留好位置，减少滚动跳动。
+ * 只知道一边的尺寸不留：缺一边就推不出宽高比，不猜。
+ */
+const assetSizes = new Map<string, { width: number; height: number }>();
+
 export function registerAssetUrl(id: string, url: string): void {
   assetUrls.set(id, url);
+}
+
+function isPixel(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value > 0;
+}
+
+/**
+ * 登记图片内在尺寸。两边都是正整数才记，否则清掉（老数据没有尺寸属正常情况）。
+ */
+export function registerAssetSize(id: string, width?: number, height?: number): void {
+  if (isPixel(width) && isPixel(height)) assetSizes.set(id, { width, height });
+  else assetSizes.delete(id);
+}
+
+/** 查已登记的尺寸；没有返回 undefined */
+export function assetSize(id: string): { width: number; height: number } | undefined {
+  return assetSizes.get(id);
+}
+
+/** 一次登记一个资源的全部渲染信息：URL / 图注 / 内在尺寸 */
+export interface AssetRegistration {
+  url?: string;
+  caption?: string;
+  width?: number;
+  height?: number;
+}
+
+export function registerAsset(id: string, meta: AssetRegistration): void {
+  if (meta.url) registerAssetUrl(id, meta.url);
+  registerAssetCaption(id, meta.caption);
+  registerAssetSize(id, meta.width, meta.height);
 }
 
 /**
@@ -36,7 +74,7 @@ export function assetCaption(id: string): string | undefined {
   return assetCaptions.get(id);
 }
 
-/** 释放所有已登记的 Blob URL 与图注（切换教材 / 卸载时调用） */
+/** 释放所有已登记的 Blob URL、图注与尺寸（切换教材 / 卸载时调用） */
 export function releaseAssetUrls(): void {
   if (typeof URL !== 'undefined' && typeof URL.revokeObjectURL === 'function') {
     for (const url of assetUrls.values()) {
@@ -45,6 +83,7 @@ export function releaseAssetUrls(): void {
   }
   assetUrls.clear();
   assetCaptions.clear();
+  assetSizes.clear();
 }
 
 /** 测试用：当前登记了多少个资源 */
@@ -55,6 +94,11 @@ export function registeredAssetUrlCount(): number {
 /** 测试用：当前登记了多少条图注 */
 export function registeredAssetCaptionCount(): number {
   return assetCaptions.size;
+}
+
+/** 测试用：当前登记了多少条尺寸 */
+export function registeredAssetSizeCount(): number {
+  return assetSizes.size;
 }
 
 const ASSET_FIGURE_CLASS = 'asset-figure';
@@ -89,6 +133,14 @@ function resolveAssets(node: Root | Element, figures: Map<Element, AssetFigureIn
       } else {
         missingAsset(node, id);
       }
+      const size = assetSizes.get(id);
+      if (size) {
+        node.properties.width = size.width;
+        node.properties.height = size.height;
+      }
+      // 首屏先按占位高度排好版，滚到图时再解码；作者已经写了的属性不覆盖
+      node.properties.loading ??= 'lazy';
+      node.properties.decoding ??= 'async';
       const caption = assetCaptions.get(id);
       if (caption) figures.set(node, { id, caption });
     }

@@ -1,6 +1,7 @@
 import MDEditor from '@uiw/react-md-editor';
 import type { ProcessedNode } from '../../lib/schema';
 import { markdownPlugins } from '../../lib/markdown';
+import { markdownComponents } from '../markdownComponents';
 import { contentWithNumber, titleCarriesNumber } from '../../lib/display';
 import { useMemo } from 'react';
 import {
@@ -35,7 +36,7 @@ const SolutionRecordRenderer = ({ node }: SolutionRecordRendererProps) => {
             <MDEditor.Markdown
               source={displayContent}
               style={{ backgroundColor: 'transparent' }}
-              {...markdownPlugins()}
+              {...markdownPlugins()} components={markdownComponents()}
             />
             {solutionContent && (
               <>
@@ -43,7 +44,7 @@ const SolutionRecordRenderer = ({ node }: SolutionRecordRendererProps) => {
                 <MDEditor.Markdown
                   source={solutionContent}
                   style={{ backgroundColor: 'transparent' }}
-                  {...markdownPlugins()}
+                  {...markdownPlugins()} components={markdownComponents()}
                 />
               </>
             )}

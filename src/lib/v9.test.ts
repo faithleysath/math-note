@@ -51,6 +51,9 @@ const asset: AssetMeta = {
   byteLength: 2048,
   sha256: 'f'.repeat(64),
   alt: '斜面示意图',
+  // 裁图流水线从 PNG 头回填的内在尺寸：往返不能丢
+  width: 1280,
+  height: 720,
   originalName: '斜面.png',
 };
 
@@ -173,6 +176,31 @@ describe('v9 资产与锚点校验', () => {
       assets: [{ ...asset, mimeType: 'image/svg+xml' }],
     });
     expect(() => parseGraph(clone(exported))).toThrowError(/image\/svg\+xml|没通过校验/);
+  });
+
+  it('width / height 必须是正整数，老数据没有也照常解析', () => {
+    const base = clone(serializeGraph(book, nodes, [], [], { assets: [asset] }));
+    expect(
+      graphJSONSchemaV9.safeParse({
+        ...base,
+        assets: [{ ...asset, width: 0 }],
+      }).success,
+    ).toBe(false);
+    expect(
+      graphJSONSchemaV9.safeParse({
+        ...base,
+        assets: [{ ...asset, height: 1.5 }],
+      }).success,
+    ).toBe(false);
+    const withoutSize = { ...asset } as Record<string, unknown>;
+    delete withoutSize.width;
+    delete withoutSize.height;
+    expect(
+      graphJSONSchemaV9.safeParse({
+        ...base,
+        assets: [withoutSize],
+      }).success,
+    ).toBe(true);
   });
 
   it('锚点指向不存在的节点会被拒绝', () => {

@@ -31,12 +31,12 @@ import {
   writeJsonFile,
 } from '../src/lib/cli-args';
 import { regionProblem, regionToPixels, type Region, type RenderedSize } from '../src/lib/coords';
+import { readPngSize as readPngSizeOf } from '../src/lib/png-size';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(HERE, '..');
 const SUK = join(REPO_ROOT, 'local-textbook', 'sukey');
 
-const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 const ASSET_ID_RE = /^[\w.-]+$/;
 
 const USAGE = `裁图流水线：按 region 裁插图 + 算哈希 + 回填 part JSON
@@ -123,8 +123,8 @@ interface ReviewEntry {
 }
 
 type AssetOutcome =
-  | { status: 'cropped'; width: number; height: number; bytes: number }
-  | { status: 'skipped'; width: number; height: number; bytes: number }
+  | { status: 'cropped'; width: number; height: number; bytes: number; jsonDirty: boolean }
+  | { status: 'skipped'; width: number; height: number; bytes: number; jsonDirty: boolean }
   | { status: 'failed'; reason: string };
 
 interface Counters {
@@ -132,6 +132,7 @@ interface Counters {
   skipped: number;
   failed: number;
   croppedBytes: number;
+  sizeBackfilled: number;
   sizes: Array<{ label: string; width: number; height: number; bytes: number }>;
 }
 
@@ -172,13 +173,7 @@ function readPngSize(path: string): RenderedSize | null {
   } catch {
     return null;
   }
-  if (buffer.length < 24) return null;
-  if (!buffer.subarray(0, 8).equals(PNG_SIGNATURE)) return null;
-  if (buffer.toString('latin1', 12, 16) !== 'IHDR') return null;
-  const width = buffer.readUInt32BE(16);
-  const height = buffer.readUInt32BE(20);
-  if (width < 1 || height < 1) return null;
-  return { width, height };
+  return readPngSizeOf(buffer);
 }
 
 function sha256Of(buffer: Buffer): string {
@@ -454,7 +449,7 @@ function main(): number {
   }
 
   const parts = loadParts(options.parts);
-  const counters: Counters = { cropped: 0, skipped: 0, failed: 0, croppedBytes: 0, sizes: [] };
+  const counters: Counters = { cropped: 0, skipped: 0, failed: 0, croppedBytes: 0, sizeBackfilled: 0, sizes: [] };
   const failures: Array<{ assetId: string; reason: string }> = [];
   const review = new Map<string, ReviewEntry[]>();
   const tempDirs = new Set<string>();
@@ -505,6 +500,10 @@ function main(): number {
           partDirty = true;
         } else {
           counters.skipped += 1;
+        }
+        if (outcome.jsonDirty) {
+          counters.sizeBackfilled += 1;
+          partDirty = true;
         }
         counters.sizes.push({ label, width: outcome.width, height: outcome.height, bytes: outcome.bytes });
 
@@ -574,6 +573,7 @@ function main(): number {
     );
   }
   if (dirtyParts > 0) console.log(`回填了 ${dirtyParts} 个 part 文件`);
+  if (counters.sizeBackfilled > 0) console.log(`回填尺寸 ${counters.sizeBackfilled} 处`);
 
   if (failures.length > 0) {
     console.error('');
@@ -652,13 +652,32 @@ function processAsset(context: ProcessContext): AssetOutcome {
     if (fileSha !== asset.sha256) problems.push('sha256 与磁盘文件不一致');
 
     if (problems.length === 0) {
-      return { status: 'skipped', width: rect.width, height: rect.height, bytes: existing.size };
+      // 图已经对了，但 part JSON 里可能还没有尺寸（老数据）：顺手补上
+      const jsonDirty =
+        !options.dryRun && (asset.width !== rect.width || asset.height !== rect.height);
+      if (!options.dryRun) {
+        asset.width = rect.width;
+        asset.height = rect.height;
+      }
+      return {
+        status: 'skipped',
+        width: rect.width,
+        height: rect.height,
+        bytes: existing.size,
+        jsonDirty,
+      };
     }
     console.warn(`  ! ${id} 已有图但${problems.join('；')}，重新裁剪`);
   }
 
   if (options.dryRun) {
-    return { status: 'cropped', width: rect.width, height: rect.height, bytes: existing?.size ?? 0 };
+    return {
+      status: 'cropped',
+      width: rect.width,
+      height: rect.height,
+      bytes: existing?.size ?? 0,
+      jsonDirty: false,
+    };
   }
 
   const assetsDir = dirname(target);
@@ -690,8 +709,17 @@ function processAsset(context: ProcessContext): AssetOutcome {
   asset.mimeType = 'image/png';
   asset.byteLength = produced.buffer.length;
   asset.sha256 = sha256;
+  // PNG 内在尺寸，渲染层靠它提前占位（rehypeAssetScheme）
+  asset.width = png.width;
+  asset.height = png.height;
 
-  return { status: 'cropped', width: png.width, height: png.height, bytes: produced.buffer.length };
+  return {
+    status: 'cropped',
+    width: png.width,
+    height: png.height,
+    bytes: produced.buffer.length,
+    jsonDirty: true,
+  };
 }
 
 try {

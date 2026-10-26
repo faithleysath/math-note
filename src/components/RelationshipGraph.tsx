@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react';
 import mermaid from 'mermaid';
+import { ensureMermaid } from '../lib/mermaid';
 import type { Node } from '../lib/schema';
 import type { RelatedNodeInfo } from '../hooks/useRelatedNodes';
 import { PREDICATE_SPECS } from '../lib/predicates';
@@ -26,7 +27,7 @@ const RelationshipGraph = ({ selectedNode, incoming, outgoing }: RelationshipGra
 
   useEffect(() => {
     let isCancelled = false;
-    mermaid.initialize({ startOnLoad: false, theme: 'neutral' });
+    ensureMermaid();
 
     const selectedNodeId = sanitizeId(selectedNode.id);
     let graphDefinition = 'graph LR\n';

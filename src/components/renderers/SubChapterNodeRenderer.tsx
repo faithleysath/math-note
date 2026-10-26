@@ -1,6 +1,7 @@
 import MDEditor from '@uiw/react-md-editor';
 import type { ProcessedNode } from '../../lib/schema';
 import { markdownPlugins } from '../../lib/markdown';
+import { markdownComponents } from '../markdownComponents';
 import { titleCarriesNumber } from '../../lib/display';
 import { useMemo } from 'react';
 
@@ -33,7 +34,7 @@ const SubChapterNodeRenderer = ({ node }: SubChapterNodeRendererProps) => {
         <MDEditor.Markdown
           source={displayContent}
           style={{ backgroundColor: 'transparent' }}
-          {...markdownPlugins()}
+          {...markdownPlugins()} components={markdownComponents()}
         />
       </div>
     </>
