@@ -23,6 +23,10 @@ typescript-eslint does not support TS 7.0.
 - `rehype-rewrite`
 - `@types/uuid`
 
+## 分享功能移除
+
+分享功能已整体删除：`api/upload.js`、`@vercel/blob`、`?note_url=` 只读加载、`loadSnapshot` 与 `readOnly` 状态都不再存在。Vercel 现在只需要部署纯前端构建。
+
 ## 大版本迁移
 
 ### Vite 8 / TypeScript 6
@@ -58,7 +62,6 @@ API 完全换了：
 ### 其他大版本
 
 - Mermaid 12：关系图 `mermaid.render` 正常，已用真实关系数据验证。
-- @vercel/blob 2：`put(pathname, body, { access, contentType, addRandomSuffix })` 接口仍在，分享上传逻辑不需要改。
 - lucide-react 1.x、React 19.3、Tailwind 4.3、@uiw/react-md-editor 4.1：现有导入和组件 API 兼容。
 
 ## 复验命令

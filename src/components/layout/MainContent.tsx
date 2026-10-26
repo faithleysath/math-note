@@ -21,7 +21,6 @@ const MainContent = () => {
   const expandedBranchId = useGraphStore(state => state.expandedBranchId);
   const selectedId = useGraphStore(state => state.selectedId);
   const editingId = useGraphStore(state => state.editingId);
-  const readOnly = useGraphStore(state => state.readOnly);
   const select = useGraphStore(state => state.select);
   const setEditing = useGraphStore(state => state.setEditing);
   const moveSibling = useGraphStore(state => state.moveSibling);
@@ -187,12 +186,10 @@ const MainContent = () => {
         ) : nodes.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center p-4">
             <p className="text-muted-foreground mb-4">此分支为空</p>
-            {!readOnly && (
-              <Button onClick={handleAddNewNodeToBranch}>
-                <Plus className="h-4 w-4 mr-2" />
-                添加第一个主章节
-              </Button>
-            )}
+            <Button onClick={handleAddNewNodeToBranch}>
+              <Plus className="h-4 w-4 mr-2" />
+              添加第一个主章节
+            </Button>
           </div>
         ) : (
           <div style={{ height: `${rowVirtualizer.getTotalSize()}px`, width: '100%', position: 'relative' }}>
@@ -219,7 +216,7 @@ const MainContent = () => {
                   onClick={() => select(node.id)}
                 >
                   <NodeRenderer node={node} />
-                  {!readOnly && !isEditing && (
+                  {!isEditing && (
                     <>
                       <div
                         className="group/insert absolute -bottom-2 left-0 w-full h-4 flex items-center justify-center cursor-pointer"

@@ -26,7 +26,6 @@ describe('教材保护', () => {
       book: null,
       index: buildIndex([], []),
       status: 'ready',
-      readOnly: false,
     });
 
     await expect(

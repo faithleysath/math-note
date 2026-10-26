@@ -43,8 +43,6 @@ interface GraphState {
   book: BookMeta | null;
   status: AppStatus;
   error: string | null;
-  readOnly: boolean;
-  sourceLabel: string;
   selectedId: string | null;
   expandedBranchId: string | null;
   expandedIds: Set<string>;
@@ -81,17 +79,10 @@ interface GraphState {
 
   exportGraph: () => GraphJSON;
   importGraph: (json: unknown) => Promise<void>;
-  loadSnapshot: (json: unknown, label: string) => Promise<void>;
   clearAll: () => Promise<void>;
 }
 
 const emptyIndex = (): GraphIndex => buildIndex([], [], []);
-
-function assertWritable(state: GraphState) {
-  if (state.readOnly) {
-    throw new ValidationError('readOnly', '当前是只读模式，不能修改。');
-  }
-}
 
 function describeError(error: unknown): string {
   if (error instanceof ValidationError) return error.message;
@@ -99,8 +90,7 @@ function describeError(error: unknown): string {
   return String(error);
 }
 
-// React StrictMode 会重复触发 effect，init 必须只跑一次，
-// 否则迁移会被执行两遍（虽然幂等，但会重复写备份、重复弹提示）。
+// React StrictMode 会重复触发 effect，init 必须只跑一次。
 let initStarted = false;
 
 export const useGraphStore = create<GraphState>()((set, get) => {
@@ -117,8 +107,6 @@ export const useGraphStore = create<GraphState>()((set, get) => {
     book: null,
     status: 'loading',
     error: null,
-    readOnly: false,
-    sourceLabel: '本地',
     selectedId: null,
     expandedBranchId: null,
     expandedIds: new Set(),
@@ -137,8 +125,6 @@ export const useGraphStore = create<GraphState>()((set, get) => {
           book: data.book,
           status: 'ready',
           error: null,
-          readOnly: false,
-          sourceLabel: '本地',
           expandedBranchId: firstBranch,
           expandedIds: new Set(firstBranch ? [firstBranch] : []),
           selectedId: firstBranch,
@@ -174,8 +160,6 @@ export const useGraphStore = create<GraphState>()((set, get) => {
         book,
         status: 'ready',
         error: null,
-        readOnly: false,
-        sourceLabel: '本地',
         selectedId: root.id,
         expandedBranchId: root.id,
         expandedIds: new Set([root.id]),
@@ -254,7 +238,6 @@ export const useGraphStore = create<GraphState>()((set, get) => {
     // -------------------------------------------------------------------------
     createNode: async (input) => {
       const state = get();
-      assertWritable(state);
       if (!state.book) {
         throw new ValidationError('book', '请先新建或导入教材，再添加内容。');
       }
@@ -310,7 +293,6 @@ export const useGraphStore = create<GraphState>()((set, get) => {
 
     updateNode: async (id, patch) => {
       const state = get();
-      assertWritable(state);
       validateNodePatch(state.index, id, patch);
 
       const existing = state.index.nodes.get(id);
@@ -351,7 +333,6 @@ export const useGraphStore = create<GraphState>()((set, get) => {
 
     deleteSubtree: async (id) => {
       const state = get();
-      assertWritable(state);
 
       const ids = collectSubtree(state.index, id);
       const idSet = new Set(ids);
@@ -417,7 +398,6 @@ export const useGraphStore = create<GraphState>()((set, get) => {
 
     moveSibling: async (id, direction) => {
       const state = get();
-      assertWritable(state);
 
       const siblings = siblingIds(state.index, id);
       const position = siblings.indexOf(id);
@@ -464,7 +444,6 @@ export const useGraphStore = create<GraphState>()((set, get) => {
     // -------------------------------------------------------------------------
     createEdge: async (input) => {
       const state = get();
-      assertWritable(state);
 
       const canonical = canonicalizePair(input.predicate, input.from, input.to);
       // 不再自动删除任何旧关系：不同前提/语境的断言必须共存
@@ -497,7 +476,6 @@ export const useGraphStore = create<GraphState>()((set, get) => {
 
     updateEdge: async (id, patch) => {
       const state = get();
-      assertWritable(state);
       const existing = state.index.edges.find((edge) => edge.id === id);
       if (!existing) throw new ValidationError('id', '关系不存在。');
 
@@ -518,7 +496,6 @@ export const useGraphStore = create<GraphState>()((set, get) => {
 
     deleteEdge: async (id) => {
       const state = get();
-      assertWritable(state);
       await db.removeEdges([id]);
       const edges = state.index.edges.filter((edge) => edge.id !== id);
       set({ index: buildIndex(state.index.nodes.values(), edges, state.index.steps) });
@@ -529,7 +506,6 @@ export const useGraphStore = create<GraphState>()((set, get) => {
     // -------------------------------------------------------------------------
     createStep: async (input) => {
       const state = get();
-      assertWritable(state);
       validateNewStep(state.index, input);
 
       const now = Date.now();
@@ -559,7 +535,6 @@ export const useGraphStore = create<GraphState>()((set, get) => {
 
     updateStep: async (id, patch) => {
       const state = get();
-      assertWritable(state);
       const existing = state.index.steps.find((step) => step.id === id);
       if (!existing) throw new ValidationError('id', '推理步骤不存在。');
 
@@ -590,7 +565,6 @@ export const useGraphStore = create<GraphState>()((set, get) => {
 
     deleteStep: async (id) => {
       const state = get();
-      assertWritable(state);
       await db.removeSteps([id]);
       const steps = state.index.steps.filter((step) => step.id !== id);
       set({
@@ -599,7 +573,7 @@ export const useGraphStore = create<GraphState>()((set, get) => {
     },
 
     // -------------------------------------------------------------------------
-    // 导入 / 导出 / 快照
+    // 导入 / 导出
     // -------------------------------------------------------------------------
     exportGraph: () => {
       const book = get().book;
@@ -628,31 +602,12 @@ export const useGraphStore = create<GraphState>()((set, get) => {
         book: parsed.book,
         status: 'ready',
         error: null,
-        readOnly: false,
-        sourceLabel: '本地',
         selectedId: index.roots[0] ?? null,
         expandedBranchId: index.roots[0] ?? null,
         expandedIds: new Set(index.roots.slice(0, 1)),
         editingId: null,
       });
 
-    },
-
-    loadSnapshot: async (json, label) => {
-      const parsed = parseGraph(json);
-      const index = buildIndex(parsed.nodes, parsed.edges, parsed.steps);
-      set({
-        index,
-        book: parsed.book,
-        status: 'ready',
-        error: null,
-        readOnly: true,
-        sourceLabel: label,
-        selectedId: index.roots[0] ?? null,
-        expandedBranchId: index.roots[0] ?? null,
-        expandedIds: new Set(index.roots.slice(0, 1)),
-        editingId: null,
-      });
     },
 
     clearAll: async () => {

@@ -15,18 +15,18 @@ import { useWindowSize } from "./hooks/useWindowSize"
 import { PanelLeft, PanelRight } from "lucide-react"
 import { cn } from "./lib/utils"
 
-const NotFoundPage = () => (
+const ErrorPage = ({ message }: { message: string | null }) => (
   <div className="h-screen w-screen bg-background text-foreground flex flex-col items-center justify-center space-y-4">
-    <h1 className="text-4xl font-bold">404</h1>
-    <p className="text-muted-foreground">找不到请求的笔记，它可能已过期或链接不正确。</p>
-    <Button onClick={() => window.location.href = '/'}>返回主页</Button>
+    <h1 className="text-4xl font-bold">加载失败</h1>
+    <p className="text-muted-foreground">{message ?? '读取本地教材数据失败。'}</p>
+    <Button onClick={() => window.location.reload()}>重试</Button>
   </div>
 );
 
 function App() {
   const status = useGraphStore(state => state.status);
   const init = useGraphStore(state => state.init);
-  const loadSnapshot = useGraphStore(state => state.loadSnapshot);
+  const error = useGraphStore(state => state.error);
   const mobileView = useGraphStore(state => state.mobileView);
   const setMobileView = useGraphStore(state => state.setMobileView);
   const { width } = useWindowSize();
@@ -46,55 +46,11 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const initializeApp = async () => {
-      const params = new URLSearchParams(window.location.search);
-      const noteUrl = params.get('note_url');
-
-      if (noteUrl) {
-        let urlToLoad: string | null;
-        // First, try to treat it as a direct URL
-        try {
-          new URL(noteUrl); // Validate if it's a full URL
-          urlToLoad = noteUrl;
-        } catch {
-          // If it's not a valid URL, assume it's Base64 encoded
-          try {
-            urlToLoad = atob(noteUrl);
-          } catch (error) {
-            console.error("Invalid Base64 in note_url, ignoring:", error);
-            urlToLoad = null;
-          }
-        }
-
-        if (urlToLoad) {
-          try {
-            const response = await fetch(urlToLoad);
-            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-            const data = await response.json();
-            await loadSnapshot(data, '只读分享');
-          } catch (caught) {
-            useGraphStore.setState({
-              status: 'error',
-              error: caught instanceof Error ? caught.message : '读取分享的笔记失败。',
-            });
-          }
-        } else {
-          // If note_url was present but invalid, show 404
-          useGraphStore.setState({ status: 'error', error: '分享链接里的地址不合法。' });
-        }
-      } else {
-        // If no URL parameter is found, load local data
-        await init();
-      }
-    };
-
-    initializeApp();
-    // The dependency array is intentionally left empty to run only once on mount.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    void init();
+  }, [init]);
 
   if (status === 'error') {
-    return <NotFoundPage />;
+    return <ErrorPage message={error} />;
   }
 
   const handleTouchStart = () => {

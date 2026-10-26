@@ -25,7 +25,7 @@ import { Input } from '../ui/input';
 import { useGraphStore } from '../../stores/useGraphStore';
 import { toast } from 'sonner';
 import Search from '../Search';
-import { Upload, Download, Share2, X, Plus, BookPlus, Pencil } from 'lucide-react';
+import { Upload, Download, X, Plus, BookPlus, Pencil } from 'lucide-react';
 import { SCHOOL_STAGES, STAGE_LABELS, SUBJECTS, SUBJECT_LABELS, type SchoolStage, type Subject } from '../../lib/schema';
 import { useWindowSize } from '@/hooks/useWindowSize';
 
@@ -51,9 +51,6 @@ const LeftSidebar = () => {
   const [bookStage, setBookStage] = useState<SchoolStage>('senior');
   const [bookEdition, setBookEdition] = useState('');
   const [isImportConfirmOpen, setIsImportConfirmOpen] = useState(false);
-  const [isSharing, setIsSharing] = useState(false);
-  const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
-  const [shareUrl, setShareUrl] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const fileToImportRef = useRef<File | null>(null);
 
@@ -92,39 +89,6 @@ const LeftSidebar = () => {
     } catch (error) {
       console.error('Failed to export data:', error);
       toast.error(error instanceof Error ? error.message : '数据导出失败。');
-    }
-  };
-
-  const handleShare = async () => {
-    setIsSharing(true);
-    try {
-      const data = exportGraph();
-      const response = await fetch('/api/upload', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || 'Upload failed');
-      }
-
-      const result = await response.json();
-      // Encode the URL in Base64 to make it cleaner
-      const encodedUrl = btoa(result.url);
-      const fullShareUrl = `${window.location.origin}?note_url=${encodedUrl}`;
-
-      setShareUrl(fullShareUrl);
-      setIsShareDialogOpen(true);
-
-    } catch (error) {
-      console.error('Failed to share data:', error);
-      toast.error(`分享失败: ${error instanceof Error ? error.message : '未知错误'}`);
-    } finally {
-      setIsSharing(false);
     }
   };
 
@@ -264,16 +228,6 @@ const LeftSidebar = () => {
               </TooltipTrigger>
               <TooltipContent>
                 <p>新建教材</p>
-              </TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="分享" onClick={handleShare} disabled={isSharing}>
-                  <Share2 className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>分享 (上传并复制链接)</p>
               </TooltipContent>
             </Tooltip>
             <Tooltip>
@@ -470,29 +424,6 @@ const LeftSidebar = () => {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-        <Dialog open={isShareDialogOpen} onOpenChange={setIsShareDialogOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>分享链接</DialogTitle>
-            </DialogHeader>
-            <div className="py-4 flex items-center space-x-2">
-              <Input value={shareUrl} readOnly />
-              <Button onClick={() => {
-                navigator.clipboard.writeText(shareUrl);
-                toast.success('链接已复制到剪贴板。');
-              }}>
-                复制
-              </Button>
-            </div>
-            <DialogFooter>
-              <DialogClose asChild>
-                <Button type="button" variant="secondary">
-                  关闭
-                </Button>
-              </DialogClose>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
         <AlertDialog open={isImportConfirmOpen} onOpenChange={setIsImportConfirmOpen}>
           <AlertDialogContent>
             <AlertDialogHeader>
