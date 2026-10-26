@@ -240,8 +240,7 @@ export interface Edge {
   status?: EdgeStatus;
   /** 语境：必须指向 note(kind='context')；缺省表示未说明语境 */
   contextId?: string;
-  assertedBy: 'manual' | 'ai' | 'import';
-  model?: string;
+  assertedBy: 'manual' | 'import';
   createdAt: number;
   updatedAt: number;
 }
@@ -264,7 +263,7 @@ export interface InferenceStep {
   proofId?: string;
   status?: EdgeStatus;
   note?: string;
-  assertedBy: 'manual' | 'ai' | 'import';
+  assertedBy: 'manual' | 'import';
   createdAt: number;
   updatedAt: number;
 }
@@ -321,8 +320,7 @@ export const edgeSchema = z.object({
   note: z.string().optional(),
   status: z.enum(['asserted', 'conjecture', 'disproven']).optional(),
   contextId: z.string().optional(),
-  assertedBy: z.enum(['manual', 'ai', 'import']),
-  model: z.string().optional(),
+  assertedBy: z.enum(['manual', 'import']),
   createdAt: z.number(),
   updatedAt: z.number(),
 });
@@ -336,7 +334,7 @@ export const stepSchema = z.object({
   proofId: z.string().optional(),
   status: z.enum(['asserted', 'conjecture', 'disproven']).optional(),
   note: z.string().optional(),
-  assertedBy: z.enum(['manual', 'ai', 'import']),
+  assertedBy: z.enum(['manual', 'import']),
   createdAt: z.number(),
   updatedAt: z.number(),
 });
@@ -347,75 +345,4 @@ export const graphJSONSchema = z.object({
   nodes: z.array(nodeSchema),
   edges: z.array(edgeSchema),
   steps: z.array(stepSchema).default([]),
-});
-
-// =============================================================================
-// AI 操作协议
-// =============================================================================
-
-export const aiOperationSchema = z.discriminatedUnion('op', [
-  z.object({
-    op: z.literal('create-node'),
-    /** 同一批操作内部引用用的临时名，后续用 "ref:名字" 指代 */
-    ref: z.string().optional(),
-    parentId: z.string(),
-    after: z.string().nullable().optional(),
-    type: z.enum(NODE_TYPES),
-    kind: z.string().optional(),
-    title: z.string(),
-    content: z.string().default(''),
-    solution: z.string().optional(),
-    aliases: z.array(z.string()).optional(),
-    tags: z.array(z.string()).optional(),
-  }),
-  z.object({
-    op: z.literal('update-node'),
-    id: z.string(),
-    ref: z.string().optional(),
-    title: z.string().optional(),
-    kind: z.string().optional(),
-    content: z.string().optional(),
-    solution: z.string().optional(),
-    aliases: z.array(z.string()).optional(),
-    tags: z.array(z.string()).optional(),
-  }),
-  z.object({
-    op: z.literal('delete-node'),
-    id: z.string(),
-  }),
-  z.object({
-    op: z.literal('create-edge'),
-    from: z.string(),
-    to: z.string(),
-    predicate: z.enum(PREDICATES),
-    condition: z.string().optional(),
-    note: z.string().optional(),
-    contextId: z.string().optional(),
-  }),
-  z.object({
-    op: z.literal('delete-edge'),
-    id: z.string(),
-  }),
-  z.object({
-    op: z.literal('create-step'),
-    premiseIds: z.array(z.string()).min(1),
-    conclusionId: z.string(),
-    rule: z.string(),
-    contextId: z.string().optional(),
-    proofId: z.string().optional(),
-  }),
-  z.object({
-    op: z.literal('delete-step'),
-    id: z.string(),
-  }),
-  z.object({
-    op: z.literal('select'),
-    id: z.string(),
-  }),
-]);
-
-export type AiOperation = z.infer<typeof aiOperationSchema>;
-
-export const aiOperationListSchema = z.object({
-  operations: z.array(aiOperationSchema),
 });

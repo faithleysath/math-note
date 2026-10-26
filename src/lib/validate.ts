@@ -95,7 +95,6 @@ export interface NewEdgeInput {
   status?: Edge['status'];
   contextId?: string;
   assertedBy?: Edge['assertedBy'];
-  model?: string;
 }
 
 // =============================================================================

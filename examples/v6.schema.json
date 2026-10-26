@@ -171,12 +171,8 @@
             "type": "string",
             "enum": [
               "manual",
-              "ai",
               "import"
             ]
-          },
-          "model": {
-            "type": "string"
           },
           "createdAt": {
             "type": "number"
@@ -242,7 +238,6 @@
             "type": "string",
             "enum": [
               "manual",
-              "ai",
               "import"
             ]
           },

@@ -27,8 +27,6 @@ import { toast } from 'sonner';
 import Search from '../Search';
 import { Upload, Download, Share2, X, Plus } from 'lucide-react';
 import { useWindowSize } from '@/hooks/useWindowSize';
-import { AiConfigDialog } from '../AiConfigDialog';
-import { AiHandwritingDialog } from '../AiHandwritingDialog';
 
 const LeftSidebar = () => {
   const setMobileView = useGraphStore(state => state.setMobileView);
@@ -176,14 +174,6 @@ const LeftSidebar = () => {
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <AiConfigDialog />
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>AI 设置</p>
-              </TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleImportClick}>
                   <Upload className="h-4 w-4" />
                 </Button>
@@ -218,9 +208,6 @@ const LeftSidebar = () => {
           <TreeView />
         </div>
         <div className="mt-4 flex-shrink-0">
-          <div className="mb-2">
-            <AiHandwritingDialog />
-          </div>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button className="w-full">

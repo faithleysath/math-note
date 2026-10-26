@@ -143,7 +143,6 @@ src/lib/validate.ts    全图不变式与单条校验
 src/lib/serialize.ts   导入校验、导出
 src/lib/citation.ts    来源字段合并（只改 source，保留 page / originalNumber）
 src/lib/db.ts          Dexie 持久化
-src/lib/draft.ts       AI 批量操作的草稿预演
 src/stores/useGraphStore.ts  内存图 + 写穿
 examples/              可直接导入的 v6 样例
 ```
@@ -170,5 +169,4 @@ examples/              可直接导入的 v6 样例
 
 | 变量 | 作用 |
 |---|---|
-| `GEMINI_API_KEY` | 让 `/api/geminiProxy` 透传 Gemini 请求时不暴露 key |
 | `SHARE_TOKEN` | 设置后，`/api/upload` 要求请求头 `x-share-token` 匹配才允许上传 |

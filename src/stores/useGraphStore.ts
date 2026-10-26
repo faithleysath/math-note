@@ -14,14 +14,12 @@ import {
 import { canonicalizePair } from '../lib/predicates';
 import {
   isContextNode,
-  type AiOperation,
   type Edge,
   type GraphJSON,
   type InferenceStep,
   type Node,
 } from '../lib/schema';
 import { parseGraph, serializeGraph } from '../lib/serialize';
-import { diffToBatch, simulateOperations, type DraftDiff } from '../lib/draft';
 import {
   ValidationError,
   validateNewEdge,
@@ -82,12 +80,6 @@ export interface GraphState {
   importGraph: (json: unknown) => Promise<void>;
   loadSnapshot: (json: unknown, label: string) => Promise<void>;
   clearAll: () => Promise<void>;
-  applyAiOperations: (ops: AiOperation[]) => Promise<{ applied: number; errors: string[] }>;
-  previewAiOperations: (ops: AiOperation[]) => {
-    errors: string[];
-    warnings: string[];
-    diff: DraftDiff | null;
-  };
   diagnose: () => { errors: string[]; warnings: string[] };
 }
 
@@ -410,7 +402,6 @@ export const useGraphStore = create<GraphState>()((set, get) => {
         status: input.status ?? 'asserted',
         contextId: input.contextId || undefined,
         assertedBy: input.assertedBy ?? 'manual',
-        model: input.model,
         createdAt: now,
         updatedAt: now,
       };
@@ -583,83 +574,6 @@ export const useGraphStore = create<GraphState>()((set, get) => {
         expandedIds: new Set(),
         editingId: null,
       });
-    },
-
-    // -------------------------------------------------------------------------
-    // AI 批量操作
-    // -------------------------------------------------------------------------
-    // -------------------------------------------------------------------------
-    // AI 批量操作：先整批模拟，再一次性事务提交
-    // -------------------------------------------------------------------------
-    previewAiOperations: (ops) => {
-      const state = get();
-      const simulation = simulateOperations(state.index, ops);
-      if (simulation.errors.length > 0) {
-        return { errors: simulation.errors, warnings: [], diff: null };
-      }
-      const issues = validateGraphInvariants({
-        nodes: [...simulation.nodes.values()],
-        edges: simulation.edges,
-        steps: simulation.steps,
-      });
-      const errors = issues.filter((issue) => issue.severity === 'error').map((issue) => issue.message);
-      const warnings = issues
-        .filter((issue) => issue.severity === 'warning')
-        .map((issue) => issue.message);
-      return {
-        errors,
-        warnings,
-        diff: errors.length > 0 ? null : simulation.diff,
-      };
-    },
-
-    applyAiOperations: async (ops) => {
-      const state = get();
-      try {
-        assertWritable(state);
-      } catch (error) {
-        return { applied: 0, errors: [describeError(error)] };
-      }
-
-      const simulation = simulateOperations(state.index, ops);
-      if (simulation.errors.length > 0) {
-        toast.error(simulation.errors[0]);
-        return { applied: 0, errors: simulation.errors };
-      }
-
-      const issues = validateGraphInvariants({
-        nodes: [...simulation.nodes.values()],
-        edges: simulation.edges,
-        steps: simulation.steps,
-      });
-      const errors = issues.filter((issue) => issue.severity === 'error');
-      if (errors.length > 0) {
-        toast.error(errors[0].message);
-        return { applied: 0, errors: errors.map((issue) => issue.message) };
-      }
-
-      const { diff } = simulation;
-      try {
-        // 单事务：任何一步失败都整体回滚，不留半成品
-        await db.applyBatch(diffToBatch(diff));
-      } catch (error) {
-        const message = describeError(error);
-        toast.error(`写入失败，未做任何修改：${message}`);
-        return { applied: 0, errors: [message] };
-      }
-
-      set({
-        index: buildIndex(simulation.nodes.values(), simulation.edges, simulation.steps),
-      });
-
-      // select 是纯 UI 操作，事务成功之后才应用
-      const lastSelect = diff.selects.at(-1);
-      if (lastSelect && simulation.nodes.has(lastSelect)) {
-        get().select(lastSelect);
-      }
-
-      toast.success(`AI 的 ${ops.length} 个操作已全部提交。`);
-      return { applied: ops.length, errors: [] };
     },
 
     diagnose: () => {
