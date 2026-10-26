@@ -1,0 +1,242 @@
+{
+  "schemaVersion": 8,
+  "exportedAt": 0,
+  "book": {
+    "subject": "physics",
+    "stage": "junior",
+    "title": "九年级物理（欧姆定律样例）",
+    "edition": "人教版"
+  },
+  "nodes": [
+    {
+      "id": "phy-root",
+      "type": "branch",
+      "title": "初中物理",
+      "content": "",
+      "parentId": null,
+      "order": 1024,
+      "createdAt": 0,
+      "updatedAt": 0
+    },
+    {
+      "id": "phy-ch17",
+      "type": "section",
+      "title": "第十七章 欧姆定律",
+      "content": "",
+      "parentId": "phy-root",
+      "order": 1024,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "kind": "chapter",
+      "citation": {
+        "originalNumber": "第十七章",
+        "page": "74"
+      }
+    },
+    {
+      "id": "phy-s171",
+      "type": "section",
+      "title": "17.1 电流与电压和电阻的关系",
+      "content": "",
+      "parentId": "phy-ch17",
+      "order": 1024,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "kind": "section",
+      "citation": {
+        "originalNumber": "17.1",
+        "page": "74"
+      }
+    },
+    {
+      "id": "phy-s172",
+      "type": "section",
+      "title": "17.2 欧姆定律",
+      "content": "",
+      "parentId": "phy-ch17",
+      "order": 2048,
+      "kind": "section",
+      "createdAt": 0,
+      "updatedAt": 0,
+      "citation": {
+        "originalNumber": "17.2",
+        "page": "78"
+      }
+    },
+    {
+      "id": "phy-current",
+      "type": "definition",
+      "title": "电流",
+      "content": "电荷的定向移动形成电流。电流的大小用电流表示，单位是安培（$\\mathrm{A}$）。",
+      "parentId": "phy-s171",
+      "order": 1024,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "kind": "notation",
+      "key": "electric-current",
+      "citation": {
+        "page": "45"
+      }
+    },
+    {
+      "id": "phy-voltage",
+      "type": "definition",
+      "title": "电压",
+      "content": "电压是形成电流的原因，单位是伏特（$\\mathrm{V}$）。",
+      "parentId": "phy-s171",
+      "order": 2048,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "kind": "notation",
+      "key": "voltage",
+      "citation": {
+        "page": "55"
+      }
+    },
+    {
+      "id": "phy-resistance",
+      "type": "definition",
+      "title": "电阻",
+      "content": "导体对电流阻碍作用的大小叫电阻，单位是欧姆（$\\Omega$）。",
+      "parentId": "phy-s171",
+      "order": 3072,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "kind": "notation",
+      "key": "resistance",
+      "citation": {
+        "page": "63"
+      }
+    },
+    {
+      "id": "phy-exp",
+      "type": "note",
+      "title": "实验：探究电流与电压的关系",
+      "content": "## 实验目的\n\n探究电阻一定时，通过导体的电流与导体两端电压的关系。\n\n## 实验器材\n\n电源、开关、定值电阻、滑动变阻器、电压表、电流表、导线若干。\n\n![探究电流与电压关系的电路图](https://placehold.co/900x420/png?text=Circuit+Diagram)\n\n## 实验步骤\n\n1. 按电路图连接电路，滑动变阻器滑片置于阻值最大处。\n2. 闭合开关，调节滑动变阻器，记录多组电压表和电流表示数。\n3. 断开开关，整理器材。\n\n## 实验数据\n\n| 次数 | 电压 $U/\\mathrm{V}$ | 电流 $I/\\mathrm{A}$ |\n|---|---|---|\n| 1 | 1.0 | 0.10 |\n| 2 | 2.0 | 0.20 |\n| 3 | 3.0 | 0.30 |\n\n## 实验结论\n\n电阻一定时，通过导体的电流跟导体两端的电压成正比。",
+      "parentId": "phy-s171",
+      "order": 4096,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "kind": "experiment",
+      "citation": {
+        "originalNumber": "实验 1",
+        "page": "75"
+      }
+    },
+    {
+      "id": "phy-law",
+      "type": "proposition",
+      "title": "欧姆定律",
+      "content": "导体中的电流，跟导体两端的电压成正比，跟导体的电阻成反比。\n\n$$I=\\frac{U}{R}$$\n\n式中 $I$ 的单位是安培（$\\mathrm{A}$），$U$ 的单位是伏特（$\\mathrm{V}$），$R$ 的单位是欧姆（$\\Omega$）。",
+      "parentId": "phy-s172",
+      "order": 1024,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "kind": "law",
+      "key": "ohms-law",
+      "citation": {
+        "page": "78"
+      }
+    },
+    {
+      "id": "phy-example",
+      "type": "problem",
+      "title": "例题：用欧姆定律求电流",
+      "content": "一只电阻为 $10\\,\\Omega$ 的定值电阻两端电压为 $3\\,\\mathrm{V}$，求通过它的电流。",
+      "parentId": "phy-s172",
+      "order": 2048,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "kind": "example",
+      "solution": "由 $I=\\dfrac{U}{R}$ 得\n\n$$I=\\frac{3\\,\\mathrm{V}}{10\\,\\Omega}=0.3\\,\\mathrm{A}.$$\n\n答：通过电阻的电流为 $0.3\\,\\mathrm{A}$。",
+      "citation": {
+        "originalNumber": "例 1",
+        "page": "79"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "pe1",
+      "from": "phy-exp",
+      "to": "phy-current",
+      "predicate": "uses",
+      "assertedBy": "import",
+      "createdAt": 0,
+      "updatedAt": 0
+    },
+    {
+      "id": "pe2",
+      "from": "phy-exp",
+      "to": "phy-voltage",
+      "predicate": "uses",
+      "assertedBy": "import",
+      "createdAt": 0,
+      "updatedAt": 0
+    },
+    {
+      "id": "pe3",
+      "from": "phy-exp",
+      "to": "phy-resistance",
+      "predicate": "uses",
+      "assertedBy": "import",
+      "createdAt": 0,
+      "updatedAt": 0
+    },
+    {
+      "id": "pe4",
+      "from": "phy-exp",
+      "to": "phy-law",
+      "predicate": "supports",
+      "assertedBy": "import",
+      "createdAt": 0,
+      "updatedAt": 0,
+      "note": "实验数据支持电阻一定时电流与电压成正比。"
+    },
+    {
+      "id": "pe5",
+      "from": "phy-law",
+      "to": "phy-current",
+      "predicate": "depends-on",
+      "assertedBy": "import",
+      "createdAt": 0,
+      "updatedAt": 0
+    },
+    {
+      "id": "pe6",
+      "from": "phy-law",
+      "to": "phy-voltage",
+      "predicate": "depends-on",
+      "assertedBy": "import",
+      "createdAt": 0,
+      "updatedAt": 0
+    },
+    {
+      "id": "pe7",
+      "from": "phy-law",
+      "to": "phy-resistance",
+      "predicate": "depends-on",
+      "assertedBy": "import",
+      "createdAt": 0,
+      "updatedAt": 0
+    },
+    {
+      "id": "pe8",
+      "from": "phy-example",
+      "to": "phy-law",
+      "predicate": "covers",
+      "assertedBy": "import",
+      "createdAt": 0,
+      "updatedAt": 0
+    },
+    {
+      "id": "pe9",
+      "from": "phy-example",
+      "to": "phy-law",
+      "predicate": "uses",
+      "assertedBy": "import",
+      "createdAt": 0,
+      "updatedAt": 0
+    }
+  ]
+}

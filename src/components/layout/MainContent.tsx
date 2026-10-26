@@ -1,7 +1,8 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { toast } from 'sonner';
 import { useGraphStore } from '../../stores/useGraphStore';
-import { collectSubtree } from '../../lib/graph';
+import { subjectProfile } from '../../lib/subjects';
+import { collectSubtree, numberDisplayFor } from '../../lib/graph';
 import type { ProcessedNode } from '../../lib/schema';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import NodeRenderer from '../renderers/NodeRenderer';
@@ -16,6 +17,7 @@ import type { Node } from '../../lib/schema';
 // =================================================================================
 const MainContent = () => {
   const index = useGraphStore(state => state.index);
+  const book = useGraphStore(state => state.book);
   const expandedBranchId = useGraphStore(state => state.expandedBranchId);
   const selectedId = useGraphStore(state => state.selectedId);
   const editingId = useGraphStore(state => state.editingId);
@@ -113,16 +115,22 @@ const MainContent = () => {
       .filter((node): node is Node => Boolean(node));
   }, [index, expandedBranchId]);
 
-  // Attach the textbook numbers computed from the tree
+  // Attach the textbook numbers computed from the tree.
+  // 原书编号优先；非数学学科不强行生成定律/实验编号。
   const processedNodes = useMemo((): ProcessedNode[] => {
-    return nodes.map((node) => ({
-      ...node,
-      displayNumber: index.numbering.get(node.id) ?? '',
-      isChapter:
-        node.type === 'section' &&
-        (node.kind === 'chapter' || (node.kind === undefined && index.numbering.get(node.id)?.startsWith('第') === true)),
-    }));
-  }, [nodes, index]);
+    const numberingMode = subjectProfile(book?.subject).numberingMode;
+    return nodes.map((node) => {
+      const number = numberDisplayFor(index, node, numberingMode);
+      return {
+        ...node,
+        displayNumber: number.text,
+        numberSource: number.source,
+        isChapter:
+          node.type === 'section' &&
+          (node.kind === 'chapter' || (node.kind === undefined && index.numbering.get(node.id)?.startsWith('第') === true)),
+      };
+    });
+  }, [nodes, index, book]);
 
   // Hotkeys for navigation
   useEffect(() => {

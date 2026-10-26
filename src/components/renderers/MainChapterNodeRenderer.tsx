@@ -1,11 +1,18 @@
 import MDEditor from '@uiw/react-md-editor';
-import remarkMath from 'remark-math';
-import rehypeKatex from 'rehype-katex';
 import type { ProcessedNode } from '../../lib/schema';
+import { markdownPlugins } from '../../lib/markdown';
+import { titleCarriesNumber } from '../../lib/display';
 import { useMemo } from 'react';
 
 interface MainChapterNodeRendererProps {
   node: ProcessedNode;
+}
+
+function chapterNumberLabel(node: ProcessedNode): string {
+  if (!node.displayNumber) return '';
+  // 编号常常已经写在标题里，避免「第 1 章 第一章 集合」
+  if (titleCarriesNumber(node.title, node.displayNumber)) return '';
+  return node.numberSource === 'source' ? `原书编号：${node.displayNumber}` : node.displayNumber;
 }
 
 const MainChapterNodeRenderer = ({ node }: MainChapterNodeRendererProps) => {
@@ -14,7 +21,7 @@ const MainChapterNodeRenderer = ({ node }: MainChapterNodeRendererProps) => {
   return (
     <>
       <h2 className="text-3xl font-bold mt-4 mb-4 border-b pb-1">
-        <span className="font-bold mr-3">{node.displayNumber}</span>
+        {chapterNumberLabel(node) && <span className="font-bold mr-3">{chapterNumberLabel(node)}</span>}
         &nbsp;&nbsp;
         {node.title}
       </h2>
@@ -22,8 +29,7 @@ const MainChapterNodeRenderer = ({ node }: MainChapterNodeRendererProps) => {
         <MDEditor.Markdown
           source={displayContent}
           style={{ backgroundColor: 'transparent' }}
-          remarkPlugins={[remarkMath]}
-          rehypePlugins={[[rehypeKatex, { throwOnError: false }]]}
+          {...markdownPlugins()}
         />
       </div>
     </>

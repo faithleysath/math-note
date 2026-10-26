@@ -1,0 +1,246 @@
+{
+  "schemaVersion": 8,
+  "exportedAt": 0,
+  "book": {
+    "subject": "biology",
+    "stage": "junior",
+    "title": "七年级生物学（细胞样例）",
+    "edition": "人教版"
+  },
+  "nodes": [
+    {
+      "id": "bio-root",
+      "type": "branch",
+      "title": "初中生物学",
+      "content": "",
+      "parentId": null,
+      "order": 1024,
+      "createdAt": 0,
+      "updatedAt": 0
+    },
+    {
+      "id": "bio-ch2",
+      "type": "section",
+      "title": "第二单元 生物体的结构层次",
+      "content": "",
+      "parentId": "bio-root",
+      "order": 1024,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "kind": "chapter",
+      "citation": {
+        "originalNumber": "第二单元",
+        "page": "28"
+      }
+    },
+    {
+      "id": "bio-s21",
+      "type": "section",
+      "title": "第一章 细胞是生命活动的基本单位",
+      "content": "",
+      "parentId": "bio-ch2",
+      "order": 1024,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "kind": "section",
+      "citation": {
+        "originalNumber": "第一章",
+        "page": "28"
+      }
+    },
+    {
+      "id": "bio-cell",
+      "type": "definition",
+      "title": "细胞",
+      "content": "细胞是生物体结构和功能的基本单位。",
+      "parentId": "bio-s21",
+      "order": 1024,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "kind": "notation",
+      "key": "cell",
+      "citation": {
+        "page": "29"
+      }
+    },
+    {
+      "id": "bio-nucleus",
+      "type": "definition",
+      "title": "细胞核",
+      "content": "细胞核是细胞的控制中心，其中含有遗传物质。",
+      "parentId": "bio-s21",
+      "order": 2048,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "kind": "notation",
+      "key": "nucleus",
+      "citation": {
+        "page": "30"
+      }
+    },
+    {
+      "id": "bio-membrane",
+      "type": "definition",
+      "title": "细胞膜",
+      "content": "细胞膜能控制物质进出细胞，使细胞内部环境保持相对稳定。",
+      "parentId": "bio-s21",
+      "order": 3072,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "kind": "notation",
+      "key": "cell-membrane"
+    },
+    {
+      "id": "bio-structure",
+      "type": "note",
+      "title": "细胞的结构与功能",
+      "content": "植物细胞和动物细胞都具有细胞膜、细胞质和细胞核。\n\n![植物细胞结构示意图](https://placehold.co/900x420/png?text=Plant+Cell+Structure)\n\n| 结构 | 主要功能 |\n|---|---|\n| 细胞膜 | 控制物质进出 |\n| 细胞质 | 进行多种生命活动 |\n| 细胞核 | 含有遗传物质，是控制中心 |\n| 细胞壁 | 支持和保护植物细胞 |\n| 叶绿体 | 进行光合作用 |",
+      "parentId": "bio-s21",
+      "order": 4096,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "kind": "structure",
+      "citation": {
+        "originalNumber": "1.2",
+        "page": "30"
+      }
+    },
+    {
+      "id": "bio-photosynthesis",
+      "type": "note",
+      "title": "光合作用的过程",
+      "content": "绿色植物通过叶绿体，利用光能，把二氧化碳和水转化成储存能量的有机物，并且释放出氧气。\n\n$$\\ce{6CO2 + 6H2O ->[光能][叶绿体] C6H12O6 + 6O2}$$",
+      "parentId": "bio-s21",
+      "order": 5120,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "kind": "process",
+      "key": "photosynthesis"
+    },
+    {
+      "id": "bio-vertebrate",
+      "type": "definition",
+      "title": "脊椎动物",
+      "content": "身体背部有由脊椎骨组成的脊柱的动物叫做脊椎动物。",
+      "parentId": "bio-s21",
+      "order": 6144,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "kind": "notation",
+      "key": "vertebrate"
+    },
+    {
+      "id": "bio-mammal",
+      "type": "definition",
+      "title": "哺乳动物",
+      "content": "体表被毛、胎生、哺乳的动物属于哺乳动物。",
+      "parentId": "bio-s21",
+      "order": 7168,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "kind": "notation",
+      "key": "mammal"
+    },
+    {
+      "id": "bio-example",
+      "type": "problem",
+      "title": "例题：细胞结构与功能",
+      "content": "下列关于细胞结构的叙述，正确的是（　　）\n\nA. 所有细胞都有叶绿体\n\nB. 细胞核是细胞的控制中心\n\nC. 细胞膜不能控制物质进出\n\nD. 细胞壁是动物细胞的基本结构",
+      "parentId": "bio-s21",
+      "order": 8192,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "kind": "example",
+      "solution": "选 **B**。叶绿体只存在于植物绿色部分的细胞中；细胞膜能控制物质进出；细胞壁不是动物细胞的结构。",
+      "citation": {
+        "originalNumber": "例 1",
+        "page": "31"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "be1",
+      "from": "bio-nucleus",
+      "to": "bio-cell",
+      "predicate": "part-of",
+      "assertedBy": "import",
+      "createdAt": 0,
+      "updatedAt": 0,
+      "note": "细胞核是细胞的组成部分。"
+    },
+    {
+      "id": "be2",
+      "from": "bio-membrane",
+      "to": "bio-cell",
+      "predicate": "part-of",
+      "assertedBy": "import",
+      "createdAt": 0,
+      "updatedAt": 0
+    },
+    {
+      "id": "be3",
+      "from": "bio-structure",
+      "to": "bio-cell",
+      "predicate": "depends-on",
+      "assertedBy": "import",
+      "createdAt": 0,
+      "updatedAt": 0
+    },
+    {
+      "id": "be4",
+      "from": "bio-structure",
+      "to": "bio-nucleus",
+      "predicate": "depends-on",
+      "assertedBy": "import",
+      "createdAt": 0,
+      "updatedAt": 0
+    },
+    {
+      "id": "be5",
+      "from": "bio-structure",
+      "to": "bio-membrane",
+      "predicate": "depends-on",
+      "assertedBy": "import",
+      "createdAt": 0,
+      "updatedAt": 0
+    },
+    {
+      "id": "be6",
+      "from": "bio-mammal",
+      "to": "bio-vertebrate",
+      "predicate": "is-a",
+      "assertedBy": "import",
+      "createdAt": 0,
+      "updatedAt": 0,
+      "note": "哺乳动物属于脊椎动物。"
+    },
+    {
+      "id": "be7",
+      "from": "bio-photosynthesis",
+      "to": "bio-cell",
+      "predicate": "depends-on",
+      "assertedBy": "import",
+      "createdAt": 0,
+      "updatedAt": 0
+    },
+    {
+      "id": "be8",
+      "from": "bio-example",
+      "to": "bio-cell",
+      "predicate": "covers",
+      "assertedBy": "import",
+      "createdAt": 0,
+      "updatedAt": 0
+    },
+    {
+      "id": "be9",
+      "from": "bio-example",
+      "to": "bio-nucleus",
+      "predicate": "covers",
+      "assertedBy": "import",
+      "createdAt": 0,
+      "updatedAt": 0
+    }
+  ]
+}

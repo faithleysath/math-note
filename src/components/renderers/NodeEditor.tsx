@@ -1,10 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import MDEditor from '@uiw/react-md-editor';
-import remarkMath from 'remark-math';
-import rehypeKatex from 'rehype-katex';
 import { toast } from 'sonner';
-import { KIND_LABELS, KIND_OPTIONS, type Node } from '../../lib/schema';
+import { KIND_LABELS, type Node } from '../../lib/schema';
+import { markdownPlugins } from '../../lib/markdown';
 import { mergeCitation } from '../../lib/citation';
+import { kindOptionsFor, subjectProfile } from '../../lib/subjects';
 import { useGraphStore } from '../../stores/useGraphStore';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -22,6 +22,8 @@ const NodeEditor = ({ node }: NodeEditorProps) => {
   const [solution, setSolution] = useState(node.solution || '');
   const [tags, setTags] = useState(node.tags?.join(', ') || '');
   const [source, setSource] = useState(node.citation?.source || '');
+  const [page, setPage] = useState(node.citation?.page || '');
+  const [originalNumber, setOriginalNumber] = useState(node.citation?.originalNumber || '');
   const [kind, setKind] = useState(node.kind || '');
   const [key, setKey] = useState(node.key || '');
   const [aliases, setAliases] = useState(node.aliases?.join(', ') || '');
@@ -33,6 +35,11 @@ const NodeEditor = ({ node }: NodeEditorProps) => {
 
   const setEditing = useGraphStore((state) => state.setEditing);
   const updateNode = useGraphStore((state) => state.updateNode);
+  const book = useGraphStore((state) => state.book);
+  const profile = subjectProfile(book?.subject);
+  const kindOptions = kindOptionsFor(book?.subject, node.type);
+  const allKinds = [...kindOptions.preferred, ...kindOptions.more];
+  const showKindField = kindOptions.preferred.length > 0 || kindOptions.more.length > 0;
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -53,7 +60,7 @@ const NodeEditor = ({ node }: NodeEditorProps) => {
       document.removeEventListener('keydown', handleKeyDown);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, content, solution, key, aliases, kind, tags, source, method, duration, correct]); // Re-bind when content changes to save the latest state
+  }, [title, content, solution, key, aliases, kind, tags, source, page, originalNumber, method, duration, correct]); // Re-bind when content changes to save the latest state
 
   useEffect(() => {
     setTitle(node.title);
@@ -61,6 +68,8 @@ const NodeEditor = ({ node }: NodeEditorProps) => {
     setSolution(node.solution || '');
     setTags(node.tags?.join(', ') || '');
     setSource(node.citation?.source || '');
+    setPage(node.citation?.page || '');
+    setOriginalNumber(node.citation?.originalNumber || '');
     setKind(node.kind || '');
     setKey(node.key || '');
     setAliases(node.aliases?.join(', ') || '');
@@ -81,8 +90,8 @@ const NodeEditor = ({ node }: NodeEditorProps) => {
         tags: tagsArray,
         aliases: aliasesArray,
         key: key.trim() || null,
-        // 只改来源名称，保留 page / originalNumber；全空时清掉 citation
-        citation: mergeCitation(node.citation, source),
+        // 来源、页码、原书编号一起编辑；全空时清掉 citation
+        citation: mergeCitation(node.citation, source, { page, originalNumber }),
         kind: kind || undefined,
         attempt:
           node.type === 'attempt'
@@ -142,7 +151,7 @@ const NodeEditor = ({ node }: NodeEditorProps) => {
           />
         </div>
 
-        {KIND_OPTIONS[node.type].length > 0 && (
+        {showKindField && (
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               细分 (kind)
@@ -153,11 +162,27 @@ const NodeEditor = ({ node }: NodeEditorProps) => {
               onChange={(e) => setKind(e.target.value)}
             >
               <option value="">未指定</option>
-              {KIND_OPTIONS[node.type].map((option) => (
-                <option key={option} value={option}>
-                  {KIND_LABELS[option] ?? option}
-                </option>
-              ))}
+              {kind && !allKinds.includes(kind) && (
+                <option value={kind}>未知分类：{KIND_LABELS[kind] ?? kind}</option>
+              )}
+              {kindOptions.preferred.length > 0 && (
+                <optgroup label={`${profile.label}推荐`}>
+                  {kindOptions.preferred.map((option) => (
+                    <option key={option} value={option}>
+                      {KIND_LABELS[option] ?? option}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              {kindOptions.more.length > 0 && (
+                <optgroup label="更多分类">
+                  {kindOptions.more.map((option) => (
+                    <option key={option} value={option}>
+                      {KIND_LABELS[option] ?? option}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
             </select>
           </div>
         )}
@@ -205,9 +230,38 @@ const NodeEditor = ({ node }: NodeEditorProps) => {
           <Input
             id="source"
             value={source}
+            placeholder={book?.title ?? '教材 / 讲义 / 网页'}
             onChange={(e) => setSource(e.target.value)}
           />
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            <div>
+              <label htmlFor="page" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                页码
+              </label>
+              <Input id="page" value={page} onChange={(e) => setPage(e.target.value)} />
+            </div>
+            <div>
+              <label htmlFor="original-number" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                原书编号
+              </label>
+              <Input
+                id="original-number"
+                value={originalNumber}
+                placeholder="例：实验 2 / 3-4"
+                onChange={(e) => setOriginalNumber(e.target.value)}
+              />
+            </div>
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            原书编号有值时优先显示，并标注为「原书编号」。
+          </p>
         </div>
+
+        {node.type === 'note' && (node.kind === 'experiment' || node.kind === 'phenomenon') && (
+          <p className="text-xs text-muted-foreground">
+            实验或观察结论请用 supports 关系连接定律/命题；proves 只用于理论证明。
+          </p>
+        )}
 
         {node.type === 'attempt' && (
           <div className="flex flex-wrap items-end gap-4">
@@ -266,10 +320,7 @@ const NodeEditor = ({ node }: NodeEditorProps) => {
             value={content}
             onChange={(val) => setContent(val || '')}
             preview="live"
-            previewOptions={{
-              remarkPlugins: [remarkMath],
-              rehypePlugins: [[rehypeKatex, { throwOnError: false }]],
-            }}
+            previewOptions={markdownPlugins()}
           />
         </div>
 
@@ -283,8 +334,7 @@ const NodeEditor = ({ node }: NodeEditorProps) => {
               onChange={(val) => setSolution(val || '')}
               preview="live"
               previewOptions={{
-                remarkPlugins: [remarkMath],
-                rehypePlugins: [[rehypeKatex, { throwOnError: false }]],
+                ...markdownPlugins(),
               }}
             />
           </div>

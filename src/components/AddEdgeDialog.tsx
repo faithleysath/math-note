@@ -21,6 +21,7 @@ import { Input } from './ui/input';
 import { useGraphStore } from '../stores/useGraphStore';
 import Search from './Search';
 import { applicablePredicates, PREDICATE_SPECS } from '../lib/predicates';
+import { predicatePreference, subjectProfile } from '../lib/subjects';
 
 interface AddEdgeDialogProps {
   sourceNode: Node;
@@ -42,6 +43,8 @@ const AddEdgeDialog = ({ sourceNode, isOpen, onClose }: AddEdgeDialogProps) => {
   const [contextId, setContextId] = useState<string>('none');
   const createEdge = useGraphStore(state => state.createEdge);
   const index = useGraphStore(state => state.index);
+  const book = useGraphStore(state => state.book);
+  const profile = subjectProfile(book?.subject);
   const contexts = useMemo(
     () => [...index.nodes.values()].filter(isContextNode),
     [index],
@@ -51,7 +54,7 @@ const AddEdgeDialog = ({ sourceNode, isOpen, onClose }: AddEdgeDialogProps) => {
     if (!selectedTarget) return [];
     const seen = new Set<string>();
     const result: Choice[] = [];
-    for (const option of applicablePredicates(sourceNode.type, selectedTarget.type)) {
+    for (const option of applicablePredicates(sourceNode, selectedTarget)) {
       const spec = PREDICATE_SPECS[option.predicate];
       const label = option.reversed ? spec.inverseLabel : spec.fromLabel;
       if (seen.has(label)) continue;
@@ -63,8 +66,11 @@ const AddEdgeDialog = ({ sourceNode, isOpen, onClose }: AddEdgeDialogProps) => {
         label,
       });
     }
-    return result;
-  }, [sourceNode.type, selectedTarget]);
+    const order = predicatePreference(book?.subject);
+    return result.sort(
+      (a, b) => (order.get(a.predicate) ?? 99) - (order.get(b.predicate) ?? 99),
+    );
+  }, [sourceNode, selectedTarget, book?.subject]);
 
   const handleCreate = async () => {
     if (!selectedTarget || !selectedChoice) {
@@ -130,6 +136,12 @@ const AddEdgeDialog = ({ sourceNode, isOpen, onClose }: AddEdgeDialogProps) => {
               </div>
               {selectedChoice && (
                 <>
+                  {(selectedChoice.predicate === 'supports' || selectedChoice.predicate === 'proves') && (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      {profile.label}：实验/观察支持科学陈述用 supports；proves 只用于理论证明，
+                      实验不能替代 proof 节点。
+                    </p>
+                  )}
                   <div className="grid grid-cols-6 items-center gap-4 mt-4">
                     <label htmlFor="condition" className="text-left">
                       前提条件

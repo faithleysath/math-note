@@ -1,0 +1,273 @@
+{
+  "schemaVersion": 8,
+  "exportedAt": 0,
+  "book": {
+    "subject": "math",
+    "stage": "senior",
+    "title": "高中数学（集合样例）",
+    "edition": "人教A版"
+  },
+  "nodes": [
+    {
+      "id": "math-root",
+      "type": "branch",
+      "title": "高中数学",
+      "content": "",
+      "parentId": null,
+      "order": 1024,
+      "createdAt": 0,
+      "updatedAt": 0
+    },
+    {
+      "id": "math-ch1",
+      "type": "section",
+      "title": "第一章 集合与常用逻辑用语",
+      "content": "本章从集合的语言开始，学习用数学语言描述对象及其关系。",
+      "parentId": "math-root",
+      "order": 1024,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "kind": "chapter",
+      "citation": {
+        "page": "1"
+      }
+    },
+    {
+      "id": "math-s11",
+      "type": "section",
+      "title": "1.1 集合的概念",
+      "content": "",
+      "parentId": "math-ch1",
+      "order": 1024,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "kind": "section",
+      "citation": {
+        "originalNumber": "1.1",
+        "page": "2"
+      }
+    },
+    {
+      "id": "math-set",
+      "type": "definition",
+      "title": "集合",
+      "content": "一般地，我们把研究对象统称为**元素**，把一些元素组成的总体叫做**集合**。集合通常用大写字母 $A,B,C,\\cdots$ 表示。",
+      "parentId": "math-s11",
+      "order": 1024,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "kind": "notation",
+      "key": "set",
+      "citation": {
+        "page": "2"
+      }
+    },
+    {
+      "id": "math-element",
+      "type": "definition",
+      "title": "元素与集合的关系",
+      "content": "如果 $a$ 是集合 $A$ 的元素，就说 $a$ **属于** $A$，记作 $a\\in A$；如果 $a$ 不是集合 $A$ 的元素，就说 $a$ **不属于** $A$，记作 $a\\notin A$。",
+      "parentId": "math-s11",
+      "order": 2048,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "kind": "notation",
+      "key": "element-membership",
+      "citation": {
+        "page": "3"
+      }
+    },
+    {
+      "id": "math-property",
+      "type": "proposition",
+      "title": "集合中元素的特性",
+      "content": "集合中的元素具有**确定性**、**互异性**和**无序性**。",
+      "parentId": "math-s11",
+      "order": 3072,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "kind": "property",
+      "citation": {
+        "page": "3"
+      }
+    },
+    {
+      "id": "math-property-proof",
+      "type": "proof",
+      "title": "集合元素特性的说明",
+      "content": "确定性来自“研究对象”的界限必须清楚；互异性要求同一集合中不重复列出同一元素；无序性说明列举元素时先后次序不影响集合本身。",
+      "parentId": "math-property",
+      "order": 1024,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "kind": "other"
+    },
+    {
+      "id": "math-subset",
+      "type": "definition",
+      "title": "子集",
+      "content": "如果集合 $A$ 中任意一个元素都是集合 $B$ 中的元素，就称集合 $A$ 为集合 $B$ 的**子集**，记作 $A\\subseteq B$。",
+      "parentId": "math-s11",
+      "order": 4096,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "kind": "notation",
+      "key": "subset"
+    },
+    {
+      "id": "math-empty-subset",
+      "type": "proposition",
+      "title": "空集是任何集合的子集",
+      "content": "对于任意集合 $A$，都有 $\\varnothing\\subseteq A$。",
+      "parentId": "math-s11",
+      "order": 5120,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "kind": "theorem",
+      "citation": {
+        "originalNumber": "定理 1",
+        "page": "6"
+      }
+    },
+    {
+      "id": "math-empty-proof",
+      "type": "proof",
+      "title": "空集子集性质的证明",
+      "content": "按子集定义，需要证明 $\\varnothing$ 的每一个元素都属于 $A$。由于 $\\varnothing$ 没有元素，这个全称命题的前提不可能被满足，因此命题为真。",
+      "parentId": "math-empty-subset",
+      "order": 1024,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "kind": "direct"
+    },
+    {
+      "id": "math-subset-count",
+      "type": "proposition",
+      "title": "有限集合的子集个数",
+      "content": "若集合 $A$ 含有 $n$ 个元素，则 $A$ 的子集个数为 $2^n$，其中真子集个数为 $2^n-1$。",
+      "parentId": "math-s11",
+      "order": 6144,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "kind": "formula"
+    },
+    {
+      "id": "math-example",
+      "type": "problem",
+      "title": "例题：用列举法表示集合",
+      "content": "用列举法表示集合 $A=\\{x\\in\\mathbb{N}\\mid 1\\le x\\le 5\\}$。",
+      "parentId": "math-s11",
+      "order": 7168,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "kind": "example",
+      "solution": "$A=\\{1,2,3,4,5\\}$。",
+      "citation": {
+        "originalNumber": "例 1",
+        "page": "4"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "me1",
+      "from": "math-s11",
+      "to": "math-set",
+      "predicate": "depends-on",
+      "assertedBy": "import",
+      "createdAt": 0,
+      "updatedAt": 0,
+      "note": "先认识集合，再学习元素与集合的关系。"
+    },
+    {
+      "id": "me2",
+      "from": "math-set",
+      "to": "math-element",
+      "predicate": "depends-on",
+      "assertedBy": "import",
+      "createdAt": 0,
+      "updatedAt": 0
+    },
+    {
+      "id": "me3",
+      "from": "math-property",
+      "to": "math-set",
+      "predicate": "depends-on",
+      "assertedBy": "import",
+      "createdAt": 0,
+      "updatedAt": 0
+    },
+    {
+      "id": "me4",
+      "from": "math-property-proof",
+      "to": "math-property",
+      "predicate": "proves",
+      "assertedBy": "import",
+      "createdAt": 0,
+      "updatedAt": 0
+    },
+    {
+      "id": "me5",
+      "from": "math-subset",
+      "to": "math-element",
+      "predicate": "depends-on",
+      "assertedBy": "import",
+      "createdAt": 0,
+      "updatedAt": 0
+    },
+    {
+      "id": "me6",
+      "from": "math-empty-subset",
+      "to": "math-subset",
+      "predicate": "depends-on",
+      "assertedBy": "import",
+      "createdAt": 0,
+      "updatedAt": 0
+    },
+    {
+      "id": "me7",
+      "from": "math-empty-proof",
+      "to": "math-empty-subset",
+      "predicate": "proves",
+      "assertedBy": "import",
+      "createdAt": 0,
+      "updatedAt": 0
+    },
+    {
+      "id": "me8",
+      "from": "math-subset-count",
+      "to": "math-subset",
+      "predicate": "depends-on",
+      "assertedBy": "import",
+      "createdAt": 0,
+      "updatedAt": 0
+    },
+    {
+      "id": "me9",
+      "from": "math-example",
+      "to": "math-set",
+      "predicate": "covers",
+      "assertedBy": "import",
+      "createdAt": 0,
+      "updatedAt": 0
+    },
+    {
+      "id": "me10",
+      "from": "math-example",
+      "to": "math-element",
+      "predicate": "covers",
+      "assertedBy": "import",
+      "createdAt": 0,
+      "updatedAt": 0
+    },
+    {
+      "id": "me11",
+      "from": "math-example",
+      "to": "math-element",
+      "predicate": "uses",
+      "assertedBy": "import",
+      "createdAt": 0,
+      "updatedAt": 0
+    }
+  ]
+}

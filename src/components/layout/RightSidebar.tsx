@@ -18,6 +18,7 @@ import { useWindowSize } from '@/hooks/useWindowSize';
 
 const RightSidebar = () => {
   const index = useGraphStore(state => state.index);
+  const book = useGraphStore(state => state.book);
   const selectedId = useGraphStore(state => state.selectedId);
   const select = useGraphStore(state => state.select);
   const setMobileView = useGraphStore(state => state.setMobileView);
@@ -142,10 +143,27 @@ const RightSidebar = () => {
                 </span>
               </div>
             )}
-            {selectedNode.citation?.source && (
+            {(selectedNode.citation?.source || book) && (
               <div>
                 <span className="font-semibold">来源:</span>
-                <span className="ml-2 text-muted-foreground">{selectedNode.citation.source}</span>
+                <span className="ml-2 text-muted-foreground">
+                  {selectedNode.citation?.source ?? book?.title}
+                  {!selectedNode.citation?.source && (
+                    <span className="ml-1 text-xs">（教材默认）</span>
+                  )}
+                </span>
+              </div>
+            )}
+            {selectedNode.citation?.page && (
+              <div>
+                <span className="font-semibold">页码:</span>
+                <span className="ml-2 text-muted-foreground">{selectedNode.citation.page}</span>
+              </div>
+            )}
+            {selectedNode.citation?.originalNumber && (
+              <div>
+                <span className="font-semibold">原书编号:</span>
+                <span className="ml-2 text-muted-foreground">{selectedNode.citation.originalNumber}</span>
               </div>
             )}
             <div>

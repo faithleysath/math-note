@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import type { Node } from '../lib/schema';
 import { useGraphStore } from '../stores/useGraphStore';
+import { numberDisplayFor } from '../lib/graph';
+import { titleCarriesNumber } from '../lib/display';
+import { subjectProfile } from '../lib/subjects';
 import { Button } from './ui/button';
 import { Trash2 } from 'lucide-react';
 import ConfirmDeleteDialog from './ConfirmDeleteDialog';
@@ -23,6 +26,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({ node, numberPrefix = '' }) => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   const index = useGraphStore((state) => state.index);
+  const book = useGraphStore((state) => state.book);
   const select = useGraphStore((state) => state.select);
   const setExpandedBranch = useGraphStore((state) => state.setExpandedBranch);
   const toggleExpanded = useGraphStore((state) => state.toggleExpanded);
@@ -86,8 +90,15 @@ const TreeNode: React.FC<TreeNodeProps> = ({ node, numberPrefix = '' }) => {
       {isExpanded && hasChildren && (
         <ul>
           {children.map((child) => {
+            const childNumber =
+              child.type === 'section'
+                ? numberDisplayFor(index, child, subjectProfile(book?.subject).numberingMode)
+                : null;
+            // 编号经常已经写在标题里（如「第十七章 欧姆定律」），不要在目录里重复
             const childPrefix =
-              child.type === 'section' ? treePrefix(index.numbering.get(child.id)) : '';
+              childNumber && !titleCarriesNumber(child.title, childNumber.text)
+                ? treePrefix(childNumber.text)
+                : '';
             return (
               <TreeNode
                 key={child.id}

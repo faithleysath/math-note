@@ -11,7 +11,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "gen:schema": "bun run scripts/gen-schema.ts",
-    "bench": "bun run scripts/bench.ts"
+    "bench": "bun run scripts/bench.ts",
+    "check:examples": "bun run scripts/check-examples.ts"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "^1.2.11",
@@ -63,6 +64,7 @@
     "tw-animate-css": "^1.3.6",
     "typescript": "~5.8.3",
     "typescript-eslint": "^8.35.1",
+    "unified": "^11.0.5",
     "vite": "^7.0.4",
     "vitest": "^5.0.5"
   }

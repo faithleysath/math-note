@@ -14,6 +14,7 @@ import {
 import { canonicalizePair } from '../lib/predicates';
 import {
   isContextNode,
+  type BookMeta,
   type Edge,
   type GraphJSON,
   type InferenceStep,
@@ -22,6 +23,7 @@ import {
 import { parseGraph, serializeGraph } from '../lib/serialize';
 import {
   ValidationError,
+  validateBook,
   validateNewEdge,
   validateNewNode,
   validateNewStep,
@@ -38,6 +40,7 @@ type AppStatus = 'loading' | 'ready' | 'error';
 
 interface GraphState {
   index: GraphIndex;
+  book: BookMeta | null;
   status: AppStatus;
   error: string | null;
   readOnly: boolean;
@@ -49,6 +52,7 @@ interface GraphState {
   mobileView: 'main' | 'left' | 'right';
 
   init: () => Promise<void>;
+  createBook: (book: BookMeta) => Promise<BookMeta>;
   select: (id: string | null) => void;
   setEditing: (id: string | null) => void;
   toggleExpanded: (id: string) => void;
@@ -109,6 +113,7 @@ export const useGraphStore = create<GraphState>()((set, get) => {
 
   return {
     index: emptyIndex(),
+    book: null,
     status: 'loading',
     error: null,
     readOnly: false,
@@ -128,6 +133,7 @@ export const useGraphStore = create<GraphState>()((set, get) => {
         const firstBranch = index.roots[0] ?? null;
         set({
           index,
+          book: data.book,
           status: 'ready',
           error: null,
           readOnly: false,
@@ -140,6 +146,41 @@ export const useGraphStore = create<GraphState>()((set, get) => {
         initStarted = false;
         set({ status: 'error', error: describeError(error) });
       }
+    },
+
+    createBook: async (input) => {
+      validateBook(input);
+      const book: BookMeta = {
+        subject: input.subject,
+        stage: input.stage,
+        title: input.title.trim(),
+        edition: input.edition?.trim() || undefined,
+      };
+      const now = Date.now();
+      const root: Node = {
+        id: crypto.randomUUID(),
+        type: 'branch',
+        title: book.title,
+        content: '',
+        parentId: null,
+        order: 1024,
+        createdAt: now,
+        updatedAt: now,
+      };
+      await db.replaceAll({ book, nodes: [root], edges: [], steps: [] });
+      set({
+        index: buildIndex([root], [], []),
+        book,
+        status: 'ready',
+        error: null,
+        readOnly: false,
+        sourceLabel: '本地',
+        selectedId: root.id,
+        expandedBranchId: root.id,
+        expandedIds: new Set([root.id]),
+        editingId: null,
+      });
+      return book;
     },
 
     select: (id) => {
@@ -519,19 +560,31 @@ export const useGraphStore = create<GraphState>()((set, get) => {
     // -------------------------------------------------------------------------
     // 导入 / 导出 / 快照
     // -------------------------------------------------------------------------
-    exportGraph: () =>
-      serializeGraph(
+    exportGraph: () => {
+      const book = get().book;
+      if (!book) {
+        throw new ValidationError('book', '请先新建或导入一本教材，再导出。');
+      }
+      return serializeGraph(
+        book,
         [...get().index.nodes.values()],
         get().index.edges,
         get().index.steps,
-      ),
+      );
+    },
 
     importGraph: async (json) => {
       const parsed = parseGraph(json);
-      await db.replaceAll({ nodes: parsed.nodes, edges: parsed.edges, steps: parsed.steps });
+      await db.replaceAll({
+        book: parsed.book,
+        nodes: parsed.nodes,
+        edges: parsed.edges,
+        steps: parsed.steps,
+      });
       const index = buildIndex(parsed.nodes, parsed.edges, parsed.steps);
       set({
         index,
+        book: parsed.book,
         status: 'ready',
         error: null,
         readOnly: false,
@@ -549,6 +602,7 @@ export const useGraphStore = create<GraphState>()((set, get) => {
       const index = buildIndex(parsed.nodes, parsed.edges, parsed.steps);
       set({
         index,
+        book: parsed.book,
         status: 'ready',
         error: null,
         readOnly: true,
@@ -564,6 +618,7 @@ export const useGraphStore = create<GraphState>()((set, get) => {
       await db.clearAll();
       set({
         index: emptyIndex(),
+        book: null,
         selectedId: null,
         expandedBranchId: null,
         expandedIds: new Set(),

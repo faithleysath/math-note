@@ -1,6 +1,6 @@
 import { buildIndex, searchNodes, stepsForNode } from '../src/lib/graph';
 import { serializeGraph, parseGraph } from '../src/lib/serialize';
-import type { Edge, Node } from '../src/lib/schema';
+import type { BookMeta, Edge, Node } from '../src/lib/schema';
 
 function makeGraph(count: number) {
   const nodes: Node[] = [];
@@ -45,6 +45,7 @@ function makeGraph(count: number) {
   return { nodes, edges, steps: [] };
 }
 
+const book: BookMeta = { subject: 'math', stage: 'senior', title: '性能测试教材' };
 const results: Record<string, unknown> = {};
 for (const size of [5000, 20000]) {
   const graph = makeGraph(size);
@@ -60,7 +61,7 @@ for (const size of [5000, 20000]) {
   for (let i = 0; i < 100; i++) stepsForNode(index, graph.nodes[i % graph.nodes.length].id);
   const stepLookup = (performance.now() - t3) / 100;
 
-  const exportJson = JSON.stringify(serializeGraph(graph.nodes, graph.edges, []));
+  const exportJson = JSON.stringify(serializeGraph(book, graph.nodes, graph.edges, []));
   const t4 = performance.now();
   parseGraph(JSON.parse(exportJson));
   const importMs = performance.now() - t4;

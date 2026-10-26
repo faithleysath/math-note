@@ -1,7 +1,7 @@
 import MDEditor from '@uiw/react-md-editor';
-import remarkMath from 'remark-math';
-import rehypeKatex from 'rehype-katex';
 import type { ProcessedNode } from '../../lib/schema';
+import { markdownPlugins } from '../../lib/markdown';
+import { contentWithNumber, titleCarriesNumber } from '../../lib/display';
 import { useMemo } from 'react';
 import {
   Accordion,
@@ -16,8 +16,9 @@ interface SolutionRecordRendererProps {
 
 const SolutionRecordRenderer = ({ node }: SolutionRecordRendererProps) => {
   const displayContent = useMemo(() => {
-    return node.content;
-  }, [node.content]);
+    const number = titleCarriesNumber(node.title, node.displayNumber) ? '' : node.displayNumber;
+    return contentWithNumber(node.content, number, node.numberSource);
+  }, [node.content, node.displayNumber, node.numberSource, node.title]);
 
   const solutionContent = useMemo(() => {
     return node.solution;
@@ -34,8 +35,7 @@ const SolutionRecordRenderer = ({ node }: SolutionRecordRendererProps) => {
             <MDEditor.Markdown
               source={displayContent}
               style={{ backgroundColor: 'transparent' }}
-              remarkPlugins={[remarkMath]}
-              rehypePlugins={[[rehypeKatex, { throwOnError: false }]]}
+              {...markdownPlugins()}
             />
             {solutionContent && (
               <>
@@ -43,8 +43,7 @@ const SolutionRecordRenderer = ({ node }: SolutionRecordRendererProps) => {
                 <MDEditor.Markdown
                   source={solutionContent}
                   style={{ backgroundColor: 'transparent' }}
-                  remarkPlugins={[remarkMath]}
-                  rehypePlugins={[[rehypeKatex, { throwOnError: false }]]}
+                  {...markdownPlugins()}
                 />
               </>
             )}

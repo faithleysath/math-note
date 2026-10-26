@@ -25,19 +25,29 @@ import { Input } from '../ui/input';
 import { useGraphStore } from '../../stores/useGraphStore';
 import { toast } from 'sonner';
 import Search from '../Search';
-import { Upload, Download, Share2, X, Plus } from 'lucide-react';
+import { Upload, Download, Share2, X, Plus, BookPlus } from 'lucide-react';
+import { SCHOOL_STAGES, STAGE_LABELS, SUBJECTS, SUBJECT_LABELS, type SchoolStage, type Subject } from '../../lib/schema';
 import { useWindowSize } from '@/hooks/useWindowSize';
 
 const LeftSidebar = () => {
   const setMobileView = useGraphStore(state => state.setMobileView);
   const setExpandedBranch = useGraphStore(state => state.setExpandedBranch);
   const createNode = useGraphStore(state => state.createNode);
+  const createBook = useGraphStore(state => state.createBook);
+  const book = useGraphStore(state => state.book);
+  const index = useGraphStore(state => state.index);
   const exportGraph = useGraphStore(state => state.exportGraph);
   const importGraph = useGraphStore(state => state.importGraph);
   const { width } = useWindowSize();
   const isMobile = width <= 768;
   const [newBranchTitle, setNewBranchTitle] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isBookDialogOpen, setIsBookDialogOpen] = useState(false);
+  const [isBookConfirmOpen, setIsBookConfirmOpen] = useState(false);
+  const [bookTitle, setBookTitle] = useState('');
+  const [bookSubject, setBookSubject] = useState<Subject>('math');
+  const [bookStage, setBookStage] = useState<SchoolStage>('senior');
+  const [bookEdition, setBookEdition] = useState('');
   const [isImportConfirmOpen, setIsImportConfirmOpen] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
@@ -69,12 +79,13 @@ const LeftSidebar = () => {
       )}`;
       const link = document.createElement("a");
       link.href = jsonString;
-      link.download = `math-note-backup-${new Date().toISOString()}.json`;
+      const safeTitle = (book?.title ?? 'backup').replace(/[\\/:*?"<>|\s]+/g, '-');
+      link.download = `math-note-${safeTitle}-${new Date().toISOString().slice(0, 10)}.json`;
       link.click();
       toast.success('数据已成功导出。');
     } catch (error) {
       console.error('Failed to export data:', error);
-      toast.error('数据导出失败。');
+      toast.error(error instanceof Error ? error.message : '数据导出失败。');
     }
   };
 
@@ -109,6 +120,43 @@ const LeftSidebar = () => {
     } finally {
       setIsSharing(false);
     }
+  };
+
+  const resetBookForm = () => {
+    setBookTitle('');
+    setBookSubject('math');
+    setBookStage('senior');
+    setBookEdition('');
+    setIsBookConfirmOpen(false);
+  };
+
+  const performCreateBook = async () => {
+    try {
+      await createBook({
+        title: bookTitle,
+        subject: bookSubject,
+        stage: bookStage,
+        edition: bookEdition.trim() || undefined,
+      });
+      toast.success(`教材「${bookTitle.trim()}」已创建。`);
+      setIsBookDialogOpen(false);
+      setIsBookConfirmOpen(false);
+      resetBookForm();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : '创建教材失败。');
+    }
+  };
+
+  const handleCreateBook = async () => {
+    if (!bookTitle.trim()) {
+      toast.warning('请填写教材名称。');
+      return;
+    }
+    if (index.nodes.size > 0) {
+      setIsBookConfirmOpen(true);
+      return;
+    }
+    await performCreateBook();
   };
 
   const handleImportClick = () => {
@@ -164,7 +212,23 @@ const LeftSidebar = () => {
             )}
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleShare} disabled={isSharing}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  aria-label="新建教材"
+                  onClick={() => setIsBookDialogOpen(true)}
+                >
+                  <BookPlus className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>新建教材</p>
+              </TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="分享" onClick={handleShare} disabled={isSharing}>
                   <Share2 className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
@@ -174,7 +238,7 @@ const LeftSidebar = () => {
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleImportClick}>
+                <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="导入" onClick={handleImportClick}>
                   <Upload className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
@@ -191,7 +255,7 @@ const LeftSidebar = () => {
             />
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleExport}>
+                <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="导出" onClick={handleExport}>
                   <Download className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
@@ -200,6 +264,16 @@ const LeftSidebar = () => {
               </TooltipContent>
             </Tooltip>
           </div>
+        </div>
+        <div className="mb-3 rounded-md border px-2.5 py-2">
+          <p className="truncate text-sm font-semibold">{book?.title ?? '还没有教材'}</p>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">
+            {book
+              ? [SUBJECT_LABELS[book.subject], STAGE_LABELS[book.stage], book.edition]
+                  .filter(Boolean)
+                  .join(' · ')
+              : '新建或导入一本教材后开始录入'}
+          </p>
         </div>
         <div className="mb-4">
           <Search showFilters />
@@ -240,6 +314,101 @@ const LeftSidebar = () => {
             </DialogContent>
           </Dialog>
         </div>
+        <Dialog open={isBookDialogOpen} onOpenChange={(open) => {
+          setIsBookDialogOpen(open);
+          if (!open) resetBookForm();
+        }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>新建教材</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3 py-4">
+              <div>
+                <label htmlFor="book-title" className="mb-1 block text-sm font-medium">
+                  教材名称
+                </label>
+                <Input
+                  id="book-title"
+                  value={bookTitle}
+                  placeholder="如：九年级物理下册"
+                  onChange={(e) => setBookTitle(e.target.value)}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label htmlFor="book-subject" className="mb-1 block text-sm font-medium">
+                    学科
+                  </label>
+                  <select
+                    id="book-subject"
+                    className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                    value={bookSubject}
+                    onChange={(e) => setBookSubject(e.target.value as Subject)}
+                  >
+                    {SUBJECTS.map((subject) => (
+                      <option key={subject} value={subject}>
+                        {SUBJECT_LABELS[subject]}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="book-stage" className="mb-1 block text-sm font-medium">
+                    学段
+                  </label>
+                  <select
+                    id="book-stage"
+                    className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                    value={bookStage}
+                    onChange={(e) => setBookStage(e.target.value as SchoolStage)}
+                  >
+                    {SCHOOL_STAGES.map((stage) => (
+                      <option key={stage} value={stage}>
+                        {STAGE_LABELS[stage]}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label htmlFor="book-edition" className="mb-1 block text-sm font-medium">
+                  版本说明（可选）
+                </label>
+                <Input
+                  id="book-edition"
+                  value={bookEdition}
+                  placeholder="如：人教版"
+                  onChange={(e) => setBookEdition(e.target.value)}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                一本教材一份独立知识库。新建会替换当前浏览器里的活动教材。
+              </p>
+            </div>
+            <DialogFooter>
+              <DialogClose asChild>
+                <Button type="button" variant="secondary">
+                  取消
+                </Button>
+              </DialogClose>
+              <Button onClick={handleCreateBook}>创建</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        <AlertDialog open={isBookConfirmOpen} onOpenChange={setIsBookConfirmOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>替换当前教材？</AlertDialogTitle>
+              <AlertDialogDescription>
+                当前活动知识库里的节点、关系和推理步骤都会被清空。请先导出备份。
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setIsBookConfirmOpen(false)}>取消</AlertDialogCancel>
+              <AlertDialogAction onClick={performCreateBook}>确认替换</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
         <Dialog open={isShareDialogOpen} onOpenChange={setIsShareDialogOpen}>
           <DialogContent>
             <DialogHeader>

@@ -1,13 +1,16 @@
 import type { GraphIndex } from './graph';
 import { collectSubtree, findPath } from './graph';
-import { PREDICATE_SPECS, canonicalizePair, isDirectionAllowed } from './predicates';
+import { PREDICATE_SPECS, canonicalizePair, isEdgeAllowed } from './predicates';
 import {
   KIND_OPTIONS,
   NODE_TYPE_META,
+  SCHOOL_STAGES,
+  SUBJECTS,
   allowedChildTypes,
   isContextNode,
   isKnownKind,
   type AttemptMeta,
+  type BookMeta,
   type Citation,
   type Edge,
   type InferenceStep,
@@ -259,6 +262,9 @@ const PREDICATE_HINT: Record<Predicate, string> = {
   generalizes: '推广 / 特例',
   covers: '考查',
   uses: '使用',
+  supports: '支持',
+  'is-a': '属于 / 包含',
+  'part-of': '组成 / 由……组成',
 };
 
 function typeNames(types: NodeType[]): string {
@@ -316,13 +322,17 @@ export function validateNewEdge(index: GraphIndex, input: NewEdgeInput): EdgeChe
 
   const spec = PREDICATE_SPECS[predicate];
 
-  if (!isDirectionAllowed(predicate, fromNode.type, toNode.type)) {
+  if (!isEdgeAllowed(predicate, fromNode, toNode)) {
+    const kindHint =
+      predicate === 'supports'
+        ? '起点必须是「实验」或「现象」笔记，终点必须是命题。'
+        : '';
     throw errorOf(
       'predicate',
       'invalid-endpoint-type',
       `「${PREDICATE_HINT[predicate]}」不能用在「${NODE_TYPE_META[fromNode.type].label} → ${
         NODE_TYPE_META[toNode.type].label
-      }」之间。起点须为 ${typeNames(spec.from)}，终点须为 ${typeNames(spec.to)}。`,
+      }」之间。${kindHint}起点须为 ${typeNames(spec.from)}，终点须为 ${typeNames(spec.to)}。`,
       {
         nodeId: from,
         suggestion:
@@ -330,7 +340,11 @@ export function validateNewEdge(index: GraphIndex, input: NewEdgeInput): EdgeChe
             ? '先把证明写成「证明」节点，再让它 proves 目标命题。'
             : predicate === 'refutes'
               ? '反例要用「反例」节点，并反驳一个明确的命题。'
-              : undefined,
+              : predicate === 'supports'
+                ? '实验与观察用 supports 支持科学陈述；proves 只用于理论证明。'
+                : predicate === 'is-a' || predicate === 'part-of'
+                  ? '这两个关系只连接两个「定义」节点，并且不能自指。'
+                  : undefined,
       },
     );
   }
@@ -420,6 +434,18 @@ export function validateNewEdge(index: GraphIndex, input: NewEdgeInput): EdgeChe
         code: 'mutual-generalization',
         message: `${fromNode.title} 与 ${toNode.title} 互为推广，可能其实是同一个结论的不同说法，请人工核查。`,
         edgeId: reverse.id,
+      });
+    }
+  }
+
+  if (predicate === 'is-a' || predicate === 'part-of') {
+    // 分类/组成允许非自指的环被人工保留，但先提示，避免把学习 DAG 规则机械套过来
+    const path = findPath(index, to, from, predicate);
+    if (path) {
+      warnings.push({
+        severity: 'warning',
+        code: 'semantic-cycle',
+        message: `这条「${PREDICATE_HINT[predicate]}」关系会形成一个环，请人工确认这是教材原意。`,
       });
     }
   }
@@ -548,16 +574,62 @@ function parentChainHasCycle(nodes: Map<string, Node>): string[] {
   return cyclic;
 }
 
+/** 新建/导入教材时的元信息校验。失败抛 ValidationError。 */
+export function validateBook(book: Partial<BookMeta> | null | undefined): void {
+  if (!book) {
+    throw errorOf('book', 'missing-book', '缺少教材元信息（book）。');
+  }
+  if (!book.title || !book.title.trim()) {
+    throw errorOf('book.title', 'empty-book-title', '教材名称不能为空。');
+  }
+  if (!book.subject || !(SUBJECTS as readonly string[]).includes(book.subject)) {
+    throw errorOf('book.subject', 'invalid-subject', '请选择合法的学科。');
+  }
+  if (!book.stage || !(SCHOOL_STAGES as readonly string[]).includes(book.stage)) {
+    throw errorOf('book.stage', 'invalid-stage', '请选择初中或高中。');
+  }
+}
+
+function bookIssues(book: BookMeta | null | undefined): ValidationIssue[] {
+  // 低层不变式校验允许不传 book（单元测试/局部图）；parseGraph 一定传入 v8 的 book
+  if (book === undefined) return [];
+  if (!book) {
+    return [{ severity: 'error', code: 'missing-book', message: '缺少教材元信息（book）。', field: 'book' }];
+  }
+  const issues: ValidationIssue[] = [];
+  if (!book.title?.trim()) {
+    issues.push({ severity: 'error', code: 'empty-book-title', message: '教材名称不能为空。', field: 'book.title' });
+  }
+  if (!(SUBJECTS as readonly string[]).includes(book.subject)) {
+    issues.push({
+      severity: 'error',
+      code: 'invalid-subject',
+      message: `教材学科 "${String(book.subject)}" 不合法。`,
+      field: 'book.subject',
+    });
+  }
+  if (!(SCHOOL_STAGES as readonly string[]).includes(book.stage)) {
+    issues.push({
+      severity: 'error',
+      code: 'invalid-stage',
+      message: `学段 "${String(book.stage)}" 不合法。`,
+      field: 'book.stage',
+    });
+  }
+  return issues;
+}
+
 /**
- * 全图校验：导入、快照加载、迁移、AI 批量提交前都要跑。
+ * 全图校验：导入、快照加载、迁移前都要跑。
  * 纯函数，不修改数据。
  */
 export function validateGraphInvariants(graph: {
+  book?: BookMeta | null;
   nodes: Node[];
   edges: Edge[];
   steps?: InferenceStep[];
 }): ValidationIssue[] {
-  const issues: ValidationIssue[] = [];
+  const issues: ValidationIssue[] = bookIssues(graph.book);
   const nodes = new Map<string, Node>();
 
   for (const node of graph.nodes) {
@@ -719,11 +791,13 @@ export function validateGraphInvariants(graph: {
     }
 
     const spec = PREDICATE_SPECS[edge.predicate];
-    if (!isDirectionAllowed(edge.predicate, fromNode.type, toNode.type)) {
+    if (!isEdgeAllowed(edge.predicate, fromNode, toNode)) {
       issues.push({
         severity: 'error',
         code: 'invalid-endpoint-type',
-        message: `关系 ${edge.id}（${PREDICATE_HINT[edge.predicate]}）不能用在「${NODE_TYPE_META[fromNode.type].label} → ${NODE_TYPE_META[toNode.type].label}」之间。`,
+        message: `关系 ${edge.id}（${PREDICATE_HINT[edge.predicate]}）不能用在「${NODE_TYPE_META[fromNode.type].label} → ${NODE_TYPE_META[toNode.type].label}」之间${
+          edge.predicate === 'supports' ? '；起点必须是实验或现象笔记' : ''
+        }。`,
         edgeId: edge.id,
       });
     }
@@ -812,6 +886,50 @@ export function validateGraphInvariants(graph: {
       }
     };
 
+    for (const id of adjacency.keys()) {
+      if (state.get(id) === undefined) visit(id);
+    }
+  }
+
+  // is-a / part-of 的环只提示，不当作学习前置那样拒绝
+  for (const predicate of ['is-a', 'part-of'] as const) {
+    const adjacency = new Map<string, string[]>();
+    for (const edge of edges) {
+      if (edge.predicate !== predicate) continue;
+      const list = adjacency.get(edge.from);
+      if (list) list.push(edge.to);
+      else adjacency.set(edge.from, [edge.to]);
+    }
+    const state = new Map<string, 0 | 1 | 2>();
+    let reported = false;
+    const visit = (start: string) => {
+      const stack: { id: string; i: number }[] = [{ id: start, i: 0 }];
+      state.set(start, 1);
+      while (stack.length > 0) {
+        const frame = stack[stack.length - 1];
+        const next = adjacency.get(frame.id)?.[frame.i];
+        frame.i += 1;
+        if (next === undefined) {
+          state.set(frame.id, 2);
+          stack.pop();
+          continue;
+        }
+        const nextState = state.get(next);
+        if (nextState === 1) {
+          if (!reported) {
+            reported = true;
+            issues.push({
+              severity: 'warning',
+              code: 'semantic-cycle',
+              message: `「${predicate === 'is-a' ? '属于' : '组成'}」关系里存在一个环，请人工确认是否符合教材原意。`,
+            });
+          }
+        } else if (nextState === undefined) {
+          state.set(next, 1);
+          stack.push({ id: next, i: 0 });
+        }
+      }
+    };
     for (const id of adjacency.keys()) {
       if (state.get(id) === undefined) visit(id);
     }

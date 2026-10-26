@@ -1,0 +1,182 @@
+{
+  "schemaVersion": 8,
+  "exportedAt": 0,
+  "book": {
+    "subject": "chemistry",
+    "stage": "junior",
+    "title": "九年级化学（制取氧气样例）",
+    "edition": "人教版"
+  },
+  "nodes": [
+    {
+      "id": "chem-root",
+      "type": "branch",
+      "title": "初中化学",
+      "content": "",
+      "parentId": null,
+      "order": 1024,
+      "createdAt": 0,
+      "updatedAt": 0
+    },
+    {
+      "id": "chem-ch2",
+      "type": "section",
+      "title": "第二单元 我们周围的空气",
+      "content": "",
+      "parentId": "chem-root",
+      "order": 1024,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "kind": "chapter",
+      "citation": {
+        "originalNumber": "第二单元",
+        "page": "26"
+      }
+    },
+    {
+      "id": "chem-s23",
+      "type": "section",
+      "title": "课题3 制取氧气",
+      "content": "",
+      "parentId": "chem-ch2",
+      "order": 1024,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "kind": "section",
+      "citation": {
+        "originalNumber": "课题3",
+        "page": "37"
+      }
+    },
+    {
+      "id": "chem-o2",
+      "type": "definition",
+      "title": "氧气",
+      "content": "氧气是一种无色、无味的气体，化学式为 $\\ce{O2}$，能支持燃烧，供给呼吸。",
+      "parentId": "chem-s23",
+      "order": 1024,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "kind": "notation",
+      "key": "oxygen",
+      "citation": {
+        "page": "33"
+      }
+    },
+    {
+      "id": "chem-exp",
+      "type": "note",
+      "title": "实验：加热高锰酸钾制取氧气",
+      "content": "## 实验目的\n\n学习实验室用高锰酸钾制取氧气的方法。\n\n## 实验原理\n\n高锰酸钾受热分解生成锰酸钾、二氧化锰和氧气。\n\n## 实验装置\n\n![加热高锰酸钾制取氧气的装置](https://placehold.co/900x420/png?text=KMnO4+Oxygen+Apparatus)\n\n## 操作步骤\n\n1. 检查装置气密性。\n2. 将高锰酸钾装入试管，在试管口放一团棉花。\n3. 点燃酒精灯，先预热，再对准药品部位加热。\n4. 用排水法收集氧气。\n5. 实验结束时，先把导管移出水面，再熄灭酒精灯。\n\n## 注意事项\n\n试管口略向下倾斜，防止冷凝水回流使试管炸裂；停止加热前必须先把导管移出水面，防止水倒吸。",
+      "parentId": "chem-s23",
+      "order": 2048,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "kind": "experiment",
+      "citation": {
+        "originalNumber": "实验 2-3",
+        "page": "38"
+      }
+    },
+    {
+      "id": "chem-reaction",
+      "type": "proposition",
+      "title": "高锰酸钾受热分解",
+      "content": "高锰酸钾受热分解的化学方程式为：\n\n$$\\ce{2KMnO4 ->[\\Delta] K2MnO4 + MnO2 + O2 ^}$$\n\n反应条件是加热。",
+      "parentId": "chem-s23",
+      "order": 3072,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "kind": "reaction",
+      "key": "kmno4-decomposition",
+      "citation": {
+        "page": "38"
+      }
+    },
+    {
+      "id": "chem-catalyst",
+      "type": "definition",
+      "title": "催化剂",
+      "content": "在化学反应里能改变其他物质的化学反应速率，而本身的质量和化学性质在反应前后都没有发生变化的物质叫做**催化剂**。",
+      "parentId": "chem-s23",
+      "order": 4096,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "kind": "notation",
+      "key": "catalyst"
+    },
+    {
+      "id": "chem-example",
+      "type": "problem",
+      "title": "例题：判断制取氧气的反应",
+      "content": "下列关于实验室制取氧气的说法中，正确的是（　　）\n\nA. 加热高锰酸钾制取氧气属于化合反应\n\nB. 催化剂在反应前后质量不变\n\nC. 收集氧气只能用排水法\n\nD. 实验结束时应先熄灭酒精灯",
+      "parentId": "chem-s23",
+      "order": 5120,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "kind": "example",
+      "solution": "选 **B**。\n\nA 项高锰酸钾分解生成三种物质，属于分解反应；C 项氧气也可以用向上排空气法收集；D 项应先移出导管再熄灭酒精灯。",
+      "citation": {
+        "originalNumber": "例 2",
+        "page": "40"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "ce1",
+      "from": "chem-exp",
+      "to": "chem-o2",
+      "predicate": "uses",
+      "assertedBy": "import",
+      "createdAt": 0,
+      "updatedAt": 0
+    },
+    {
+      "id": "ce2",
+      "from": "chem-exp",
+      "to": "chem-reaction",
+      "predicate": "supports",
+      "assertedBy": "import",
+      "createdAt": 0,
+      "updatedAt": 0,
+      "note": "实验现象和收集到的气体支持该分解反应。"
+    },
+    {
+      "id": "ce3",
+      "from": "chem-reaction",
+      "to": "chem-o2",
+      "predicate": "depends-on",
+      "assertedBy": "import",
+      "createdAt": 0,
+      "updatedAt": 0
+    },
+    {
+      "id": "ce4",
+      "from": "chem-exp",
+      "to": "chem-catalyst",
+      "predicate": "cites",
+      "assertedBy": "import",
+      "createdAt": 0,
+      "updatedAt": 0
+    },
+    {
+      "id": "ce5",
+      "from": "chem-example",
+      "to": "chem-reaction",
+      "predicate": "covers",
+      "assertedBy": "import",
+      "createdAt": 0,
+      "updatedAt": 0
+    },
+    {
+      "id": "ce6",
+      "from": "chem-example",
+      "to": "chem-catalyst",
+      "predicate": "covers",
+      "assertedBy": "import",
+      "createdAt": 0,
+      "updatedAt": 0
+    }
+  ]
+}

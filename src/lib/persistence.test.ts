@@ -1,7 +1,14 @@
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { validateGraphInvariants } from './validate';
 import { mkNode } from './test-helpers';
-import type { Edge, InferenceStep } from './schema';
+import type { BookMeta, Edge, InferenceStep } from './schema';
+
+const book: BookMeta = {
+  subject: 'physics',
+  stage: 'junior',
+  title: '测试物理教材',
+  edition: '测试版',
+};
 
 const nodes = [
   mkNode('b', 'branch', null, 1024),
@@ -60,11 +67,12 @@ beforeAll(async () => {
 describe('持久化与事务', () => {
   beforeEach(async () => {
     await db.clearAll();
-    await db.replaceAll({ nodes, edges, steps });
+    await db.replaceAll({ book, nodes, edges, steps });
   });
 
   it('整库替换后再读回，内容一致', async () => {
     const reloaded = await db.loadAll();
+    expect(reloaded.book).toEqual(book);
     expect(reloaded.nodes).toHaveLength(nodes.length);
     expect(reloaded.edges).toHaveLength(edges.length);
     expect(reloaded.steps).toHaveLength(steps.length);

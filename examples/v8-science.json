@@ -1,0 +1,161 @@
+{
+  "schemaVersion": 8,
+  "exportedAt": 0,
+  "book": {
+    "subject": "science",
+    "stage": "junior",
+    "title": "综合科学（跨学科探究样例）",
+    "edition": "校本"
+  },
+  "nodes": [
+    {
+      "id": "sci-root",
+      "type": "branch",
+      "title": "综合科学",
+      "content": "",
+      "parentId": null,
+      "order": 1024,
+      "createdAt": 0,
+      "updatedAt": 0
+    },
+    {
+      "id": "sci-ch1",
+      "type": "section",
+      "title": "第一章 能量与我们",
+      "content": "",
+      "parentId": "sci-root",
+      "order": 1024,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "kind": "chapter",
+      "citation": {
+        "originalNumber": "第一章"
+      }
+    },
+    {
+      "id": "sci-s11",
+      "type": "section",
+      "title": "1.1 跨学科探究：家庭用电与安全",
+      "content": "",
+      "parentId": "sci-ch1",
+      "order": 1024,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "kind": "section",
+      "citation": {
+        "originalNumber": "1.1"
+      }
+    },
+    {
+      "id": "sci-energy",
+      "type": "definition",
+      "title": "能量",
+      "content": "能量是物体做功的能力，常见形式有电能、热能、光能、化学能等。",
+      "parentId": "sci-s11",
+      "order": 1024,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "kind": "notation",
+      "key": "energy"
+    },
+    {
+      "id": "sci-law",
+      "type": "proposition",
+      "title": "能量守恒定律",
+      "content": "能量既不会凭空消灭，也不会凭空产生，它只会从一种形式转化为其他形式，或者从一个物体转移到其他物体，而能量的总量保持不变。",
+      "parentId": "sci-s11",
+      "order": 2048,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "kind": "law",
+      "key": "energy-conservation"
+    },
+    {
+      "id": "sci-exp",
+      "type": "note",
+      "title": "探究：灯泡发光时的能量转化",
+      "content": "## 问题\n\n白炽灯工作时，电能转化成了哪些形式的能量？\n\n## 观察与测量\n\n接通电源后，灯泡发光发热。用温度计测量灯泡附近温度，发现温度升高。\n\n## 分析\n\n灯泡发光说明电能转化为光能；灯泡发热说明电能同时转化为热能。",
+      "parentId": "sci-s11",
+      "order": 3072,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "kind": "experiment",
+      "citation": {
+        "originalNumber": "活动 1"
+      }
+    },
+    {
+      "id": "sci-reaction",
+      "type": "proposition",
+      "title": "燃烧中的能量转化",
+      "content": "可燃物燃烧时，化学能转化为热能和光能，例如：\n\n$$\\ce{CH4 + 2O2 ->[点燃] CO2 + 2H2O}$$\n\n反应放出热量。",
+      "parentId": "sci-s11",
+      "order": 4096,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "kind": "reaction",
+      "key": "methane-combustion"
+    },
+    {
+      "id": "sci-example",
+      "type": "problem",
+      "title": "探究任务：设计安全用电提示",
+      "content": "结合能量转化和家庭电路知识，为教室设计一条安全用电提示，并说明理由。",
+      "parentId": "sci-s11",
+      "order": 5120,
+      "createdAt": 0,
+      "updatedAt": 0,
+      "kind": "exploration",
+      "solution": "示例：不要在一个插座上同时使用多个大功率电器。因为同时使用会使总电流过大，导线发热增加，可能引发火灾。"
+    }
+  ],
+  "edges": [
+    {
+      "id": "se1",
+      "from": "sci-exp",
+      "to": "sci-law",
+      "predicate": "supports",
+      "assertedBy": "import",
+      "createdAt": 0,
+      "updatedAt": 0,
+      "note": "灯泡发光发热是电能转化为光能和热能的观察证据。"
+    },
+    {
+      "id": "se2",
+      "from": "sci-law",
+      "to": "sci-reaction",
+      "predicate": "generalizes",
+      "assertedBy": "import",
+      "createdAt": 0,
+      "updatedAt": 0,
+      "note": "能量守恒定律是更一般的陈述，燃烧放热是它的具体表现。"
+    },
+    {
+      "id": "se3",
+      "from": "sci-exp",
+      "to": "sci-energy",
+      "predicate": "uses",
+      "assertedBy": "import",
+      "createdAt": 0,
+      "updatedAt": 0
+    },
+    {
+      "id": "se4",
+      "from": "sci-example",
+      "to": "sci-law",
+      "predicate": "covers",
+      "assertedBy": "import",
+      "createdAt": 0,
+      "updatedAt": 0
+    },
+    {
+      "id": "se5",
+      "from": "sci-example",
+      "to": "sci-energy",
+      "predicate": "covers",
+      "assertedBy": "import",
+      "createdAt": 0,
+      "updatedAt": 0
+    }
+  ]
+}

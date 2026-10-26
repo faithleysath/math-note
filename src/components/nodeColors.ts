@@ -19,6 +19,12 @@ export function nodePrefix(node: Pick<Node, 'type' | 'kind'>): string {
           return 'Crit: ';
         case 'claim':
           return 'Claim: ';
+        case 'law':
+          return 'Law: ';
+        case 'principle':
+          return 'Princ: ';
+        case 'reaction':
+          return 'Rxn: ';
         default:
           return 'Th: ';
       }
@@ -36,7 +42,20 @@ export function nodePrefix(node: Pick<Node, 'type' | 'kind'>): string {
           return 'Eg: ';
       }
     case 'note':
-      return 'Note: ';
+      switch (node.kind) {
+        case 'experiment':
+          return 'Lab: ';
+        case 'model':
+          return 'Model: ';
+        case 'phenomenon':
+          return 'Phn: ';
+        case 'process':
+          return 'Proc: ';
+        case 'structure':
+          return 'Struct: ';
+        default:
+          return 'Note: ';
+      }
     case 'counterexample':
       return 'Cex: ';
     case 'attempt':
@@ -65,6 +84,12 @@ export function nodeTextColor(node: Pick<Node, 'type' | 'kind'>): string {
           return 'text-green-700 dark:text-green-400';
         case 'claim':
           return 'text-amber-700 dark:text-amber-400';
+        case 'law':
+          return 'text-indigo-600 dark:text-indigo-400';
+        case 'principle':
+          return 'text-violet-600 dark:text-violet-400';
+        case 'reaction':
+          return 'text-teal-600 dark:text-teal-400';
         default:
           return 'text-green-600 dark:text-green-400';
       }
@@ -82,7 +107,20 @@ export function nodeTextColor(node: Pick<Node, 'type' | 'kind'>): string {
           return 'text-orange-600 dark:text-orange-400';
       }
     case 'note':
-      return 'text-yellow-600 dark:text-yellow-400';
+      switch (node.kind) {
+        case 'experiment':
+          return 'text-teal-600 dark:text-teal-400';
+        case 'model':
+          return 'text-violet-600 dark:text-violet-400';
+        case 'phenomenon':
+          return 'text-amber-600 dark:text-amber-400';
+        case 'process':
+          return 'text-emerald-600 dark:text-emerald-400';
+        case 'structure':
+          return 'text-sky-600 dark:text-sky-400';
+        default:
+          return 'text-yellow-600 dark:text-yellow-400';
+      }
     case 'counterexample':
       return 'text-rose-600 dark:text-rose-400';
     case 'attempt':
@@ -103,17 +141,39 @@ export function nodeBadgeColor(node: Pick<Node, 'type' | 'kind'>): string {
     case 'definition':
       return 'bg-blue-100 text-blue-800';
     case 'proposition':
-      return node.kind === 'lemma'
-        ? 'bg-teal-100 text-teal-800'
-        : node.kind === 'corollary'
-          ? 'bg-cyan-100 text-cyan-800'
-          : 'bg-green-100 text-green-800';
+      switch (node.kind) {
+        case 'lemma':
+          return 'bg-teal-100 text-teal-800';
+        case 'corollary':
+          return 'bg-cyan-100 text-cyan-800';
+        case 'law':
+          return 'bg-indigo-100 text-indigo-800';
+        case 'principle':
+          return 'bg-violet-100 text-violet-800';
+        case 'reaction':
+          return 'bg-teal-100 text-teal-800';
+        default:
+          return 'bg-green-100 text-green-800';
+      }
     case 'proof':
       return 'bg-red-100 text-red-800';
     case 'problem':
       return node.kind === 'exercise' ? 'bg-purple-100 text-purple-800' : 'bg-orange-100 text-orange-800';
     case 'note':
-      return 'bg-yellow-100 text-yellow-800';
+      switch (node.kind) {
+        case 'experiment':
+          return 'bg-teal-100 text-teal-800';
+        case 'model':
+          return 'bg-violet-100 text-violet-800';
+        case 'phenomenon':
+          return 'bg-amber-100 text-amber-800';
+        case 'process':
+          return 'bg-emerald-100 text-emerald-800';
+        case 'structure':
+          return 'bg-sky-100 text-sky-800';
+        default:
+          return 'bg-yellow-100 text-yellow-800';
+      }
     case 'counterexample':
       return 'bg-rose-100 text-rose-800';
     case 'attempt':

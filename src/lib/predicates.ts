@@ -1,7 +1,7 @@
-import type { NodeType, Predicate } from './schema';
+import type { Node, NodeType, Predicate } from './schema';
 
 // =============================================================================
-// 谓词注册表（恰好 9 种）
+// 谓词注册表（v8：原 9 种 + supports / is-a / part-of）
 // =============================================================================
 // 这张表是关系的唯一真相来源：UI 按钮、方向判断、校验规则、显示文案、
 // 图谱箭头、推理规则全部从这里生成。
@@ -41,6 +41,11 @@ interface PredicateSpec {
   from: NodeType[];
   /** 允许出现的 to 类型 */
   to: NodeType[];
+  /**
+   * 需要进一步限制起点 kind 时使用。
+   * supports 只允许实验/现象笔记作为起点，不能只靠 NodeType 判断。
+   */
+  fromKinds?: Partial<Record<NodeType, readonly string[]>>;
   /** 需要精确到 (from,to) 组合时使用，例如 generalizes 只能同类推广 */
   pairs?: TypePair[];
   /** 是否提供「方向反转」的输入方式（充分条件 / 必要条件） */
@@ -214,6 +219,51 @@ export const PREDICATE_SPECS: Record<Predicate, PredicateSpec> = {
     to: CITABLE,
     swappable: false,
   },
+  supports: {
+    family: 'evidential',
+    fromLabel: '支持',
+    inverseLabel: '被支持',
+    verb: '支持了',
+    logical: false,
+    transitive: false,
+    symmetric: false,
+    equivalence: false,
+    forbidCycle: false,
+    from: ['note'],
+    to: CLAIMS,
+    // 实验或观察报告支持一个科学陈述；不等于严格证明
+    fromKinds: { note: ['experiment', 'phenomenon'] },
+    swappable: false,
+  },
+  'is-a': {
+    family: 'semantic',
+    fromLabel: '属于',
+    inverseLabel: '包含',
+    verb: '属于',
+    logical: false,
+    // 类别包含在语义上可传递，但编辑器不会自动补边或推断结论
+    transitive: true,
+    symmetric: false,
+    equivalence: false,
+    forbidCycle: false,
+    from: ['definition'],
+    to: ['definition'],
+    swappable: true,
+  },
+  'part-of': {
+    family: 'semantic',
+    fromLabel: '组成',
+    inverseLabel: '由……组成',
+    verb: '是……的组成部分',
+    logical: false,
+    transitive: false,
+    symmetric: false,
+    equivalence: false,
+    forbidCycle: false,
+    from: ['definition'],
+    to: ['definition'],
+    swappable: true,
+  },
 };
 
 const PREDICATE_LIST = Object.keys(PREDICATE_SPECS) as Predicate[];
@@ -228,7 +278,7 @@ interface ApplicablePredicate {
   reversed: boolean;
 }
 
-/** 某个谓词是否允许 fromType → toType */
+/** 某个谓词是否允许 fromType → toType（只看类型） */
 export function isDirectionAllowed(predicate: Predicate, fromType: NodeType, toType: NodeType): boolean {
   const spec = PREDICATE_SPECS[predicate];
   if (spec.pairs) {
@@ -237,16 +287,34 @@ export function isDirectionAllowed(predicate: Predicate, fromType: NodeType, toT
   return spec.from.includes(fromType) && spec.to.includes(toType);
 }
 
-export function applicablePredicates(fromType: NodeType, toType: NodeType): ApplicablePredicate[] {
+type NodeLike = Pick<Node, 'type' | 'kind'>;
+
+function kindAllowed(spec: PredicateSpec, node: NodeLike): boolean {
+  const constraints = spec.fromKinds?.[node.type];
+  if (!constraints) return true;
+  return Boolean(node.kind && constraints.includes(node.kind));
+}
+
+/**
+ * 关系是否允许这两个节点。
+ * UI 创建、单边校验、整图导入校验必须共用这个函数，
+ * 否则会出现「编辑器不让建、JSON 导入却通过」的不一致。
+ */
+export function isEdgeAllowed(predicate: Predicate, fromNode: NodeLike, toNode: NodeLike): boolean {
+  if (!isDirectionAllowed(predicate, fromNode.type, toNode.type)) return false;
+  return kindAllowed(PREDICATE_SPECS[predicate], fromNode);
+}
+
+export function applicablePredicates(fromNode: NodeLike, toNode: NodeLike): ApplicablePredicate[] {
   const result: ApplicablePredicate[] = [];
   for (const predicate of PREDICATE_LIST) {
     const spec = PREDICATE_SPECS[predicate];
-    const forwardOk = isDirectionAllowed(predicate, fromType, toType);
-    const backwardOk = isDirectionAllowed(predicate, toType, fromType);
+    const forwardOk = isEdgeAllowed(predicate, fromNode, toNode);
+    const backwardOk = isEdgeAllowed(predicate, toNode, fromNode);
     if (forwardOk) {
       result.push({ predicate, reversed: false });
     }
-    // 可换方向的说法（充分条件 / 必要条件、推广 / 特例）两个方向都给
+    // 可换方向的说法（充分条件 / 必要条件、推广 / 特例、属于 / 包含）两个方向都给
     if (backwardOk && (spec.swappable || !forwardOk)) {
       result.push({ predicate, reversed: true });
     }

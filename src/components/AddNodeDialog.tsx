@@ -14,6 +14,7 @@ import {
 } from './ui/dialog';
 import { Input } from './ui/input';
 import { useGraphStore } from '../stores/useGraphStore';
+import { kindOptionsFor } from '../lib/subjects';
 
 interface AddNodeDialogProps {
   parent: Node;
@@ -26,9 +27,14 @@ const AddNodeDialog = ({ parent, isOpen, onClose, insertAfterNodeId }: AddNodeDi
   const [title, setTitle] = useState('');
   const [selectedType, setSelectedType] = useState<NodeType | null>(null);
   const [selectedKind, setSelectedKind] = useState<string | undefined>(undefined);
+  const [showMoreKinds, setShowMoreKinds] = useState(false);
   const createNode = useGraphStore(state => state.createNode);
+  const book = useGraphStore(state => state.book);
 
-  const possibleChildren = allowedChildTypes(parent.type);
+  // 教材编纂模式默认不提供「个人解题记录」入口；导入的数据仍可正常显示
+  const possibleChildren = allowedChildTypes(parent.type).filter((type) => type !== 'attempt');
+  const kindOptions = selectedType ? kindOptionsFor(book?.subject, selectedType) : null;
+  const allKinds = kindOptions ? [...kindOptions.preferred, ...kindOptions.more] : [];
 
   const handleCreate = async () => {
     if (!title || !selectedType) {
@@ -55,6 +61,7 @@ const AddNodeDialog = ({ parent, isOpen, onClose, insertAfterNodeId }: AddNodeDi
     setTitle('');
     setSelectedType(null);
     setSelectedKind(undefined);
+    setShowMoreKinds(false);
     onClose();
   };
 
@@ -92,7 +99,8 @@ const AddNodeDialog = ({ parent, isOpen, onClose, insertAfterNodeId }: AddNodeDi
                   )}
                   onClick={() => {
                     setSelectedType(type);
-                    setSelectedKind(KIND_OPTIONS[type][0]);
+                    setSelectedKind(kindOptionsFor(book?.subject, type).preferred[0] ?? KIND_OPTIONS[type][0]);
+                    setShowMoreKinds(false);
                   }}
                 >
                   {NODE_TYPE_META[type].label}
@@ -100,11 +108,11 @@ const AddNodeDialog = ({ parent, isOpen, onClose, insertAfterNodeId }: AddNodeDi
               ))}
             </div>
           </div>
-          {selectedType && KIND_OPTIONS[selectedType].length > 0 && (
-            <div className="grid grid-cols-6 items-center gap-4">
-              <label className="text-left">细分</label>
+          {selectedType && kindOptions && allKinds.length > 0 && (
+            <div className="grid grid-cols-6 items-start gap-4">
+              <label className="text-left pt-2">细分</label>
               <div className="col-span-5 flex flex-wrap gap-2">
-                {KIND_OPTIONS[selectedType].map(kind => (
+                {(showMoreKinds ? allKinds : kindOptions.preferred).map(kind => (
                   <Button
                     key={kind}
                     variant={selectedKind === kind ? 'default' : 'outline'}
@@ -114,6 +122,15 @@ const AddNodeDialog = ({ parent, isOpen, onClose, insertAfterNodeId }: AddNodeDi
                     {KIND_LABELS[kind] ?? kind}
                   </Button>
                 ))}
+                {kindOptions.more.length > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowMoreKinds(prev => !prev)}
+                  >
+                    {showMoreKinds ? '收起更多分类' : `更多分类 (${kindOptions.more.length})`}
+                  </Button>
+                )}
               </div>
             </div>
           )}

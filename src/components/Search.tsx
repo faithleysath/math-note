@@ -14,6 +14,7 @@ import { nodesMatching, searchNodes, type SearchFilter } from '../lib/graph';
 import { NODE_TYPE_META, typeLabel, type Node, type NodeType } from '../lib/schema';
 import { nodeBadgeColor } from './nodeColors';
 import { useGraphStore } from '../stores/useGraphStore';
+import { filterGroupsFor } from '../lib/subjects';
 import { cn } from '@/lib/utils';
 import { useDebounce } from '@/hooks/useDebounce';
 
@@ -23,60 +24,15 @@ interface SearchProps {
   showFilters?: boolean;
 }
 
-/** 筛选器选项：按 type 或 type + kind */
-const FILTER_GROUPS: { label: string; options: { value: string; label: string }[] }[] = [
-  { label: '结构', options: [{ value: 'section', label: '章节' }] },
-  {
-    label: '知识',
-    options: [
-      { value: 'definition', label: '定义' },
-      { value: 'note', label: '全部笔记' },
-      { value: 'note:method', label: '方法' },
-      { value: 'note:context', label: '语境' },
-      { value: 'note:summary', label: '总结' },
-      { value: 'note:history', label: '数学文化' },
-    ],
-  },
-  {
-    label: '命题',
-    options: [
-      { value: 'proposition', label: '全部命题' },
-      { value: 'proposition:theorem', label: '定理' },
-      { value: 'proposition:lemma', label: '引理' },
-      { value: 'proposition:corollary', label: '推论' },
-      { value: 'proposition:property', label: '性质' },
-      { value: 'proposition:formula', label: '公式' },
-      { value: 'proposition:criterion', label: '判定' },
-      { value: 'proposition:claim', label: '断言' },
-    ],
-  },
-  {
-    label: '题目',
-    options: [
-      { value: 'problem', label: '全部题目' },
-      { value: 'problem:example', label: '例题' },
-      { value: 'problem:exercise', label: '练习' },
-      { value: 'problem:exploration', label: '探究' },
-      { value: 'problem:review', label: '复习' },
-    ],
-  },
-  {
-    label: '其他',
-    options: [
-      { value: 'proof', label: '证明' },
-      { value: 'counterexample', label: '反例' },
-      { value: 'attempt', label: '解题记录' },
-    ],
-  },
-];
-
 const Search = ({ onSelectNode, showFilters = false }: SearchProps) => {
   const index = useGraphStore(state => state.index);
+  const book = useGraphStore(state => state.book);
   const select = useGraphStore(state => state.select);
   const [searchTerm, setSearchTerm] = useState('');
   const [isOpen, setIsOpen] = useState(false);
   const [filterValue, setFilterValue] = useState('');
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
+  const filterGroups = useMemo(() => filterGroupsFor(book?.subject), [book?.subject]);
 
   const filter = useMemo<SearchFilter | undefined>(() => {
     if (!filterValue) return undefined;
@@ -142,7 +98,7 @@ const Search = ({ onSelectNode, showFilters = false }: SearchProps) => {
             </SelectTrigger>
             <SelectContent className="max-h-72">
               <SelectItem value="all">全部类型</SelectItem>
-              {FILTER_GROUPS.map((group) => (
+              {filterGroups.map((group) => (
                 <SelectGroup key={group.label}>
                   <SelectLabel>{group.label}</SelectLabel>
                   {group.options.map((option) => (

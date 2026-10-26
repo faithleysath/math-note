@@ -1,8 +1,8 @@
 import MDEditor from '@uiw/react-md-editor';
-import remarkMath from 'remark-math';
-import rehypeKatex from 'rehype-katex';
 import type { ProcessedNode } from '../../lib/schema';
 import { NODE_TYPE_META } from '../../lib/schema';
+import { markdownPlugins } from '../../lib/markdown';
+import { titleCarriesNumber } from '../../lib/display';
 import { useMemo } from 'react';
 
 interface ProseNodeRendererProps {
@@ -18,16 +18,19 @@ const ProseNodeRenderer = ({ node }: ProseNodeRendererProps) => {
     const label = node.kind
       ? NODE_TYPE_META[node.type].kindLabel(node.kind)
       : NODE_TYPE_META[node.type].label;
-    return `**${label}：${node.title}**\n\n${node.content}`;
-  }, [node.content, node.title, node.type, node.kind]);
+    const number =
+      node.displayNumber && !titleCarriesNumber(node.title, node.displayNumber)
+        ? `**原书编号：${node.displayNumber}**\n\n`
+        : '';
+    return `${number}**${label}：${node.title}**\n\n${node.content}`;
+  }, [node.content, node.title, node.type, node.kind, node.displayNumber]);
 
   return (
     <div className="text-base">
       <MDEditor.Markdown
         source={displayContent}
         style={{ backgroundColor: 'transparent' }}
-        remarkPlugins={[remarkMath]}
-        rehypePlugins={[[rehypeKatex, { throwOnError: false }]]}
+        {...markdownPlugins()}
       />
     </div>
   );

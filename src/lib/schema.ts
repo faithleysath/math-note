@@ -31,10 +31,23 @@ export const KIND_OPTIONS: Record<NodeType, readonly string[]> = {
   branch: [],
   section: ['chapter', 'section', 'subsection', 'topic'],
   definition: ['notation'],
-  proposition: ['theorem', 'lemma', 'corollary', 'property', 'formula', 'criterion', 'claim'],
+  proposition: ['theorem', 'lemma', 'corollary', 'property', 'formula', 'criterion', 'claim', 'law', 'principle', 'reaction'],
   proof: ['direct', 'contradiction', 'induction', 'geometric', 'other'],
   problem: ['example', 'exercise', 'exploration', 'review'],
-  note: ['explanation', 'method', 'summary', 'history', 'context', 'topic', 'remark'],
+  note: [
+    'explanation',
+    'method',
+    'summary',
+    'history',
+    'context',
+    'topic',
+    'remark',
+    'experiment',
+    'model',
+    'phenomenon',
+    'process',
+    'structure',
+  ],
   counterexample: ['numerical', 'geometric', 'other'],
   attempt: ['personal', 'review'],
 };
@@ -52,6 +65,9 @@ export const KIND_LABELS: Record<string, string> = {
   formula: '公式',
   criterion: '判定',
   claim: '断言',
+  law: '定律',
+  principle: '原理',
+  reaction: '化学反应',
   direct: '直接证明',
   contradiction: '反证法',
   induction: '归纳法',
@@ -64,9 +80,14 @@ export const KIND_LABELS: Record<string, string> = {
   explanation: '讲解',
   method: '方法',
   summary: '总结',
-  history: '数学文化',
+  history: '科学文化',
   context: '语境',
   remark: '备注',
+  experiment: '实验',
+  model: '模型',
+  phenomenon: '现象',
+  process: '过程',
+  structure: '结构',
   numerical: '数值反例',
   personal: '个人解题',
 };
@@ -107,6 +128,10 @@ export function typeLabel(node: { type: NodeType; kind?: string }): string {
   if (!node.kind) return meta.label;
   if (node.type === 'section') return node.kind === 'chapter' ? '主章节' : kindLabel === '节' ? '子章节' : kindLabel;
   if (node.type === 'proposition' || node.type === 'problem') return kindLabel;
+  // 理科学科的笔记类概念直接显示「实验 / 模型 / 过程」，不写成「笔记 · 实验」
+  if (node.type === 'note' && ['experiment', 'model', 'phenomenon', 'process', 'structure'].includes(node.kind)) {
+    return kindLabel;
+  }
   return `${meta.label} · ${kindLabel}`;
 }
 
@@ -152,7 +177,7 @@ export function allowedChildTypes(parentType: NodeType | null): NodeType[] {
 }
 
 // =============================================================================
-// 关系谓词（恰好 9 种）
+// 关系谓词（v8：原 9 种 + 3 种理科语义关系）
 // =============================================================================
 
 const PREDICATES = [
@@ -165,9 +190,48 @@ const PREDICATES = [
   'iff', // A ⇔ B
   'generalizes', // 概念/命题的推广
   'cites', // 弱引用
+  'supports', // 实验/观察 → 科学陈述
+  'is-a', // 子类 → 上位类
+  'part-of', // 组成部分 → 整体
 ] as const;
 
 export type Predicate = (typeof PREDICATES)[number];
+
+// =============================================================================
+// 知识库级元信息（v8）
+// =============================================================================
+
+export const SUBJECTS = ['math', 'physics', 'chemistry', 'biology', 'science'] as const;
+export type Subject = (typeof SUBJECTS)[number];
+
+export const SUBJECT_LABELS: Record<Subject, string> = {
+  math: '数学',
+  physics: '物理',
+  chemistry: '化学',
+  biology: '生物学',
+  science: '综合科学',
+};
+
+export const SCHOOL_STAGES = ['junior', 'senior'] as const;
+export type SchoolStage = (typeof SCHOOL_STAGES)[number];
+
+export const STAGE_LABELS: Record<SchoolStage, string> = {
+  junior: '初中',
+  senior: '高中',
+};
+
+/**
+ * 一本教材自己的身份信息。
+ * 这不是跨教材统一 ID：相同 title 的两份 JSON 仍然是两个互不相通的库。
+ */
+export interface BookMeta {
+  subject: Subject;
+  stage: SchoolStage;
+  /** 如「八年级物理下册」 */
+  title: string;
+  /** 如「人教版」；可选 */
+  edition?: string;
+}
 
 // =============================================================================
 // 实体
@@ -214,8 +278,15 @@ export interface Node {
   updatedAt: number;
 }
 
+/** 编号来源：原书编号 / 软件生成 / 不显示 */
+export type NumberSource = 'source' | 'generated' | 'none';
+
 /** 渲染用的节点：附带算好的教科书编号 */
-export type ProcessedNode = Node & { displayNumber: string; isChapter: boolean };
+export type ProcessedNode = Node & {
+  displayNumber: string;
+  numberSource: NumberSource;
+  isChapter: boolean;
+};
 
 /**
  * 边永远是 from 作为主语、to 作为宾语。
@@ -259,8 +330,9 @@ export interface InferenceStep {
 }
 
 export interface GraphJSON {
-  schemaVersion: 7;
+  schemaVersion: 8;
   exportedAt: number;
+  book: BookMeta;
   nodes: Node[];
   edges: Edge[];
   steps?: InferenceStep[];
@@ -269,6 +341,13 @@ export interface GraphJSON {
 // =============================================================================
 // 运行时校验（zod）
 // =============================================================================
+
+const bookMetaSchema = z.strictObject({
+  subject: z.enum(SUBJECTS),
+  stage: z.enum(SCHOOL_STAGES),
+  title: z.string().min(1),
+  edition: z.string().optional(),
+});
 
 const citationSchema = z.strictObject({
   source: z.string().optional(),
@@ -328,8 +407,9 @@ const stepSchema = z.strictObject({
 });
 
 export const graphJSONSchema = z.strictObject({
-  schemaVersion: z.literal(7),
+  schemaVersion: z.literal(8),
   exportedAt: z.number(),
+  book: bookMetaSchema,
   nodes: z.array(nodeSchema),
   edges: z.array(edgeSchema),
   steps: z.array(stepSchema).default([]),

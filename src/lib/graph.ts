@@ -4,8 +4,10 @@ import {
   type InferenceStep,
   type Node,
   type NodeType,
+  type NumberSource,
   type Predicate,
 } from './schema';
+import type { NumberingMode } from './subjects';
 
 /** 兄弟节点排序间隔 */
 const ORDER_GAP = 1024;
@@ -174,6 +176,35 @@ function computeNumbering(
 function prefixNumber(label: string, path: number[], position: number): string {
   const prefix = path.join('.');
   return prefix ? `${label} ${prefix}.${position}` : `${label} ${position}`;
+}
+
+export interface NumberDisplay {
+  text: string;
+  source: NumberSource;
+}
+
+/**
+ * 节点实际显示的教材编号。
+ *
+ * - 原书编号永远优先，并标为 source；
+ * - 数学配置沿用软件生成的编号；
+ * - 其他理科默认只为章节、定义、题目生成编号，
+ *   不伪造「定律 1.2.1」「实验 3.1」这类原书不存在的编号。
+ */
+export function numberDisplayFor(
+  index: GraphIndex,
+  node: Pick<Node, 'id' | 'type' | 'citation'>,
+  mode: NumberingMode = 'generated',
+): NumberDisplay {
+  const original = node.citation?.originalNumber?.trim();
+  if (original) return { text: original, source: 'source' };
+
+  const generated = index.numbering.get(node.id);
+  if (!generated) return { text: '', source: 'none' };
+  if (mode === 'generated') return { text: generated, source: 'generated' };
+
+  const allowed = node.type === 'section' || node.type === 'definition' || node.type === 'problem';
+  return allowed ? { text: generated, source: 'generated' } : { text: '', source: 'none' };
 }
 
 // =============================================================================
