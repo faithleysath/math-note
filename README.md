@@ -4,7 +4,7 @@
 
 仓库：<https://github.com/faithleysath/textbook-graph>
 
-线上示例：<https://math-note-2bas.vercel.app>
+线上示例：<https://pi.laysath.cn>
 
 ## 一教材一知识库
 
