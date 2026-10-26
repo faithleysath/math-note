@@ -192,6 +192,8 @@ const MainContent = () => {
               const node = processedNodes[virtualItem.index];
               const siblings = nodes.filter(n => n.parentId === node.parentId);
               const nodeIndexWithinSiblings = siblings.findIndex(n => n.id === node.id);
+              // 编辑中的节点不再显示悬浮工具栏和行间插入线，避免挡住编辑框
+              const isEditing = editingId === node.id;
 
               return (
                 <div
@@ -209,7 +211,7 @@ const MainContent = () => {
                   onClick={() => select(node.id)}
                 >
                   <NodeRenderer node={node} />
-                  {!readOnly && (
+                  {!readOnly && !isEditing && (
                     <>
                       <div
                         className="group/insert absolute -bottom-2 left-0 w-full h-4 flex items-center justify-center cursor-pointer"
