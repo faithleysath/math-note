@@ -76,7 +76,6 @@
       "to": "quadratic",
       "predicate": "depends-on",
       "assertedBy": "import",
-      "status": "asserted",
       "createdAt": 0,
       "updatedAt": 0
     },
@@ -86,7 +85,6 @@
       "to": "axis",
       "predicate": "proves",
       "assertedBy": "import",
-      "status": "asserted",
       "createdAt": 0,
       "updatedAt": 0
     },
@@ -96,7 +94,6 @@
       "to": "quadratic",
       "predicate": "uses",
       "assertedBy": "import",
-      "status": "asserted",
       "createdAt": 0,
       "updatedAt": 0
     },
@@ -106,7 +103,6 @@
       "to": "axis",
       "predicate": "covers",
       "assertedBy": "import",
-      "status": "asserted",
       "createdAt": 0,
       "updatedAt": 0
     },
@@ -116,7 +112,6 @@
       "to": "quadratic",
       "predicate": "covers",
       "assertedBy": "import",
-      "status": "asserted",
       "createdAt": 0,
       "updatedAt": 0
     }

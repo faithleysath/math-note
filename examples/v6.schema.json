@@ -156,14 +156,6 @@
           "note": {
             "type": "string"
           },
-          "status": {
-            "type": "string",
-            "enum": [
-              "asserted",
-              "conjecture",
-              "disproven"
-            ]
-          },
           "contextId": {
             "type": "string"
           },
@@ -222,14 +214,6 @@
           },
           "proofId": {
             "type": "string"
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "asserted",
-              "conjecture",
-              "disproven"
-            ]
           },
           "note": {
             "type": "string"

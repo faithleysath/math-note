@@ -222,9 +222,6 @@ export interface Node {
 /** 渲染用的节点：附带算好的教科书编号 */
 export type ProcessedNode = Node & { displayNumber: string; isChapter: boolean };
 
-/** 关系被主张的状态；不涉及录入质量或形式化验证 */
-export type EdgeStatus = 'asserted' | 'conjecture' | 'disproven';
-
 /**
  * 边永远是 from 作为主语、to 作为宾语。
  * 「必要条件」在输入时归一化为 implies 反向，不存第二份。
@@ -237,7 +234,6 @@ export interface Edge {
   /** 前提条件，LaTeX / Markdown。数学蕴含几乎都带前提。 */
   condition?: string;
   note?: string;
-  status?: EdgeStatus;
   /** 语境：必须指向 note(kind='context')；缺省表示未说明语境 */
   contextId?: string;
   assertedBy: 'manual' | 'import';
@@ -261,7 +257,6 @@ export interface InferenceStep {
   contextId?: string;
   /** 这条推导属于哪个证明节点 */
   proofId?: string;
-  status?: EdgeStatus;
   note?: string;
   assertedBy: 'manual' | 'import';
   createdAt: number;
@@ -318,7 +313,6 @@ export const edgeSchema = z.object({
   predicate: z.enum(PREDICATES),
   condition: z.string().optional(),
   note: z.string().optional(),
-  status: z.enum(['asserted', 'conjecture', 'disproven']).optional(),
   contextId: z.string().optional(),
   assertedBy: z.enum(['manual', 'import']),
   createdAt: z.number(),
@@ -332,7 +326,6 @@ export const stepSchema = z.object({
   rule: z.string().min(1),
   contextId: z.string().optional(),
   proofId: z.string().optional(),
-  status: z.enum(['asserted', 'conjecture', 'disproven']).optional(),
   note: z.string().optional(),
   assertedBy: z.enum(['manual', 'import']),
   createdAt: z.number(),

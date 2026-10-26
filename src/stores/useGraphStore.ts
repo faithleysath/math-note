@@ -65,14 +65,14 @@ export interface GraphState {
   createEdge: (input: NewEdgeInput) => Promise<Edge>;
   updateEdge: (
     id: string,
-    patch: Partial<Pick<Edge, 'condition' | 'note' | 'status' | 'contextId'>>,
+    patch: Partial<Pick<Edge, 'condition' | 'note' | 'contextId'>>,
   ) => Promise<void>;
   deleteEdge: (id: string) => Promise<void>;
 
   createStep: (input: NewStepInput) => Promise<InferenceStep>;
   updateStep: (
     id: string,
-    patch: Partial<Pick<InferenceStep, 'rule' | 'note' | 'status' | 'contextId' | 'proofId'>>,
+    patch: Partial<Pick<InferenceStep, 'rule' | 'note' | 'contextId' | 'proofId'>>,
   ) => Promise<void>;
   deleteStep: (id: string) => Promise<void>;
 
@@ -399,7 +399,6 @@ export const useGraphStore = create<GraphState>()((set, get) => {
         predicate: input.predicate,
         condition: input.condition || undefined,
         note: input.note || undefined,
-        status: input.status ?? 'asserted',
         contextId: input.contextId || undefined,
         assertedBy: input.assertedBy ?? 'manual',
         createdAt: now,
@@ -462,7 +461,6 @@ export const useGraphStore = create<GraphState>()((set, get) => {
         rule: input.rule.trim(),
         contextId: input.contextId || undefined,
         proofId: input.proofId || undefined,
-        status: input.status ?? 'asserted',
         note: input.note || undefined,
         assertedBy: input.assertedBy ?? 'manual',
         createdAt: now,

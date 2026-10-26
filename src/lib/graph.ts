@@ -1,7 +1,6 @@
 import {
   typeLabel,
   type Edge,
-  type EdgeStatus,
   type InferenceStep,
   type Node,
   type NodeType,
@@ -288,7 +287,7 @@ export function rebalancedOrders(index: GraphIndex, parentId: string | null): Ma
 // 结构遍历只看「物理上存了哪些边」，不判断数学真假，也不合并语境。
 // 数学推理必须走下面的 inferLogicalRelations。
 
-/** 纯结构可达性（导航用），不检查 status / condition / 语境 */
+/** 纯结构可达性（导航用），不检查 condition / 语境 */
 export function reachable(
   index: GraphIndex,
   startId: string,
@@ -314,45 +313,6 @@ export function reachable(
       const next = direction === 'out'
         ? (edge.from === current ? edge.to : edge.from)
         : (edge.to === current ? edge.from : edge.to);
-      if (visited.has(next)) continue;
-      visited.add(next);
-      result.add(next);
-      queue.push(next);
-    }
-  }
-  return result;
-}
-
-export interface StructuralQueryOptions {
-  /** 是否包含已推翻的边，导航视图默认包含（历史记录仍然可看） */
-  includeDisproven?: boolean;
-  /** 是否包含猜想 */
-  includeConjectures?: boolean;
-}
-
-export function reachableStructural(
-  index: GraphIndex,
-  startId: string,
-  predicate: Predicate,
-  options: StructuralQueryOptions = {},
-): Set<string> {
-  const includeDisproven = options.includeDisproven ?? true;
-  const includeConjectures = options.includeConjectures ?? true;
-  const result = new Set<string>();
-  const queue = [startId];
-  const visited = new Set<string>([startId]);
-
-  while (queue.length > 0) {
-    const current = queue.shift() as string;
-    const edges = [
-      ...(index.edgesFrom.get(current) ?? []),
-      ...(PREDICATE_SPECS[predicate].symmetric ? (index.edgesTo.get(current) ?? []) : []),
-    ];
-    for (const edge of edges) {
-      if (edge.predicate !== predicate) continue;
-      if (!includeDisproven && edge.status === 'disproven') continue;
-      if (!includeConjectures && edge.status === 'conjecture') continue;
-      const next = edge.from === current ? edge.to : edge.from;
       if (visited.has(next)) continue;
       visited.add(next);
       result.add(next);
@@ -400,7 +360,6 @@ export function findPath(
 // 指定语境时语境不同的边不参与；路径上的文字条件会被带出来，不会被抹掉。
 
 export interface LogicalQueryOptions {
-  includeConjectures?: boolean;
   /** 指定语境：只接受该语境的边；不指定表示不限定语境 */
   contextId?: string;
   maxDepth?: number;
@@ -422,14 +381,8 @@ export interface DerivedRelation {
   contextId?: string;
 }
 
-export function edgeStatus(edge: { status?: EdgeStatus }): EdgeStatus {
-  return edge.status ?? 'asserted';
-}
-
 export function passesLogicalFilter(edge: Edge, options: LogicalQueryOptions = {}): boolean {
   if (isLogicalPredicate(edge.predicate) === false) return false;
-  if (edgeStatus(edge) === 'disproven') return false;
-  if (edgeStatus(edge) === 'conjecture' && !options.includeConjectures) return false;
   if (options.contextId !== undefined && edge.contextId !== options.contextId) return false;
   return true;
 }
@@ -574,8 +527,6 @@ function sharedContext(contexts: (string | undefined)[]): string | undefined {
 }
 
 export function passesStepFilter(step: InferenceStep, options: LogicalQueryOptions = {}): boolean {
-  if (edgeStatus(step) === 'disproven') return false;
-  if (edgeStatus(step) === 'conjecture' && !options.includeConjectures) return false;
   if (options.contextId !== undefined && step.contextId !== options.contextId) return false;
   return true;
 }

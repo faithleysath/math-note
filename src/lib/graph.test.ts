@@ -14,7 +14,6 @@ import {
   inferLogicalRelations,
   ORDER_GAP,
   reachable,
-  reachableStructural,
   searchNodes,
   topoSort,
 } from './graph';
@@ -159,14 +158,9 @@ describe('结构遍历', () => {
     expect([...reachable(index, 'thmC', 'depends-on')].sort()).toEqual(['def', 'thmA', 'thmB']);
   });
 
-  it('结构查询默认保留已推翻的边，作为历史记录', () => {
-    const index = buildIndex(nodes, [
-      edge('thmA', 'def', 'depends-on', { status: 'disproven' }),
-    ]);
+  it('结构查询包含图上所有已存的关系', () => {
+    const index = buildIndex(nodes, [edge('thmA', 'def', 'depends-on')]);
     expect(reachable(index, 'thmA', 'depends-on').has('def')).toBe(true);
-    expect(
-      reachableStructural(index, 'thmA', 'depends-on', { includeDisproven: false }).has('def'),
-    ).toBe(false);
   });
 
   it('iff 在结构上双向可达（即使只存一条）', () => {
@@ -213,18 +207,12 @@ describe('数学推理', () => {
     expect(derived[0].contextId).toBeUndefined();
   });
 
-  it('已推翻的边不参与推理', () => {
+  it('已存的关系都参与候选关联计算', () => {
     const index = buildIndex(nodes, [
-      edge('a', 'b', 'implies', { status: 'disproven' }),
+      edge('a', 'b', 'implies'),
       edge('b', 'c', 'implies'),
     ]);
-    expect(inferLogicalRelations(index, 'a').map((rel) => rel.to)).not.toContain('c');
-  });
-
-  it('猜想默认不参与，显式要求时才参与', () => {
-    const index = buildIndex(nodes, [edge('a', 'b', 'implies', { status: 'conjecture' })]);
-    expect(inferLogicalRelations(index, 'a')).toHaveLength(0);
-    expect(inferLogicalRelations(index, 'a', { includeConjectures: true })).toHaveLength(1);
+    expect(inferLogicalRelations(index, 'a').map((rel) => rel.to)).toEqual(['b', 'c']);
   });
 
   it('语境筛选：指定语境时只走同语境的边', () => {
@@ -274,13 +262,6 @@ describe('等价类', () => {
     const classes = equivalenceClasses(index);
     expect(classes).toHaveLength(2);
     expect(classes.map((item) => item.contextId).sort()).toEqual(['ctx1', 'ctx2']);
-  });
-
-  it('已推翻的等价关系不进入已证等价类', () => {
-    const index = buildIndex(nodes, [
-      edge('a', 'b', 'iff', { status: 'disproven' }),
-    ]);
-    expect(equivalenceClasses(index)).toHaveLength(0);
   });
 
   it('没有明确语境的等价关系只算候选', () => {

@@ -363,7 +363,6 @@
       "to": "set",
       "predicate": "depends-on",
       "assertedBy": "import",
-      "status": "asserted",
       "createdAt": 1750000000000,
       "updatedAt": 1750000000000
     },
@@ -373,7 +372,6 @@
       "to": "subset",
       "predicate": "depends-on",
       "assertedBy": "import",
-      "status": "asserted",
       "createdAt": 1750000000000,
       "updatedAt": 1750000000000
     },
@@ -383,7 +381,6 @@
       "to": "set-prop",
       "predicate": "proves",
       "assertedBy": "import",
-      "status": "asserted",
       "createdAt": 1750000000000,
       "updatedAt": 1750000000000
     },
@@ -393,7 +390,6 @@
       "to": "subset",
       "predicate": "uses",
       "assertedBy": "import",
-      "status": "asserted",
       "createdAt": 1750000000000,
       "updatedAt": 1750000000000
     },
@@ -403,7 +399,6 @@
       "to": "subset",
       "predicate": "covers",
       "assertedBy": "import",
-      "status": "asserted",
       "createdAt": 1750000000000,
       "updatedAt": 1750000000000,
       "contextId": "m-context"
@@ -414,7 +409,6 @@
       "to": "implies-def",
       "predicate": "depends-on",
       "assertedBy": "import",
-      "status": "asserted",
       "createdAt": 1750000000000,
       "updatedAt": 1750000000000
     },
@@ -424,7 +418,6 @@
       "to": "p-abs",
       "predicate": "implies",
       "assertedBy": "import",
-      "status": "asserted",
       "createdAt": 1750000000000,
       "updatedAt": 1750000000000
     },
@@ -434,7 +427,6 @@
       "to": "p-claim",
       "predicate": "implies",
       "assertedBy": "import",
-      "status": "asserted",
       "createdAt": 1750000000000,
       "updatedAt": 1750000000000,
       "condition": "$x$ 为实数"
@@ -445,7 +437,6 @@
       "to": "p-claim",
       "predicate": "refutes",
       "assertedBy": "import",
-      "status": "asserted",
       "createdAt": 1750000000000,
       "updatedAt": 1750000000000
     },
@@ -455,7 +446,6 @@
       "to": "quadratic",
       "predicate": "depends-on",
       "assertedBy": "import",
-      "status": "asserted",
       "createdAt": 1750000000000,
       "updatedAt": 1750000000000
     },
@@ -465,7 +455,6 @@
       "to": "axis",
       "predicate": "proves",
       "assertedBy": "import",
-      "status": "asserted",
       "createdAt": 1750000000000,
       "updatedAt": 1750000000000
     },
@@ -475,7 +464,6 @@
       "to": "axis",
       "predicate": "proves",
       "assertedBy": "import",
-      "status": "asserted",
       "createdAt": 1750000000000,
       "updatedAt": 1750000000000
     },
@@ -485,7 +473,6 @@
       "to": "quadratic",
       "predicate": "uses",
       "assertedBy": "import",
-      "status": "asserted",
       "createdAt": 1750000000000,
       "updatedAt": 1750000000000
     },
@@ -495,7 +482,6 @@
       "to": "axis",
       "predicate": "covers",
       "assertedBy": "import",
-      "status": "asserted",
       "createdAt": 1750000000000,
       "updatedAt": 1750000000000
     },
@@ -505,7 +491,6 @@
       "to": "quadratic",
       "predicate": "covers",
       "assertedBy": "import",
-      "status": "asserted",
       "createdAt": 1750000000000,
       "updatedAt": 1750000000000
     },
@@ -515,7 +500,6 @@
       "to": "ap-def",
       "predicate": "depends-on",
       "assertedBy": "import",
-      "status": "asserted",
       "createdAt": 1750000000000,
       "updatedAt": 1750000000000
     },
@@ -525,7 +509,6 @@
       "to": "ap-sum",
       "predicate": "covers",
       "assertedBy": "import",
-      "status": "asserted",
       "createdAt": 1750000000000,
       "updatedAt": 1750000000000
     },
@@ -535,7 +518,6 @@
       "to": "axis",
       "predicate": "cites",
       "assertedBy": "import",
-      "status": "asserted",
       "createdAt": 1750000000000,
       "updatedAt": 1750000000000
     },
@@ -545,7 +527,6 @@
       "to": "ap-sum",
       "predicate": "generalizes",
       "assertedBy": "import",
-      "status": "conjecture",
       "createdAt": 1750000000000,
       "updatedAt": 1750000000000,
       "note": "演示用：命题推广到公式不是好例子，仅测试 generalizes 合法性"
@@ -556,7 +537,6 @@
       "to": "set",
       "predicate": "generalizes",
       "assertedBy": "import",
-      "status": "asserted",
       "createdAt": 1750000000000,
       "updatedAt": 1750000000000,
       "note": "函数概念建立在集合之上"

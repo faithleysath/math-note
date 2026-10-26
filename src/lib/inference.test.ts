@@ -98,27 +98,6 @@ describe('推理步骤（超边）', () => {
     expect(target?.contextId).toBeUndefined();
   });
 
-  it('已推翻的推理步骤不参与推导（重复校验）', () => {
-    const index = buildIndex(
-      nodes,
-      [edge('s', 'a', 'implies'), edge('s', 'b', 'implies')],
-      [step({ status: 'conjecture' })],
-    );
-    expect(deriveWithSteps(index, 's').map((item) => item.nodeId)).not.toContain('c');
-    expect(
-      deriveWithSteps(index, 's', { includeConjectures: true }).map((item) => item.nodeId),
-    ).toContain('c');
-  });
-
-  it('已推翻的推理步骤不参与推导', () => {
-    const index = buildIndex(
-      nodes,
-      [edge('s', 'a', 'implies'), edge('s', 'b', 'implies')],
-      [step({ status: 'disproven' })],
-    );
-    expect(deriveWithSteps(index, 's').map((item) => item.nodeId)).not.toContain('c');
-  });
-
   it('能解释每一步是怎么来的', () => {
     const index = buildIndex(nodes, [edge('s', 'a', 'implies'), edge('s', 'b', 'implies')], [step()]);
     const target = deriveWithSteps(index, 's').find((item) => item.nodeId === 'c');

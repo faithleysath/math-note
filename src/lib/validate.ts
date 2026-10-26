@@ -10,7 +10,6 @@ import {
   type AttemptMeta,
   type Citation,
   type Edge,
-  type EdgeStatus,
   type InferenceStep,
   type Node,
   type NodeType,
@@ -92,7 +91,6 @@ export interface NewEdgeInput {
   predicate: Predicate;
   condition?: string;
   note?: string;
-  status?: Edge['status'];
   contextId?: string;
   assertedBy?: Edge['assertedBy'];
 }
@@ -448,7 +446,6 @@ export interface NewStepInput {
   rule: string;
   contextId?: string;
   proofId?: string;
-  status?: EdgeStatus;
   note?: string;
   assertedBy?: InferenceStep['assertedBy'];
 }
@@ -983,14 +980,6 @@ export function findConflictHints(index: GraphIndex): ConflictHint[] {
   }
 
   for (const edge of index.edges) {
-    if (edge.predicate === 'implies' && edge.status === 'disproven') {
-      hints.push({
-        code: 'disproven-implication',
-        message: '这条蕴含已被标记为不成立，但它仍然出现在图里，注意别把它当成结论。',
-        edgeIds: [edge.id],
-      });
-    }
-
     if (edge.predicate === 'generalizes') {
       for (const reverse of byEndpoint.get(`generalizes|${edge.to}|${edge.from}`) ?? []) {
         if (edge.id >= reverse.id) continue;

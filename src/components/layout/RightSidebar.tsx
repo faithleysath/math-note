@@ -11,8 +11,6 @@ import {
   ancestorNodes,
   coveredKnowledge,
   coveringProblems,
-  deriveWithSteps,
-  explainTrace,
   stepsForNode,
 } from '../../lib/graph';
 import { typeLabel, type Node } from '../../lib/schema';
@@ -31,11 +29,6 @@ const RightSidebar = () => {
   const selectedNode = selectedId ? index.nodes.get(selectedId) : undefined;
 
   const { outgoing, incoming } = useRelatedNodes(selectedId ?? undefined);
-
-  const derived = useMemo(() => {
-    if (!selectedId) return [];
-    return deriveWithSteps(index, selectedId);
-  }, [index, selectedId]);
 
   const relatedSteps = useMemo(() => {
     if (!selectedId) return [];
@@ -239,7 +232,6 @@ const RightSidebar = () => {
                         <p className="text-xs text-muted-foreground">
                           {[
                             `规则：${step.rule}`,
-                            step.status === 'conjecture' ? '猜想' : step.status === 'disproven' ? '已推翻' : '确定',
                             step.contextId
                               ? `语境：${index.nodes.get(step.contextId)?.title ?? step.contextId}`
                               : '语境未知',
@@ -261,46 +253,6 @@ const RightSidebar = () => {
             )}
           </div>
 
-          <div className="mt-6">
-            <div className="flex items-center justify-between mb-2 border-b pb-2">
-              <h3 className="text-md font-semibold">候选关联</h3>
-            </div>
-            <p className="mb-2 text-xs text-muted-foreground">
-              只列出图上能走到的候选关联；路径上的文字条件与语境会一起显示，不代表已证明。
-            </p>
-            {derived.length === 0 ? (
-              <p className="text-sm text-muted-foreground">没有可推导的结论。</p>
-            ) : (
-              <ul className="space-y-2">
-                {derived.map((relation) => {
-                  const target = index.nodes.get(relation.nodeId);
-                  return (
-                    <li key={relation.nodeId} className="text-sm">
-                      <span
-                        className="text-primary hover:underline cursor-pointer"
-                        onClick={() => select(relation.nodeId)}
-                      >
-                        {target?.title ?? relation.nodeId}
-                      </span>
-                      <p className="text-xs text-muted-foreground">
-                        {[
-                          explainTrace(index, relation),
-                          relation.unresolvedConditions.length > 0
-                            ? `条件：${relation.unresolvedConditions.join('；')}`
-                            : null,
-                          relation.contextId
-                            ? `语境：${index.nodes.get(relation.contextId)?.title ?? relation.contextId}`
-                            : null,
-                        ]
-                          .filter(Boolean)
-                          .join(' · ')}
-                      </p>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </div>
           {isStepOpen && (
             <StepDialog
               isOpen={isStepOpen}
