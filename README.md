@@ -2,6 +2,8 @@
 
 把一本初高中数学、物理、化学、生物或综合科学教材转成一份独立知识图谱的纯前端编辑器：按目录保存原文，用带语义的关系把定义、命题、证明、实验、题目连成网，数据存在自己的浏览器里。
 
+仓库：<https://github.com/faithleysath/textbook-graph>
+
 线上示例：<https://math-note-2bas.vercel.app>
 
 ## 一教材一知识库
