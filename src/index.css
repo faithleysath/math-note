@@ -126,3 +126,22 @@
 .wmde-markdown ol {
   list-style: decimal outside none; /* 有序列表显示数字编号 */
 }
+
+/* react-resizable-panels v4: horizontal group gets a horizontal separator */
+[data-slot="resizable-handle"][aria-orientation="horizontal"] {
+  height: 1px;
+  width: 100%;
+  flex-direction: column;
+}
+
+[data-slot="resizable-handle"][aria-orientation="horizontal"]::after {
+  inset-inline: 0;
+  top: 50%;
+  width: 100%;
+  height: 1px;
+  transform: translateY(-50%);
+}
+
+[data-slot="resizable-handle"][aria-orientation="horizontal"] > div {
+  transform: rotate(90deg);
+}

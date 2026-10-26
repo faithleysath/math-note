@@ -195,7 +195,7 @@ bun run gen:schema
 bun run check:examples
 ```
 
-技术栈：React 19 + TypeScript + Vite 7 + Tailwind 4 + shadcn/ui + Zustand 5 + Dexie 4 + zod + KaTeX（mhchem）。
+技术栈：React 19 + TypeScript 6 + Vite 8 + Tailwind 4 + shadcn/ui + Zustand 5 + Dexie 4 + zod + KaTeX 0.19（mhchem）。
 
 ```
 src/lib/schema.ts      9 种节点 / kind 枚举 / 12 种谓词 / book / 推理步骤 / zod
@@ -209,6 +209,7 @@ src/lib/citation.ts    来源字段合并（source / page / originalNumber）
 src/lib/db.ts          Dexie 持久化（book + 图数据同事务）
 src/stores/useGraphStore.ts  活动教材 + 内存图 + 写穿
 examples/              五门学科的 v8 验收样例
+docs/DEPENDENCIES.md   依赖升级与版本约束记录
 ```
 
 ## 性能（本机实测，`bun run bench`）

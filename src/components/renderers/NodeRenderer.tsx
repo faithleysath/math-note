@@ -26,7 +26,7 @@ const NodeRenderer = memo(({ node }: NodeRendererProps) => {
   const editingId = useGraphStore((state) => state.editingId);
 
   if (editingId === node.id) {
-    return <NodeEditor node={node} />;
+    return <NodeEditor key={node.id} node={node} />;
   }
 
   switch (node.type) {

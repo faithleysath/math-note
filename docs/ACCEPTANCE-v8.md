@@ -1,9 +1,9 @@
 # v8 验收记录
 
 - 日期：2026-10-26
-- 环境：本地 `bun run dev`（Vite 7），ego-lite Chromium，1400×720 视口
+- 环境：本地 `bun run dev` / `vite preview`（Vite 8），ego-lite Chromium，1400×720 视口
 - 数据：`examples/v8-*.json`
-- 结论：`bun run test` 102 项通过，`bun run lint`、`bun run build` 通过；下列人工核对项全部通过。
+- 结论：`bun run test` 102 项通过，`bun run lint`、`bun run build` 通过；下列人工核对项全部通过。2026-10-26 依赖升级后已复跑测试，并用开发/生产构建分别验证 mhchem、Mermaid 和可拖拽面板。
 
 ## 复现方式
 

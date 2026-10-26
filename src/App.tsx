@@ -32,7 +32,7 @@ function App() {
   const { width } = useWindowSize();
   const isMobile = width <= 768;
   const [showFabs, setShowFabs] = useState(false);
-  const fabTimer = useRef<NodeJS.Timeout | null>(null);
+  const fabTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useHotkeys();
 
@@ -51,7 +51,7 @@ function App() {
       const noteUrl = params.get('note_url');
 
       if (noteUrl) {
-        let urlToLoad: string | null = null;
+        let urlToLoad: string | null;
         // First, try to treat it as a direct URL
         try {
           new URL(noteUrl); // Validate if it's a full URL
@@ -168,16 +168,16 @@ function App() {
 
   return (
     <div className="h-screen w-screen bg-background text-foreground">
-      <ResizablePanelGroup direction="horizontal">
-        <ResizablePanel defaultSize={20} minSize={15}>
+      <ResizablePanelGroup orientation="horizontal">
+        <ResizablePanel defaultSize="20%" minSize="15%">
           <LeftSidebar />
         </ResizablePanel>
         <ResizableHandle withHandle />
-        <ResizablePanel defaultSize={55} minSize={30}>
+        <ResizablePanel defaultSize="55%" minSize="30%">
           <MainContent />
         </ResizablePanel>
         <ResizableHandle withHandle />
-        <ResizablePanel defaultSize={25} minSize={15}>
+        <ResizablePanel defaultSize="25%" minSize="15%">
           <RightSidebar />
         </ResizablePanel>
       </ResizablePanelGroup>

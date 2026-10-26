@@ -141,12 +141,10 @@ const MainContent = () => {
         event.preventDefault();
         const currentIndex = selectedId ? processedNodes.findIndex(n => n.id === selectedId) : -1;
 
-        let nextIndex = -1;
-        if (event.key === 'j') { // Move down
-          nextIndex = currentIndex === -1 ? 0 : Math.min(currentIndex + 1, processedNodes.length - 1);
-        } else { // Move up
-          nextIndex = currentIndex === -1 ? 0 : Math.max(currentIndex - 1, 0);
-        }
+        const nextIndex =
+          event.key === 'j'
+            ? currentIndex === -1 ? 0 : Math.min(currentIndex + 1, processedNodes.length - 1)
+            : currentIndex === -1 ? 0 : Math.max(currentIndex - 1, 0);
 
         if (nextIndex !== -1 && processedNodes[nextIndex]) {
           select(processedNodes[nextIndex].id);
@@ -160,6 +158,8 @@ const MainContent = () => {
     };
   }, [selectedId, processedNodes, editingId, select]);
 
+  // TanStack Virtual 返回的函数无法被 React Compiler 安全 memo；跳过该组件是预期行为
+  // eslint-disable-next-line react-hooks/incompatible-library
   const rowVirtualizer = useVirtualizer({
     count: processedNodes.length,
     getScrollElement: () => parentRef.current,

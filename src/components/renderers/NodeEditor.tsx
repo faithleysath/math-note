@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import MDEditor from '@uiw/react-md-editor';
 import { toast } from 'sonner';
 import { KIND_LABELS, type Node } from '../../lib/schema';
@@ -41,44 +41,7 @@ const NodeEditor = ({ node }: NodeEditorProps) => {
   const allKinds = [...kindOptions.preferred, ...kindOptions.more];
   const showKindField = kindOptions.preferred.length > 0 || kindOptions.more.length > 0;
 
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      // Save with Cmd/Ctrl + S
-      if ((event.metaKey || event.ctrlKey) && event.key === 's') {
-        event.preventDefault();
-        handleSave();
-      }
-      // Cancel with Escape
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        handleCancel();
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, content, solution, key, aliases, kind, tags, source, page, originalNumber, method, duration, correct]); // Re-bind when content changes to save the latest state
-
-  useEffect(() => {
-    setTitle(node.title);
-    setContent(node.content);
-    setSolution(node.solution || '');
-    setTags(node.tags?.join(', ') || '');
-    setSource(node.citation?.source || '');
-    setPage(node.citation?.page || '');
-    setOriginalNumber(node.citation?.originalNumber || '');
-    setKind(node.kind || '');
-    setKey(node.key || '');
-    setAliases(node.aliases?.join(', ') || '');
-    setMethod(node.attempt?.method || '');
-    setDuration(node.attempt?.durationMin != null ? String(node.attempt.durationMin) : '');
-    setCorrect(node.attempt?.correct ?? null);
-  }, [node]);
-
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     try {
       const tagsArray = tags.split(',').map(tag => tag.trim()).filter(Boolean);
       const aliasesArray = aliases.split(',').map(alias => alias.trim()).filter(Boolean);
@@ -108,11 +71,49 @@ const NodeEditor = ({ node }: NodeEditorProps) => {
       console.error("Failed to save node:", error);
       toast.error(error instanceof Error ? error.message : '保存失败。');
     }
-  };
+  }, [
+    aliases,
+    content,
+    correct,
+    duration,
+    key,
+    kind,
+    method,
+    node,
+    originalNumber,
+    page,
+    setEditing,
+    solution,
+    source,
+    tags,
+    title,
+    updateNode,
+  ]);
 
-  const handleCancel = () => {
+  const handleCancel = useCallback(() => {
     setEditing(null); // Exit editing mode
-  };
+  }, [setEditing]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Save with Cmd/Ctrl + S
+      if ((event.metaKey || event.ctrlKey) && event.key === 's') {
+        event.preventDefault();
+        handleSave();
+      }
+      // Cancel with Escape
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        handleCancel();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [handleSave, handleCancel]);
+
 
   const contentLabel = useMemo(() => {
     switch (node.type) {
