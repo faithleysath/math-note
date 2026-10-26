@@ -1,5 +1,6 @@
 import type { GraphIndex } from './graph';
 import { collectSubtree, findPath } from './graph';
+import { validateAssetIntegrity } from './assets';
 import { PREDICATE_SPECS, canonicalizePair, isEdgeAllowed } from './predicates';
 import {
   KIND_OPTIONS,
@@ -9,6 +10,7 @@ import {
   allowedChildTypes,
   isContextNode,
   isKnownKind,
+  type AssetMeta,
   type AttemptMeta,
   type BookMeta,
   type Citation,
@@ -17,6 +19,7 @@ import {
   type Node,
   type NodeType,
   type Predicate,
+  type SourceAnchor,
 } from './schema';
 
 // =============================================================================
@@ -659,15 +662,30 @@ function bookIssues(book: BookMeta | null | undefined): ValidationIssue[] {
 /**
  * 全图校验：导入、快照加载、迁移前都要跑。
  * 纯函数，不修改数据。
+ *
+ * v9 的资产 / 锚点检查只在调用方传了 `assets` 或 `anchors` 时才跑（也可以用
+ * `options.checkAssets === false` 显式关掉）；老调用点只传 v8 的四个字段，
+ * 行为与以前完全一致。
  */
-export function validateGraphInvariants(graph: {
-  book?: BookMeta | null;
-  nodes: Node[];
-  edges: Edge[];
-  steps?: InferenceStep[];
-}): ValidationIssue[] {
+export function validateGraphInvariants(
+  graph: {
+    book?: BookMeta | null;
+    nodes: Node[];
+    edges: Edge[];
+    steps?: InferenceStep[];
+    assets?: AssetMeta[];
+    anchors?: SourceAnchor[];
+  },
+  options: { checkAssets?: boolean } = {},
+): ValidationIssue[] {
   const issues: ValidationIssue[] = bookIssues(graph.book);
   const nodes = new Map<string, Node>();
+
+  if (options.checkAssets !== false && (graph.assets !== undefined || graph.anchors !== undefined)) {
+    issues.push(
+      ...validateAssetIntegrity({ nodes: graph.nodes, assets: graph.assets, anchors: graph.anchors }),
+    );
+  }
 
   for (const node of graph.nodes) {
     if (nodes.has(node.id)) {

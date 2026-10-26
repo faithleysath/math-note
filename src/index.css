@@ -145,3 +145,33 @@
 [data-slot="resizable-handle"][aria-orientation="horizontal"] > div {
   transform: rotate(90deg);
 }
+
+/*
+ * asset:// 图片在 IndexedDB 里还没有二进制时，由 rehypeAssetScheme 打上这个类。
+ * 空 img 什么都看不见，这里给个虚线占位框，别让「缺图」和「图裂」分不出来。
+ */
+.asset-missing,
+.wmde-markdown img.asset-missing {
+  display: inline-flex;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  min-width: 12rem;
+  min-height: 5rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  background: repeating-linear-gradient(
+    45deg,
+    color-mix(in oklch, var(--muted) 70%, transparent) 0 8px,
+    transparent 8px 16px
+  );
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+  font-style: italic;
+}
+
+/* 图裂的 img 在 Chrome/Firefox 里仍会渲染伪元素，借它补一句文字提示 */
+.asset-missing::after {
+  content: '图片缺失';
+}

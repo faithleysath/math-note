@@ -44,7 +44,7 @@ const aStep: InferenceStep = {
 describe('导入导出', () => {
   it('导出再导入完整保留 book', () => {
     const json = serialize(nodes, []);
-    expect(json.schemaVersion).toBe(8);
+    expect(json.schemaVersion).toBe(9);
     expect(json.book).toEqual(book);
     expect(parseGraph(toJson(json)).book).toEqual(book);
   });

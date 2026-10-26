@@ -116,3 +116,54 @@ describe('持久化与事务', () => {
     expect(after.edges).toHaveLength(0);
   });
 });
+
+describe('v9 媒体资源表', () => {
+  const asset: import('./db').AssetRecord = {
+    id: 'img-1',
+    path: 'assets/img-1.png',
+    mimeType: 'image/png',
+    byteLength: 3,
+    sha256: 'a'.repeat(64),
+    alt: '示意图',
+    data: new Blob([new Uint8Array([1, 2, 3])], { type: 'image/png' }),
+  };
+
+  beforeEach(async () => {
+    await db.clearAll();
+  });
+
+  it('replaceAll 会在同一事务里落 assets，loadAll 只返回元信息', async () => {
+    await db.replaceAll({ book, nodes, edges, steps, assets: [asset] });
+    const reloaded = await db.loadAll();
+    expect(reloaded.assets).toEqual([
+      {
+        id: 'img-1',
+        path: 'assets/img-1.png',
+        mimeType: 'image/png',
+        byteLength: 3,
+        sha256: 'a'.repeat(64),
+        alt: '示意图',
+        originalName: undefined,
+      },
+    ]);
+    expect('data' in reloaded.assets[0]).toBe(false);
+  });
+
+  it('getAssetBlob / putAssets / removeAssets 读写一致', async () => {
+    await db.putAssets([asset]);
+    const blob = await db.getAssetBlob('img-1');
+    expect(blob?.size).toBe(3);
+    expect(blob?.type).toBe('image/png');
+    expect(await db.getAssetBlob('missing')).toBeNull();
+
+    await db.removeAssets(['img-1']);
+    expect(await db.getAssetBlob('img-1')).toBeNull();
+    expect((await db.loadAll()).assets).toEqual([]);
+  });
+
+  it('clearAll 会清空 assets', async () => {
+    await db.putAssets([asset]);
+    await db.clearAll();
+    expect((await db.loadAll()).assets).toEqual([]);
+  });
+});

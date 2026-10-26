@@ -14,7 +14,8 @@ describe('验收样例', () => {
       const parsed = parseGraph(
         JSON.parse(readFileSync(new URL(file, examplesDir), 'utf8')),
       );
-      expect(parsed.warnings).toEqual([]);
+      // v8 样例走自动迁移：除了一条迁移提示，不应该有别的问题
+      expect(parsed.warnings.map((issue) => issue.code)).toEqual(['migrated-from-v8']);
       return parsed.book.subject;
     });
     expect(new Set(subjects)).toEqual(

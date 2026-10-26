@@ -24,3 +24,6 @@ dist-ssr
 *.sw?
 .vercel
 .env*
+
+# 本地教材原文/扫描件（受版权保护，不入库）
+local-textbook/

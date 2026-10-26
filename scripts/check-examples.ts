@@ -2,7 +2,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { parseGraph } from '../src/lib/serialize';
 
 for (const file of readdirSync(new URL('../examples', import.meta.url)).filter(
-  (name) => name.endsWith('.json') && name !== 'v8.schema.json',
+  (name) => name.endsWith('.json') && !name.endsWith('.schema.json'),
 )) {
   const parsed = parseGraph(
     JSON.parse(readFileSync(new URL(`../examples/${file}`, import.meta.url), 'utf8')),

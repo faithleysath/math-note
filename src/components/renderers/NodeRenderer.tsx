@@ -24,6 +24,8 @@ interface NodeRendererProps {
  */
 const NodeRenderer = memo(({ node }: NodeRendererProps) => {
   const editingId = useGraphStore((state) => state.editingId);
+  // 订阅资源版本号：载入 / 释放图片 URL 后正文里的 asset:// 要用新 URL 重新解析（返回值本身不用）
+  useGraphStore((state) => state.assetsRevision);
 
   if (editingId === node.id) {
     return <NodeEditor key={node.id} node={node} />;

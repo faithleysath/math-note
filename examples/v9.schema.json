@@ -1,0 +1,460 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/faithleysath/textbook-graph/examples/v9.schema.json",
+  "title": "教材图谱 v9 导入格式",
+  "description": "教材图谱知识图谱 v9 的导入/导出格式：v8 的全部字段，加上本地媒体资源（assets）与出处锚点（anchors）。v8 备份可由应用自动迁移。约束的权威定义在 src/lib/schema.ts 与 src/lib/validate.ts；本文件由 scripts/gen-schema.ts 生成。",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "type": "number",
+      "const": 9
+    },
+    "exportedAt": {
+      "type": "number"
+    },
+    "book": {
+      "type": "object",
+      "properties": {
+        "subject": {
+          "type": "string",
+          "enum": [
+            "math",
+            "physics",
+            "chemistry",
+            "biology",
+            "science"
+          ]
+        },
+        "stage": {
+          "type": "string",
+          "enum": [
+            "junior",
+            "senior"
+          ]
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "edition": {
+          "type": "string"
+        },
+        "bookId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "publisher": {
+          "type": "string",
+          "minLength": 1
+        },
+        "publicationYear": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "isbn": {
+          "type": "string",
+          "minLength": 1
+        },
+        "volume": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sourceRevision": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "subject",
+        "stage",
+        "title"
+      ],
+      "additionalProperties": false
+    },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "branch",
+              "section",
+              "definition",
+              "proposition",
+              "proof",
+              "problem",
+              "note",
+              "counterexample",
+              "attempt"
+            ]
+          },
+          "kind": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "solution": {
+            "type": "string"
+          },
+          "parentId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "order": {
+            "type": "number"
+          },
+          "key": {
+            "type": "string",
+            "minLength": 1
+          },
+          "aliases": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "citation": {
+            "type": "object",
+            "properties": {
+              "source": {
+                "type": "string"
+              },
+              "page": {
+                "type": "string"
+              },
+              "originalNumber": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "attempt": {
+            "type": "object",
+            "properties": {
+              "correct": {
+                "type": "boolean"
+              },
+              "durationMin": {
+                "type": "number"
+              },
+              "method": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "createdAt": {
+            "type": "number"
+          },
+          "updatedAt": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "title",
+          "content",
+          "parentId",
+          "order",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "from": {
+            "type": "string",
+            "minLength": 1
+          },
+          "to": {
+            "type": "string",
+            "minLength": 1
+          },
+          "predicate": {
+            "type": "string",
+            "enum": [
+              "depends-on",
+              "covers",
+              "uses",
+              "proves",
+              "refutes",
+              "implies",
+              "iff",
+              "generalizes",
+              "cites",
+              "supports",
+              "is-a",
+              "part-of"
+            ]
+          },
+          "condition": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "contextId": {
+            "type": "string"
+          },
+          "assertedBy": {
+            "type": "string",
+            "enum": [
+              "manual",
+              "import"
+            ]
+          },
+          "createdAt": {
+            "type": "number"
+          },
+          "updatedAt": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "from",
+          "to",
+          "predicate",
+          "assertedBy",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "steps": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "premiseIds": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "conclusionId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "rule": {
+            "type": "string",
+            "minLength": 1
+          },
+          "contextId": {
+            "type": "string"
+          },
+          "proofId": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "assertedBy": {
+            "type": "string",
+            "enum": [
+              "manual",
+              "import"
+            ]
+          },
+          "createdAt": {
+            "type": "number"
+          },
+          "updatedAt": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "premiseIds",
+          "conclusionId",
+          "rule",
+          "assertedBy",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "anchors": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "nodeId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sourceId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "pageLabel": {
+            "type": "string"
+          },
+          "region": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "type": "number",
+                "minimum": 0,
+                "exclusiveMaximum": 1
+              },
+              "y": {
+                "type": "number",
+                "minimum": 0,
+                "exclusiveMaximum": 1
+              },
+              "width": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "maximum": 1
+              },
+              "height": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "maximum": 1
+              }
+            },
+            "required": [
+              "x",
+              "y",
+              "width",
+              "height"
+            ],
+            "additionalProperties": false,
+            "description": "归一化页面区域（原点左上、y 向下）：x、y ∈ [0,1)，width、height ∈ (0,1]，且 x + width ≤ 1、y + height ≤ 1（容差 1e-6）。"
+          },
+          "contentRange": {
+            "type": "object",
+            "properties": {
+              "start": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "end": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "contentHash": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "start",
+              "end",
+              "contentHash"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "id",
+          "nodeId",
+          "sourceId",
+          "pageLabel"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "assets": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "mimeType": {
+            "type": "string",
+            "minLength": 1
+          },
+          "byteLength": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "alt": {
+            "type": "string"
+          },
+          "caption": {
+            "type": "string"
+          },
+          "originalName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "path",
+          "mimeType",
+          "byteLength",
+          "sha256",
+          "alt"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "exportedAt",
+    "book",
+    "nodes",
+    "edges"
+  ],
+  "additionalProperties": false
+}

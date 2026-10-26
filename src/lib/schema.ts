@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { REGION_EPS } from './coords';
 
 // =============================================================================
 // 节点类型（恰好 9 种）
@@ -339,6 +340,62 @@ export interface GraphJSON {
 }
 
 // =============================================================================
+// v9：本地媒体资源 + 出处锚点
+// =============================================================================
+// v9 只新增两张表，不动 v8 的任何字段语义：
+//   assets  —— 本地图片等媒体（markdown 里写 asset://<id>）
+//   anchors —— 教材出处锚点（页码 + 归一化区域 + 原文片段）
+// v8 备份导入时自动补齐这两个空数组，见 migrations/v8-to-v9.ts。
+
+/** 媒体资源的元信息；二进制内容不入 JSON，存在 IndexedDB 的 assets 表里 */
+export interface AssetMeta {
+  /** 与 markdown 里 asset://<id> 对应 */
+  id: string;
+  /** 包内相对路径，如 assets/img-001.png */
+  path: string;
+  mimeType: string;
+  byteLength: number;
+  /** 64 位小写 hex */
+  sha256: string;
+  alt: string;
+  /** 原书图注原文；没有图注时不填，不要填空串 */
+  caption?: string;
+  originalName?: string;
+}
+
+/** 教材出处锚点：把节点定位到原书某页的某个区域 */
+export interface SourceAnchor {
+  id: string;
+  nodeId: string;
+  sourceId: string;
+  pageLabel: string;
+  /** 归一化到 0..1 的页面区域 */
+  region?: { x: number; y: number; width: number; height: number };
+  contentRange?: { start: number; end: number; contentHash: string };
+}
+
+/** v9 的教材元信息：比 v8 多出可选的出版信息 */
+export interface BookMetaV9 extends BookMeta {
+  bookId?: string;
+  publisher?: string;
+  publicationYear?: number;
+  isbn?: string;
+  volume?: string;
+  sourceRevision?: string;
+}
+
+export interface GraphJSONV9 {
+  schemaVersion: 9;
+  exportedAt: number;
+  book: BookMetaV9;
+  nodes: Node[];
+  edges: Edge[];
+  steps?: InferenceStep[];
+  anchors: SourceAnchor[];
+  assets: AssetMeta[];
+}
+
+// =============================================================================
 // 运行时校验（zod）
 // =============================================================================
 
@@ -413,4 +470,88 @@ export const graphJSONSchema = z.strictObject({
   nodes: z.array(nodeSchema),
   edges: z.array(edgeSchema),
   steps: z.array(stepSchema).default([]),
+});
+
+// =============================================================================
+// 运行时校验（zod，v9）
+// =============================================================================
+
+/** v9 的教材元信息：v8 字段不变，新增字段全部可选 */
+export const bookMetaV9Schema = bookMetaSchema.extend({
+  bookId: z.string().min(1).optional(),
+  publisher: z.string().min(1).optional(),
+  publicationYear: z.number().int().min(0).optional(),
+  isbn: z.string().min(1).optional(),
+  volume: z.string().min(1).optional(),
+  sourceRevision: z.string().min(1).optional(),
+});
+
+/** sha256 只接受 64 位小写 hex */
+export const ASSET_SHA256_RE = /^[0-9a-f]{64}$/;
+
+export const assetMetaSchema = z.strictObject({
+  id: z.string().min(1),
+  path: z.string().min(1),
+  mimeType: z.string().min(1),
+  byteLength: z.number().int().positive(),
+  sha256: z.string().regex(ASSET_SHA256_RE),
+  alt: z.string(),
+  caption: z.string().optional(),
+  originalName: z.string().optional(),
+});
+
+/**
+ * 归一化页面区域，坐标规范见 docs/plans/transcribe-spec.md §0.2.2：
+ * 原点左上、x 向右、y 向下、归一化到 [0, 1]。
+ *
+ * 逐字段的 min/max 只能拦住单值越界，跨字段的「别超出页面」由两个 refine 保证；
+ * 容差只吸收浮点噪声，越界就是错误，不做截断。
+ */
+const regionSchema = z
+  .strictObject({
+    x: z.number().finite().min(0).lt(1),
+    y: z.number().finite().min(0).lt(1),
+    width: z.number().finite().gt(0).max(1),
+    height: z.number().finite().gt(0).max(1),
+  })
+  // JSON Schema 表达不了跨字段约束，至少把规则写进 description，外部工具能读到
+  .describe('归一化页面区域（原点左上、y 向下）：x、y ∈ [0,1)，width、height ∈ (0,1]，且 x + width ≤ 1、y + height ≤ 1（容差 1e-6）。')
+  .refine((region) => region.x + region.width <= 1 + REGION_EPS, {
+    message: `region 超出页面右边界：x + width 必须 ≤ 1（容差 ${REGION_EPS}）。`,
+    path: ['width'],
+  })
+  .refine((region) => region.y + region.height <= 1 + REGION_EPS, {
+    message: `region 超出页面下边界：y + height 必须 ≤ 1（容差 ${REGION_EPS}）。`,
+    path: ['height'],
+  });
+
+const contentRangeSchema = z
+  .strictObject({
+    start: z.number().int().min(0),
+    end: z.number().int().min(0),
+    contentHash: z.string().min(1),
+  })
+  .refine((range) => range.end >= range.start, {
+    message: 'end 不能小于 start',
+    path: ['end'],
+  });
+
+export const sourceAnchorSchema = z.strictObject({
+  id: z.string().min(1),
+  nodeId: z.string().min(1),
+  sourceId: z.string().min(1),
+  pageLabel: z.string(),
+  region: regionSchema.optional(),
+  contentRange: contentRangeSchema.optional(),
+});
+
+export const graphJSONSchemaV9 = z.strictObject({
+  schemaVersion: z.literal(9),
+  exportedAt: z.number(),
+  book: bookMetaV9Schema,
+  nodes: z.array(nodeSchema),
+  edges: z.array(edgeSchema),
+  steps: z.array(stepSchema).default([]),
+  anchors: z.array(sourceAnchorSchema).default([]),
+  assets: z.array(assetMetaSchema).default([]),
 });

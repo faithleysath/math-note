@@ -25,7 +25,7 @@ import { Input } from '../ui/input';
 import { useGraphStore } from '../../stores/useGraphStore';
 import { toast } from 'sonner';
 import Search from '../Search';
-import { Upload, Download, X, Plus, BookPlus, Pencil } from 'lucide-react';
+import { Upload, Download, X, Plus, BookPlus, Pencil, ImagePlus } from 'lucide-react';
 import { SCHOOL_STAGES, STAGE_LABELS, SUBJECTS, SUBJECT_LABELS, type SchoolStage, type Subject } from '../../lib/schema';
 import { useWindowSize } from '@/hooks/useWindowSize';
 
@@ -39,6 +39,9 @@ const LeftSidebar = () => {
   const index = useGraphStore(state => state.index);
   const exportGraph = useGraphStore(state => state.exportGraph);
   const importGraph = useGraphStore(state => state.importGraph);
+  const loadAssetFiles = useGraphStore(state => state.loadAssetFiles);
+  const assetCount = useGraphStore(state => state.assetCount);
+  const missingAssetIds = useGraphStore(state => state.missingAssetIds);
   const { width } = useWindowSize();
   const isMobile = width <= 768;
   const [newBranchTitle, setNewBranchTitle] = useState('');
@@ -53,6 +56,7 @@ const LeftSidebar = () => {
   const [isImportConfirmOpen, setIsImportConfirmOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const fileToImportRef = useRef<File | null>(null);
+  const assetInputRef = useRef<HTMLInputElement>(null);
 
   const handleAddBranch = async () => {
     if (!book) {
@@ -200,6 +204,37 @@ const LeftSidebar = () => {
     reader.readAsText(file);
   };
 
+  const handleAssetFiles = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const input = event.target;
+    const files = Array.from(input.files ?? []);
+    // 清空 value：不重置的话，再选同一批文件不会触发 change
+    input.value = '';
+    if (files.length === 0) return;
+
+    try {
+      const result = await loadAssetFiles(files);
+      const failed = result.badHash.length + result.unknown.length + result.tooLarge.length;
+      const notes: string[] = [];
+      if (result.matched > 0) {
+        notes.push(failed === 0 ? `${result.matched} 张全部匹配` : `${result.matched} 张匹配成功`);
+      }
+      if (result.badHash.length > 0) {
+        notes.push(`${result.badHash.length} 张哈希不符：${result.badHash.join(', ')}`);
+      }
+      if (result.unknown.length > 0) {
+        notes.push(`${result.unknown.length} 个文件不属于本书`);
+      }
+      if (result.tooLarge.length > 0) {
+        notes.push(`${result.tooLarge.length} 张超过 8 MiB，已跳过`);
+      }
+      if (notes.length === 0) return;
+      if (failed > 0) toast.warning(notes.join('；'));
+      else toast.success(notes.join('；'));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : '载入图片失败。');
+    }
+  };
+
   return (
     <TooltipProvider>
       <div className="h-full p-4 flex flex-col">
@@ -283,6 +318,34 @@ const LeftSidebar = () => {
               </Button>
             )}
           </div>
+          {book && (
+            <div className="mt-2 flex items-center justify-between gap-2 border-t pt-2">
+              <span className="min-w-0 truncate text-[11px] text-muted-foreground">
+                {assetCount === 0
+                  ? '无本地资源'
+                  : missingAssetIds.length > 0
+                    ? `资源 ${assetCount} 张 · 缺 ${missingAssetIds.length} 张`
+                    : `资源 ${assetCount} 张`}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-6 shrink-0 gap-1 px-2 text-[11px]"
+                onClick={() => assetInputRef.current?.click()}
+              >
+                <ImagePlus className="h-3 w-3" />
+                载入图片…
+              </Button>
+              <input
+                ref={assetInputRef}
+                type="file"
+                multiple
+                accept="image/*"
+                className="hidden"
+                onChange={handleAssetFiles}
+              />
+            </div>
+          )}
         </div>
         <div className="mb-4">
           <Search showFilters />

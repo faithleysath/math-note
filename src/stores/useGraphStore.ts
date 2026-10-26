@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { toast } from 'sonner';
 import * as db from '../lib/db';
+import { assetFileNames, MAX_ASSET_BYTES, sha256Hex } from '../lib/assets';
+import { registerAssetUrl, releaseAssetUrls } from '../lib/markdown';
 import {
   ancestorIds,
   buildIndex,
@@ -14,9 +16,10 @@ import {
 import { canonicalizePair } from '../lib/predicates';
 import {
   isContextNode,
+  type AssetMeta,
   type BookMeta,
   type Edge,
-  type GraphJSON,
+  type GraphJSONV9,
   type InferenceStep,
   type Node,
 } from '../lib/schema';
@@ -38,6 +41,18 @@ import {
 
 type AppStatus = 'loading' | 'ready' | 'error';
 
+/** loadAssetFiles 的结果：每种「没成功」的原因分开报，toast 才好写人话 */
+export interface AssetLoadResult {
+  /** 哈希对得上、已经写进 IndexedDB 的文件数 */
+  matched: number;
+  /** 文件名匹配上了，但内容哈希不符 */
+  badHash: string[];
+  /** 文件名不属于本书的任何资源 */
+  unknown: string[];
+  /** 超过 MAX_ASSET_BYTES 被跳过的文件 */
+  tooLarge: string[];
+}
+
 interface GraphState {
   index: GraphIndex;
   book: BookMeta | null;
@@ -48,6 +63,12 @@ interface GraphState {
   expandedIds: Set<string>;
   editingId: string | null;
   mobileView: 'main' | 'left' | 'right';
+  /** assets 表里的元信息条数（不管有没有二进制） */
+  assetCount: number;
+  /** 有元信息但还没载入二进制、也就是渲染不出来的资源 id */
+  missingAssetIds: string[];
+  /** 资源 URL 登记 / 释放的版本号；正文靠它触发重渲染 */
+  assetsRevision: number;
 
   init: () => Promise<void>;
   createBook: (book: BookMeta) => Promise<BookMeta>;
@@ -77,8 +98,9 @@ interface GraphState {
   ) => Promise<void>;
   deleteStep: (id: string) => Promise<void>;
 
-  exportGraph: () => GraphJSON;
+  exportGraph: () => GraphJSONV9;
   importGraph: (json: unknown) => Promise<void>;
+  loadAssetFiles: (files: File[]) => Promise<AssetLoadResult>;
   clearAll: () => Promise<void>;
 }
 
@@ -88,6 +110,26 @@ function describeError(error: unknown): string {
   if (error instanceof ValidationError) return error.message;
   if (error instanceof Error) return error.message;
   return String(error);
+}
+
+/**
+ * 当前教材的资源元信息。
+ * exportGraph 是同步的，没法临时查库，所以这里留一份；换教材 / 清空时同步更新。
+ */
+let assetMetas: AssetMeta[] = [];
+
+/**
+ * 释放旧 Blob URL，再给库里所有带二进制的资源建一份新的，
+ * 返回「有元信息但没二进制」的 id 列表。换教材时必须先释放，否则 Blob URL 会泄漏。
+ */
+async function refreshAssetUrls(metas: AssetMeta[]): Promise<string[]> {
+  releaseAssetUrls();
+  const withBinary = new Set<string>();
+  for (const record of await db.assetsWithBinary()) {
+    registerAssetUrl(record.id, URL.createObjectURL(record.data));
+    withBinary.add(record.id);
+  }
+  return metas.filter((meta) => !withBinary.has(meta.id)).map((meta) => meta.id);
 }
 
 // React StrictMode 会重复触发 effect，init 必须只跑一次。
@@ -112,6 +154,9 @@ export const useGraphStore = create<GraphState>()((set, get) => {
     expandedIds: new Set(),
     editingId: null,
     mobileView: 'main',
+    assetCount: 0,
+    missingAssetIds: [],
+    assetsRevision: 0,
 
     init: async () => {
       if (initStarted) return;
@@ -120,6 +165,8 @@ export const useGraphStore = create<GraphState>()((set, get) => {
         const data = await db.loadAll();
         const index = buildIndex(data.nodes, data.edges, data.steps);
         const firstBranch = index.roots[0] ?? null;
+        assetMetas = data.assets;
+        const missingAssetIds = await refreshAssetUrls(data.assets);
         set({
           index,
           book: data.book,
@@ -128,6 +175,9 @@ export const useGraphStore = create<GraphState>()((set, get) => {
           expandedBranchId: firstBranch,
           expandedIds: new Set(firstBranch ? [firstBranch] : []),
           selectedId: firstBranch,
+          assetCount: data.assets.length,
+          missingAssetIds,
+          assetsRevision: get().assetsRevision + 1,
         });
       } catch (error) {
         initStarted = false;
@@ -155,6 +205,8 @@ export const useGraphStore = create<GraphState>()((set, get) => {
         updatedAt: now,
       };
       await db.replaceAll({ book, nodes: [root], edges: [], steps: [] });
+      assetMetas = [];
+      releaseAssetUrls();
       set({
         index: buildIndex([root], [], []),
         book,
@@ -164,6 +216,9 @@ export const useGraphStore = create<GraphState>()((set, get) => {
         expandedBranchId: root.id,
         expandedIds: new Set([root.id]),
         editingId: null,
+        assetCount: 0,
+        missingAssetIds: [],
+        assetsRevision: get().assetsRevision + 1,
       });
       return book;
     },
@@ -585,17 +640,22 @@ export const useGraphStore = create<GraphState>()((set, get) => {
         [...get().index.nodes.values()],
         get().index.edges,
         get().index.steps,
+        { assets: [...assetMetas] },
       );
     },
 
     importGraph: async (json) => {
       const parsed = parseGraph(json);
+      // 二进制在 JSON 里不存在，这里只落元信息；用户之后用 loadAssetFiles 补图
       await db.replaceAll({
         book: parsed.book,
         nodes: parsed.nodes,
         edges: parsed.edges,
         steps: parsed.steps,
+        assets: parsed.assets,
       });
+      assetMetas = parsed.assets;
+      const missingAssetIds = await refreshAssetUrls(parsed.assets);
       const index = buildIndex(parsed.nodes, parsed.edges, parsed.steps);
       set({
         index,
@@ -606,12 +666,85 @@ export const useGraphStore = create<GraphState>()((set, get) => {
         expandedBranchId: index.roots[0] ?? null,
         expandedIds: new Set(index.roots.slice(0, 1)),
         editingId: null,
+        assetCount: parsed.assets.length,
+        missingAssetIds,
+        assetsRevision: get().assetsRevision + 1,
       });
+    },
 
+    /**
+     * 载入本地图片：文件名对得上 → 算 SHA-256 → 只写哈希一致的。
+     * 不会新建资源行（putAssetBinaries 找不到行会报错），对不上的一律不落库。
+     */
+    loadAssetFiles: async (files) => {
+      const result: AssetLoadResult = { matched: 0, badHash: [], unknown: [], tooLarge: [] };
+      const metas = await db.loadAssetMetas();
+      assetMetas = metas;
+
+      // 文件名 → 候选资源。同名资源不止一个时靠哈希挑，不猜。
+      const byName = new Map<string, AssetMeta[]>();
+      for (const meta of metas) {
+        for (const name of assetFileNames(meta)) {
+          const candidates = byName.get(name);
+          if (candidates) {
+            if (!candidates.includes(meta)) candidates.push(meta);
+          } else {
+            byName.set(name, [meta]);
+          }
+        }
+      }
+
+      const missingBefore = new Set(await db.assetsWithoutBinary());
+      const writes: { id: string; data: Blob }[] = [];
+
+      for (const file of files) {
+        if (file.size > MAX_ASSET_BYTES) {
+          result.tooLarge.push(file.name);
+          continue;
+        }
+        const candidates = byName.get(file.name);
+        if (!candidates?.length) {
+          result.unknown.push(file.name);
+          continue;
+        }
+
+        const bytes = await file.arrayBuffer();
+        const digest = await sha256Hex(bytes);
+        const hit = candidates.find((meta) => meta.sha256 === digest);
+        if (!hit) {
+          result.badHash.push(file.name);
+          continue;
+        }
+
+        // 同一张图被选了两遍时只写一次
+        if (writes.every((item) => item.id !== hit.id)) {
+          writes.push({ id: hit.id, data: new Blob([bytes], { type: hit.mimeType }) });
+        }
+        result.matched += 1;
+      }
+
+      if (writes.length > 0) {
+        await db.putAssetBinaries(writes);
+        for (const item of writes) {
+          // 本来就有图的不重建 URL，否则旧 Blob URL 会被覆盖掉、泄漏
+          if (missingBefore.has(item.id)) {
+            registerAssetUrl(item.id, URL.createObjectURL(item.data));
+          }
+        }
+      }
+
+      set({
+        assetCount: metas.length,
+        missingAssetIds: await db.assetsWithoutBinary(),
+        assetsRevision: get().assetsRevision + 1,
+      });
+      return result;
     },
 
     clearAll: async () => {
       await db.clearAll();
+      assetMetas = [];
+      releaseAssetUrls();
       set({
         index: emptyIndex(),
         book: null,
@@ -619,6 +752,9 @@ export const useGraphStore = create<GraphState>()((set, get) => {
         expandedBranchId: null,
         expandedIds: new Set(),
         editingId: null,
+        assetCount: 0,
+        missingAssetIds: [],
+        assetsRevision: get().assetsRevision + 1,
       });
     },
 
