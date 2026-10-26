@@ -44,7 +44,7 @@ export interface ParsedGraph {
 
 /**
  * 解析一份备份 / 快照。
- * 只接受 v5；结构不对或全图不变式不通过就抛错，绝不覆盖现有数据。
+ * 只接受 v6；结构不对或全图不变式不通过就抛错，绝不覆盖现有数据。
  */
 export function parseGraph(json: unknown): ParsedGraph {
   let parsed: GraphJSON;

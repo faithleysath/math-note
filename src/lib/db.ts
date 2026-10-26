@@ -17,7 +17,7 @@ export class MathNoteDB extends Dexie {
   steps!: Table<InferenceStep, string>;
 
   constructor() {
-    // 只有一种数据格式（v5），这里不再维护历史版本或是迁移用的辅助表
+    // 只有一种数据格式（v6），这里不再维护历史版本或是迁移用的辅助表
     super('math-note-graph-v6');
     this.version(1).stores({
       nodes: '&id, type, key, parentId',
