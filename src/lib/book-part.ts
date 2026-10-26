@@ -1833,6 +1833,60 @@ export function expectedManifestStats(manifest: unknown): ExpectedManifestStats 
  * zod 结构不过就到此为止：后面的检查都要解析后的数据，硬跑只会把「结构错」
  * 放大成一堆「引用错」。
  */
+/**
+ * `citation.page` 必须等于该条目在清单里的印刷页码。
+ * 页码是溯源的根，写错一位就等于指向别的页；这类错误人工审计才能发现，值得机械化。
+ */
+function citationPageIssuesOf(part: BookPart, expected: ExpectedManifest): ValidationIssue[] {
+  const offset = expected.pageOffset?.offset;
+  if (typeof offset !== 'number' || !Number.isFinite(offset)) return [];
+
+  const printedOf = new Map<string, string>();
+  for (const item of expected.items) {
+    if (typeof item.pdfPage !== 'number') continue;
+    printedOf.set(item.srcId, String(item.pdfPage - offset));
+  }
+
+  const issues: ValidationIssue[] = [];
+  for (const node of part.nodes) {
+    if (node.type === 'branch') continue;
+    const claimed: string[] = [node.id.replace(/@\d+$/, '')];
+    for (const tag of node.tags ?? []) {
+      if (typeof tag === 'string' && tag.startsWith('src:')) claimed.push(tag.slice(4));
+    }
+    const pages = new Set<string>();
+    for (const srcId of claimed) {
+      const printed = printedOf.get(srcId);
+      if (printed !== undefined) pages.add(printed);
+    }
+    // 一个节点认领了跨页的多个条目时，任一页都算对
+    if (pages.size === 0) continue;
+    const page = node.citation?.page;
+    if (page === undefined || page === null) {
+      issues.push({
+        severity: 'warning',
+        code: 'citation-page-missing',
+        message: `节点「${node.title}」没有 citation.page：原书页码是溯源的根，有据可查的节点必须填（§6）。`,
+        nodeId: node.id,
+        field: 'citation.page',
+      });
+      continue;
+    }
+    if (!pages.has(String(page).trim())) {
+      issues.push({
+        severity: 'warning',
+        code: 'citation-page-mismatch',
+        message:
+          `节点「${node.title}」的 citation.page 是 ${String(page)}，但清单里对应条目的印刷页码是 ` +
+          `${[...pages].join(' / ')}：页码写错会让溯源指到别的页（§6）。`,
+        nodeId: node.id,
+        field: 'citation.page',
+      });
+    }
+  }
+  return issues;
+}
+
 export function validateBookPart(part: unknown, expected?: ExpectedManifest): ValidationIssue[] {
   const issues: ValidationIssue[] = forbiddenFieldIssues(part);
 
@@ -1853,7 +1907,10 @@ export function validateBookPart(part: unknown, expected?: ExpectedManifest): Va
   issues.push(...ownershipIssues(value));
   issues.push(...dependsOnIssuesOf(value));
   issues.push(...assetIssuesOf(value, shapedNodesOf(value)));
-  if (expected) issues.push(...coverageIssuesOf(value, expected));
+  if (expected) {
+    issues.push(...coverageIssuesOf(value, expected));
+    issues.push(...citationPageIssuesOf(value, expected));
+  }
 
   return issues;
 }

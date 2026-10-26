@@ -17,7 +17,24 @@ const dryRun = process.argv.includes('--dry-run');
 const expectedDir = arg('expected', 'local-textbook/sukey/expected');
 const partsDir = arg('parts', 'local-textbook/sukey/parts');
 
-type Flagged = { srcId: string; text: string; caption?: string };
+type Flagged = {
+  srcId: string;
+  text: string;
+  pdfPage?: number;
+  region?: { x: number; y: number; width: number; height: number };
+};
+
+/** 用 (pdfPage, region) 精确定位 asset —— 一个节点可能引用多张图，按 nodeId 匹配会串台 */
+function sameRegion(a?: { x: number; y: number; width: number; height: number }, b?: { x: number; y: number; width: number; height: number }): boolean {
+  if (!a || !b) return false;
+  const eps = 1e-9;
+  return (
+    Math.abs(a.x - b.x) < eps &&
+    Math.abs(a.y - b.y) < eps &&
+    Math.abs(a.width - b.width) < eps &&
+    Math.abs(a.height - b.height) < eps
+  );
+}
 const flagged = new Map<string, Flagged>();
 
 for (const name of readdirSync(expectedDir).filter((n) => n.endsWith('.json'))) {
@@ -28,7 +45,8 @@ for (const name of readdirSync(expectedDir).filter((n) => n.endsWith('.json'))) 
     flagged.set(item.srcId, {
       srcId: item.srcId,
       text: (item.text ?? '').trim(),
-      caption: item.originalNumber ?? undefined,
+      pdfPage: item.pdfPage,
+      region: item.region,
     });
   }
 }
@@ -48,27 +66,28 @@ for (const name of readdirSync(partsDir).filter((n) => n.endsWith('.json'))) {
 
   for (const asset of part.assets) {
     // asset 的 srcId：优先 tags 里认领的 src，其次 nodeId
-    const claimed: string[] = [];
-    if (typeof asset.srcId === 'string') claimed.push(asset.srcId);
-    const node = (part.nodes ?? []).find((n: { id: string }) => n.id === asset.nodeId);
-    for (const tag of node?.tags ?? []) {
-      if (typeof tag === 'string' && tag.startsWith('src:')) claimed.push(tag.slice(4));
-    }
-    claimed.push(asset.nodeId);
-
-    const hit = claimed.find((id) => flagged.has(id));
+    // 只认 (pdfPage, region) 完全一致的那一条；按 nodeId 匹配会让同一节点的多张图互相污染
+    const hit = [...flagged.entries()].find(
+      ([, info]) => info.pdfPage === asset.pdfPage && sameRegion(info.region, asset.region),
+    )?.[0];
     if (!hit) continue;
-    if (!asset.caption) continue;
 
-    if (!asset.alt || asset.alt.trim() === '') {
-      asset.alt = asset.caption;
-    } else if (!asset.alt.includes(asset.caption)) {
-      asset.alt = `${asset.caption}。${asset.alt}`;
+    // 图注文字只存在于像素里也不行：必须在 alt 里留一份可检索、可读屏的副本。
+    // 优先用清单里那条的原文（Pass 1 抄的印刷图注），其次才是 asset 自带的 caption。
+    const info = flagged.get(hit)!;
+    const captionText = (info.text || asset.caption || '').trim();
+    const already = captionText !== '' && (asset.alt ?? '').includes(captionText);
+    const hadCaption = typeof asset.caption === 'string';
+
+    if (!already || hadCaption) {
+      if (captionText !== '' && !already) {
+        asset.alt = (asset.alt ?? '').trim() === '' ? captionText : `${captionText}。${asset.alt}`;
+      }
+      if (!dryRun && hadCaption) delete asset.caption;
+      changed = true;
+      dropped += 1;
+      console.log(`  ${asset.id}：图注压在图上，caption→alt${already ? '（alt 已有，只删 caption）' : ''}`);
     }
-    if (!dryRun) delete asset.caption;
-    changed = true;
-    dropped += 1;
-    console.log(`  ${asset.id}：图注压在图上，去掉 caption，文字并入 alt`);
   }
 
   if (changed && !dryRun) {
