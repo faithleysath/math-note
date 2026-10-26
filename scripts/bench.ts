@@ -1,4 +1,4 @@
-import { buildIndex, searchNodes, deriveWithSteps, prerequisiteOrder } from '../src/lib/graph';
+import { buildIndex, searchNodes, stepsForNode } from '../src/lib/graph';
 import { serializeGraph, parseGraph } from '../src/lib/serialize';
 import type { Edge, Node } from '../src/lib/schema';
 
@@ -56,13 +56,9 @@ for (const size of [5000, 20000]) {
   for (let i = 0; i < 20; i++) searchNodes(index, '数列', 20);
   const search = (performance.now() - t1) / 20;
 
-  const t2 = performance.now();
-  deriveWithSteps(index, graph.nodes[10].id, {});
-  const derive = performance.now() - t2;
-
   const t3 = performance.now();
-  prerequisiteOrder(index, { candidateIds: graph.nodes.slice(0, 1000).map((n) => n.id) });
-  const topo = performance.now() - t3;
+  for (let i = 0; i < 100; i++) stepsForNode(index, graph.nodes[i % graph.nodes.length].id);
+  const stepLookup = (performance.now() - t3) / 100;
 
   const exportJson = JSON.stringify(serializeGraph(graph.nodes, graph.edges, []));
   const t4 = performance.now();
@@ -74,8 +70,7 @@ for (const size of [5000, 20000]) {
     edges: graph.edges.length,
     indexMs: +build.toFixed(1),
     searchMs: +search.toFixed(2),
-    deriveMs: +derive.toFixed(1),
-    topoMs: +topo.toFixed(1),
+    stepLookupMs: +stepLookup.toFixed(3),
     importMs: +importMs.toFixed(1),
     jsonMB: +(exportJson.length / 1024 / 1024).toFixed(1),
     heapMB: +(process.memoryUsage().heapUsed / 1024 / 1024).toFixed(0),

@@ -7,7 +7,7 @@ import {
 } from './schema';
 import { ValidationError, validateGraphInvariants, type ValidationIssue } from './validate';
 
-export const SCHEMA_VERSION = 6;
+const SCHEMA_VERSION = 6;
 
 function messageOf(error: unknown): string {
   if (error && typeof error === 'object' && 'issues' in error) {
@@ -35,7 +35,7 @@ export function serializeGraph(
   };
 }
 
-export interface ParsedGraph {
+interface ParsedGraph {
   nodes: Node[];
   edges: Edge[];
   steps: InferenceStep[];

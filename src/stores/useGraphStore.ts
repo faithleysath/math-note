@@ -26,19 +26,17 @@ import {
   validateNewNode,
   validateNewStep,
   validateNodePatch,
-  validateGraphInvariants,
   sameRelationKey,
   sameStepKey,
-  findConflictHints,
   type NewEdgeInput,
   type NewNodeInput,
   type NewStepInput,
   type NodePatch,
 } from '../lib/validate';
 
-export type AppStatus = 'loading' | 'ready' | 'error';
+type AppStatus = 'loading' | 'ready' | 'error';
 
-export interface GraphState {
+interface GraphState {
   index: GraphIndex;
   status: AppStatus;
   error: string | null;
@@ -80,7 +78,6 @@ export interface GraphState {
   importGraph: (json: unknown) => Promise<void>;
   loadSnapshot: (json: unknown, label: string) => Promise<void>;
   clearAll: () => Promise<void>;
-  diagnose: () => { errors: string[]; warnings: string[] };
 }
 
 const emptyIndex = (): GraphIndex => buildIndex([], [], []);
@@ -574,22 +571,6 @@ export const useGraphStore = create<GraphState>()((set, get) => {
       });
     },
 
-    diagnose: () => {
-      const state = get();
-      const issues = validateGraphInvariants({
-        nodes: [...state.index.nodes.values()],
-        edges: state.index.edges,
-        steps: state.index.steps,
-      });
-      const hints = findConflictHints(state.index);
-      return {
-        errors: issues.filter((issue) => issue.severity === 'error').map((issue) => issue.message),
-        warnings: [
-          ...issues.filter((issue) => issue.severity === 'warning').map((issue) => issue.message),
-          ...hints.map((hint) => hint.message),
-        ],
-      };
-    },
   };
 });
 
@@ -599,12 +580,6 @@ export const useGraphStore = create<GraphState>()((set, get) => {
 
 export function selectedNode(state: GraphState): Node | null {
   return state.selectedId ? (state.index.nodes.get(state.selectedId) ?? null) : null;
-}
-
-export function branchNodes(state: GraphState): Node[] {
-  return state.index.roots
-    .map((id) => state.index.nodes.get(id))
-    .filter((node): node is Node => Boolean(node));
 }
 
 export function childrenOf(state: GraphState, parentId: string | null): Node[] {

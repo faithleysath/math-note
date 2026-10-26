@@ -1,14 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { buildIndex } from './graph';
 import {
-  findConflictHints,
   sameRelationKey,
-  subtreeSize,
-  validateCanReparent,
-  validateNodePatch,
   validateGraphInvariants,
   validateNewEdge,
   validateNewNode,
+  validateNodePatch,
   ValidationError,
 } from './validate';
 import { mkNode } from './test-helpers';
@@ -107,14 +104,7 @@ describe('节点校验', () => {
 
   it('不能把节点移动到自己的子孙下', () => {
     const index = buildIndex(base, []);
-    expect(() => validateCanReparent(index, 'c1', 's11')).toThrowError(/自己的子孙/);
-    expect(() => validateCanReparent(index, 'c1', 'b1')).not.toThrow();
-  });
-
-  it('子树大小算得对', () => {
-    const index = buildIndex(base, []);
-    expect(subtreeSize(index, 's11')).toBe(7);
-    expect(subtreeSize(index, 'b1')).toBe(11);
+    expect(() => validateNodePatch(index, 'c1', { parentId: 's11' })).toThrowError(/自己的子孙/);
   });
 });
 
@@ -385,45 +375,5 @@ describe('多证明与反例', () => {
     expect(() =>
       validateNewEdge(index, { from: 'cex1', to: 'con1', predicate: 'refutes' }),
     ).toThrowError(/不能用在/);
-  });
-
-  it('反例线索指向被反驳的命题，而不是「某条边错了」', () => {
-    const index = buildIndex(base, [edge('e1', 'cex1', 't1', 'refutes')]);
-    const hint = findConflictHints(index).find((item) => item.code === 'counterexample-target');
-    expect(hint?.message).toMatch(/定理甲/);
-  });
-});
-
-describe('冲突提示', () => {
-  it('互补推广给出核查线索', () => {
-    const index = buildIndex(base, [
-      edge('e1', 't1', 't2', 'generalizes'),
-      edge('e2', 't2', 't1', 'generalizes'),
-    ]);
-    expect(findConflictHints(index).some((hint) => hint.code === 'mutual-generalization')).toBe(true);
-  });
-
-  it('同端点有多条不同前提时不会漏报', () => {
-    const index = buildIndex(base, [
-      edge('e1', 't1', 't2', 'implies', { condition: 'x>0' }),
-      edge('e2', 't1', 't2', 'implies', { condition: 'x<0' }),
-      edge('e3', 't2', 't1', 'implies', { condition: 'x>=0' }),
-    ]);
-    const hints = findConflictHints(index).filter(
-      (hint) => hint.code === 'mutual-implication-different-conditions',
-    );
-    // 反向边要和两条正向边分别比较，不能被索引覆盖掉
-    expect(hints).toHaveLength(2);
-    expect(hints.flatMap((hint) => hint.edgeIds).sort()).toEqual(['e1', 'e2', 'e3', 'e3']);
-  });
-
-  it('不同前提的双向蕴含不会被当成无条件等价', () => {
-    const index = buildIndex(base, [
-      edge('e1', 't1', 't2', 'implies', { condition: 'x>0' }),
-      edge('e2', 't2', 't1', 'implies', { condition: 'x<0' }),
-    ]);
-    expect(
-      findConflictHints(index).some((hint) => hint.code === 'mutual-implication-different-conditions'),
-    ).toBe(true);
   });
 });

@@ -9,7 +9,7 @@ import { z } from 'zod';
 // 例题 / 练习 不是独立类型，而是 problem 的 kind；
 // 章节 / 小节 不是独立类型，而是 section 的 kind。
 
-export const NODE_TYPES = [
+const NODE_TYPES = [
   'branch', // 根知识分支（高中数学）
   'section', // 任意深度的知识目录
   'definition', // 概念及其定义
@@ -71,7 +71,7 @@ export const KIND_LABELS: Record<string, string> = {
   personal: '个人解题',
 };
 
-export interface NodeTypeMeta {
+interface NodeTypeMeta {
   /** 中文全称，用于徽章与选择器 */
   label: string;
   /** 树里的短前缀 */
@@ -120,11 +120,6 @@ export function isContextNode(node: { type: NodeType; kind?: string }): boolean 
   return node.type === 'note' && node.kind === 'context';
 }
 
-/** 是否是「方法」节点：depends-on / covers / uses 的目标之一 */
-export function isMethodNote(node: { type: NodeType; kind?: string }): boolean {
-  return node.type === 'note' && node.kind === 'method';
-}
-
 /** 只有题目有「标准答案」；命题的证明是独立的 proof 节点 */
 export const SOLUTION_TYPES: ReadonlySet<NodeType> = new Set(['problem']);
 
@@ -160,7 +155,7 @@ export function allowedChildTypes(parentType: NodeType | null): NodeType[] {
 // 关系谓词（恰好 9 种）
 // =============================================================================
 
-export const PREDICATES = [
+const PREDICATES = [
   'depends-on', // 学习前置（不是数学蕴含）
   'covers', // 题目考查的知识点
   'uses', // 证明/解法实际用到的依据
@@ -287,7 +282,7 @@ const attemptMetaSchema = z.object({
   method: z.string().optional(),
 });
 
-export const nodeSchema = z.object({
+const nodeSchema = z.object({
   id: z.string().min(1),
   type: z.enum(NODE_TYPES),
   // 历史数据的未知 kind 允许暂存，校验器会告警
@@ -306,7 +301,7 @@ export const nodeSchema = z.object({
   updatedAt: z.number(),
 });
 
-export const edgeSchema = z.object({
+const edgeSchema = z.object({
   id: z.string().min(1),
   from: z.string().min(1),
   to: z.string().min(1),
@@ -319,7 +314,7 @@ export const edgeSchema = z.object({
   updatedAt: z.number(),
 });
 
-export const stepSchema = z.object({
+const stepSchema = z.object({
   id: z.string().min(1),
   premiseIds: z.array(z.string()).min(1),
   conclusionId: z.string().min(1),

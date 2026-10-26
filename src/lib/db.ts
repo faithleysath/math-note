@@ -11,7 +11,7 @@ import type { Edge, InferenceStep, Node } from './schema';
  * 应用启动时一次性全量读入内存，之后所有遍历 / 编号 / 搜索都在内存里做，
  * 这里只是落盘。
  */
-export class MathNoteDB extends Dexie {
+class MathNoteDB extends Dexie {
   nodes!: Table<Node, string>;
   edges!: Table<Edge, string>;
   steps!: Table<InferenceStep, string>;
@@ -50,11 +50,6 @@ export async function putNodes(nodes: Node[]): Promise<void> {
 export async function putEdges(edges: Edge[]): Promise<void> {
   if (edges.length === 0) return;
   await db.edges.bulkPut(edges);
-}
-
-export async function removeNodes(ids: string[]): Promise<void> {
-  if (ids.length === 0) return;
-  await db.nodes.bulkDelete(ids);
 }
 
 export async function removeEdges(ids: string[]): Promise<void> {

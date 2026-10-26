@@ -1,21 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
   ancestorIds,
-  coveredKnowledge,
-  coveringProblems,
-  nodesMatching,
   buildIndex,
   collectSubtree,
   computeInsertOrder,
-  cycleNodes,
-  dumpTree,
-  equivalenceClasses,
-  findImplicationPaths,
-  inferLogicalRelations,
-  ORDER_GAP,
-  reachable,
+  coveredKnowledge,
+  coveringProblems,
+  nodesMatching,
   searchNodes,
-  topoSort,
 } from './graph';
 import { mkEdge as edge, mkNode as node } from './test-helpers';
 import type { Node } from './schema';
@@ -106,18 +98,13 @@ describe('树遍历', () => {
     expect(ancestorIds(index, 't1')).toEqual(['b1', 'c1', 's11']);
     expect(ancestorIds(index, 'b1')).toEqual([]);
   });
-
-  it('dumpTree 可读', () => {
-    const index = buildIndex(textbook(), []);
-    expect(dumpTree(index)).toContain('proposition [定理 1.1.1] t1');
-  });
 });
 
 describe('排序', () => {
   it('末尾追加', () => {
     const index = buildIndex(textbook(), []);
     const position = computeInsertOrder(index, 's11', null);
-    expect(position.order).toBe(3072 + ORDER_GAP);
+    expect(position.order).toBe(3072 + 1024);
     expect(position.rebalance).toBe(false);
   });
 
@@ -137,211 +124,6 @@ describe('排序', () => {
     const index = buildIndex(nodes, []);
     const position = computeInsertOrder(index, 'b1', 'n1');
     expect(position.rebalance).toBe(true);
-  });
-});
-
-describe('结构遍历', () => {
-  const nodes = [
-    node('def', 'definition', null, 1024),
-    node('thmA', 'theorem', null, 2048),
-    node('thmB', 'theorem', null, 3072),
-    node('thmC', 'theorem', null, 4096),
-  ];
-  const edges = [
-    edge('thmA', 'def', 'depends-on'),
-    edge('thmB', 'thmA', 'depends-on'),
-    edge('thmC', 'thmB', 'depends-on'),
-  ];
-
-  it('依赖可以传递', () => {
-    const index = buildIndex(nodes, edges);
-    expect([...reachable(index, 'thmC', 'depends-on')].sort()).toEqual(['def', 'thmA', 'thmB']);
-  });
-
-  it('结构查询包含图上所有已存的关系', () => {
-    const index = buildIndex(nodes, [edge('thmA', 'def', 'depends-on')]);
-    expect(reachable(index, 'thmA', 'depends-on').has('def')).toBe(true);
-  });
-
-  it('iff 在结构上双向可达（即使只存一条）', () => {
-    const index = buildIndex(nodes, [edge('thmA', 'thmB', 'iff')]);
-    expect(reachable(index, 'thmA', 'iff').has('thmB')).toBe(true);
-    expect(reachable(index, 'thmB', 'iff').has('thmA')).toBe(true);
-  });
-});
-
-describe('数学推理', () => {
-  const nodes = [
-    node('a', 'theorem', null, 1024, { title: 'x²=1' }),
-    node('b', 'theorem', null, 2048, { title: 'x=1' }),
-    node('c', 'theorem', null, 3072, { title: 'x>0' }),
-    node('ctx', 'context', null, 4096, { title: '实数域' }),
-  ];
-
-  it('路径上的文字条件不会被丢掉', () => {
-    const index = buildIndex(nodes, [
-      edge('a', 'b', 'implies', { condition: 'x>0' }),
-      edge('b', 'c', 'implies'),
-    ]);
-    const derived = findImplicationPaths(index, 'a', 'c');
-    expect(derived.length).toBeGreaterThan(0);
-    expect(derived[0].unresolvedConditions).toEqual(['x>0']);
-  });
-
-  it('语境一致时路径共享同一个语境', () => {
-    const index = buildIndex(nodes, [
-      edge('a', 'b', 'implies', { contextId: 'ctx' }),
-      edge('b', 'c', 'implies', { contextId: 'ctx' }),
-    ]);
-    const derived = findImplicationPaths(index, 'a', 'c');
-    expect(derived[0].contextId).toBe('ctx');
-    expect(derived[0].unresolvedConditions).toEqual([]);
-  });
-
-  it('语境不同时不能合并', () => {
-    const index = buildIndex(nodes, [
-      edge('a', 'b', 'implies', { contextId: 'ctx' }),
-      edge('b', 'c', 'implies', { contextId: 'other' }),
-    ]);
-    const derived = findImplicationPaths(index, 'a', 'c');
-    expect(derived[0].contextId).toBeUndefined();
-  });
-
-  it('已存的关系都参与候选关联计算', () => {
-    const index = buildIndex(nodes, [
-      edge('a', 'b', 'implies'),
-      edge('b', 'c', 'implies'),
-    ]);
-    expect(inferLogicalRelations(index, 'a').map((rel) => rel.to)).toEqual(['b', 'c']);
-  });
-
-  it('语境筛选：指定语境时只走同语境的边', () => {
-    const index = buildIndex(nodes, [
-      edge('a', 'b', 'implies', { contextId: 'ctx' }),
-      edge('b', 'c', 'implies', { contextId: 'other' }),
-    ]);
-    expect(inferLogicalRelations(index, 'a', { contextId: 'ctx' }).map((r) => r.to)).toEqual(['b']);
-    expect(inferLogicalRelations(index, 'a').map((r) => r.to)).toContain('c');
-  });
-
-  it('反例反驳的是命题，不会被当成「蕴含错误」', () => {
-    const index = buildIndex(nodes, [
-      edge('a', 'b', 'implies'),
-      edge('cex', 'a', 'refutes'),
-    ]);
-    // refutes 的起点必须是 counterexample 类型；这里只验证推理链不受影响
-    expect(inferLogicalRelations(index, 'a').map((rel) => rel.to)).toEqual(['b']);
-  });
-});
-
-describe('等价类', () => {
-  const nodes = [
-    node('a', 'theorem', null, 1024),
-    node('b', 'theorem', null, 2048),
-    node('c', 'theorem', null, 3072),
-    node('ctx1', 'context', null, 4096),
-    node('ctx2', 'context', null, 5120),
-  ];
-
-  it('同语境下的三方等价合成一类', () => {
-    const index = buildIndex(nodes, [
-      edge('a', 'b', 'iff', { contextId: 'ctx1' }),
-      edge('b', 'c', 'iff', { contextId: 'ctx1' }),
-      edge('c', 'a', 'iff', { contextId: 'ctx1' }),
-    ]);
-    const classes = equivalenceClasses(index);
-    expect(classes).toHaveLength(1);
-    expect([...classes[0].members].sort()).toEqual(['a', 'b', 'c']);
-  });
-
-  it('不同语境的等价关系不并在一起', () => {
-    const index = buildIndex(nodes, [
-      edge('a', 'b', 'iff', { contextId: 'ctx1' }),
-      edge('b', 'c', 'iff', { contextId: 'ctx2' }),
-    ]);
-    const classes = equivalenceClasses(index);
-    expect(classes).toHaveLength(2);
-    expect(classes.map((item) => item.contextId).sort()).toEqual(['ctx1', 'ctx2']);
-  });
-
-  it('没有明确语境的等价关系只算候选', () => {
-    const index = buildIndex(nodes, [edge('a', 'b', 'iff')]);
-    expect(equivalenceClasses(index)).toHaveLength(0);
-    const withCandidates = equivalenceClasses(index, 'iff', { includeConditional: true });
-    expect(withCandidates).toHaveLength(1);
-    expect(withCandidates[0].conditional).toBe(true);
-  });
-
-  it('前提不同的等价关系不能被并成一个无条件等价类', () => {
-    // A: x=1, B: x^2=1, C: x=-1；A⇔B 在 x>0 下，B⇔C 在 x<0 下
-    const index = buildIndex(nodes, [
-      edge('a', 'b', 'iff', { contextId: 'ctx1', condition: 'x>0' }),
-      edge('b', 'c', 'iff', { contextId: 'ctx1', condition: 'x<0' }),
-    ]);
-    expect(equivalenceClasses(index)).toHaveLength(0);
-
-    const candidates = equivalenceClasses(index, 'iff', { includeConditional: true });
-    expect(candidates).toHaveLength(2);
-    expect(candidates.every((item) => item.conditional)).toBe(true);
-    expect(candidates.map((item) => item.conditions.join()).sort()).toEqual(['x<0', 'x>0']);
-  });
-
-  it('无前提且语境明确的等价关系进入同语境分组', () => {
-    const index = buildIndex(nodes, [
-      edge('a', 'b', 'iff', { contextId: 'ctx1' }),
-    ]);
-    const classes = equivalenceClasses(index);
-    expect(classes).toHaveLength(1);
-    expect(classes[0]).toMatchObject({ contextId: 'ctx1', conditional: false });
-  });
-
-  it('语境未说明的等价关系只算候选分组', () => {
-    const index = buildIndex(nodes, [edge('a', 'b', 'iff')]);
-    expect(equivalenceClasses(index)).toHaveLength(0);
-
-    const candidates = equivalenceClasses(index, 'iff', { includeConditional: true });
-    expect(candidates).toHaveLength(1);
-    expect(candidates[0].conditional).toBe(true);
-  });
-});
-
-describe('拓扑排序与环诊断', () => {
-  const nodes = [
-    node('a', 'theorem', null, 1024),
-    node('b', 'theorem', null, 2048),
-    node('c', 'theorem', null, 3072),
-    node('isolated', 'theorem', null, 4096),
-  ];
-
-  it('学习顺序把前置放在前面', () => {
-    const index = buildIndex(nodes, [
-      edge('c', 'b', 'depends-on'),
-      edge('b', 'a', 'depends-on'),
-    ]);
-    const { order } = topoSort(index, 'depends-on', 'to-first');
-    expect(order.indexOf('a')).toBeLessThan(order.indexOf('b'));
-    expect(order.indexOf('b')).toBeLessThan(order.indexOf('c'));
-  });
-
-  it('孤立节点也能排进候选', () => {
-    const index = buildIndex(nodes, [edge('b', 'a', 'depends-on')]);
-    const { order } = topoSort(index, 'depends-on', 'to-first', {
-      candidateIds: ['a', 'b', 'isolated'],
-    });
-    expect(order).toContain('isolated');
-    expect(order).toHaveLength(3);
-  });
-
-  it('区分环上节点和被环阻塞的节点', () => {
-    const index = buildIndex(nodes, [
-      edge('a', 'b', 'depends-on'),
-      edge('b', 'a', 'depends-on'),
-      edge('c', 'a', 'depends-on'),
-    ]);
-    const { cyclic, blocked } = topoSort(index, 'depends-on', 'to-first');
-    expect(cyclic.sort()).toEqual(['a', 'b']);
-    expect(blocked).toEqual(['c']);
-    expect([...cycleNodes(index, 'depends-on')].sort()).toEqual(['a', 'b']);
   });
 });
 

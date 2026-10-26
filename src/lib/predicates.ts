@@ -1,4 +1,4 @@
-import type { Node, NodeType, Predicate } from './schema';
+import type { NodeType, Predicate } from './schema';
 
 // =============================================================================
 // 谓词注册表（恰好 9 种）
@@ -6,14 +6,14 @@ import type { Node, NodeType, Predicate } from './schema';
 // 这张表是关系的唯一真相来源：UI 按钮、方向判断、校验规则、显示文案、
 // 图谱箭头、推理规则全部从这里生成。
 
-export type PredicateFamily = 'semantic' | 'epistemic' | 'evidential' | 'logical';
+type PredicateFamily = 'semantic' | 'epistemic' | 'evidential' | 'logical';
 
-export interface TypePair {
+interface TypePair {
   from: NodeType;
   to: NodeType;
 }
 
-export interface PredicateSpec {
+interface PredicateSpec {
   family: PredicateFamily;
   /** from 侧看这条边叫什么 */
   fromLabel: string;
@@ -216,37 +216,13 @@ export const PREDICATE_SPECS: Record<Predicate, PredicateSpec> = {
   },
 };
 
-export const PREDICATE_LIST = Object.keys(PREDICATE_SPECS) as Predicate[];
-
-export function isLogicalPredicate(predicate: Predicate): boolean {
-  return PREDICATE_SPECS[predicate].logical;
-}
-
-/** 参与数学推理的谓词 */
-export const LOGICAL_PREDICATES: Predicate[] = PREDICATE_LIST.filter(isLogicalPredicate);
-
-export const FAMILY_META: Record<PredicateFamily, { label: string; order: number }> = {
-  semantic: { label: '知识点关系', order: 1 },
-  epistemic: { label: '引用与依赖', order: 2 },
-  evidential: { label: '论证', order: 3 },
-  logical: { label: '逻辑关系', order: 4 },
-};
-
-export function predicatesByFamily(): { family: PredicateFamily; label: string; predicates: Predicate[] }[] {
-  return (Object.keys(FAMILY_META) as PredicateFamily[])
-    .sort((a, b) => FAMILY_META[a].order - FAMILY_META[b].order)
-    .map((family) => ({
-      family,
-      label: FAMILY_META[family].label,
-      predicates: PREDICATE_LIST.filter((p) => PREDICATE_SPECS[p].family === family),
-    }));
-}
+const PREDICATE_LIST = Object.keys(PREDICATE_SPECS) as Predicate[];
 
 // =============================================================================
 // 方向与允许性
 // =============================================================================
 
-export interface ApplicablePredicate {
+interface ApplicablePredicate {
   predicate: Predicate;
   /** true 表示这条边应当存成 target → source */
   reversed: boolean;
@@ -288,54 +264,4 @@ export function canonicalizePair(
     return { from: toId, to: fromId };
   }
   return { from: fromId, to: toId };
-}
-
-// =============================================================================
-// 显示
-// =============================================================================
-
-export interface EdgeDescription {
-  label: string;
-  sentence: string;
-  otherId: string;
-  direction: 'out' | 'in';
-}
-
-export function describeEdge(
-  edge: { from: string; to: string; predicate: Predicate },
-  viewerId: string,
-  nodes: Map<string, Node>,
-): EdgeDescription {
-  const spec = PREDICATE_SPECS[edge.predicate];
-  const fromNode = nodes.get(edge.from);
-  const toNode = nodes.get(edge.to);
-  const fromTitle = fromNode?.title ?? edge.from;
-  const toTitle = toNode?.title ?? edge.to;
-  const isFrom = viewerId === edge.from;
-  return {
-    label: isFrom ? spec.fromLabel : spec.inverseLabel,
-    sentence: `${fromTitle} ${spec.verb} ${toTitle}`,
-    otherId: isFrom ? edge.to : edge.from,
-    direction: isFrom ? 'out' : 'in',
-  };
-}
-
-/** 图谱里用的箭头 */
-export function mermaidArrow(predicate: Predicate): string {
-  switch (predicate) {
-    case 'implies':
-    case 'proves':
-      return '==>';
-    case 'iff':
-      return '<-->';
-    case 'cites':
-    case 'refutes':
-      return '-.->';
-    default:
-      return '-->';
-  }
-}
-
-export function predicateLabel(predicate: Predicate): string {
-  return `${PREDICATE_SPECS[predicate].fromLabel}（${predicate}）`;
 }

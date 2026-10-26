@@ -38,7 +38,7 @@
 
 | 谓词 | 起点 → 终点 | 说明 |
 |---|---|---|
-| `depends-on` | 可学习内容 → section / definition / proposition / note | 学习前置；用于拓扑排序；**要求无环**；不等于数学蕴含 |
+| `depends-on` | 可学习内容 → section / definition / proposition / note | 学习前置；**要求无环**；不等于数学蕴含 |
 | `covers` | problem → definition / proposition / note | 题目考查的知识点；不传递 |
 | `uses` | proof / attempt / problem / note → definition / proposition / note | 证明或解法实际用到的依据；不传递 |
 | `proves` | proof → proposition | 证明归属；不代表证明过程已被验证 |
@@ -73,8 +73,8 @@
 }
 ```
 
-它不参与目录树、没有位置和编号。推理引擎是前向链式：先走 `implies`/`iff`，再看哪些步骤的所有前提都成立；
-每条结果都带「依据 + 路径上的文字条件 + 语境」。前提和结论都必须是 `proposition`。
+它不参与目录树、没有位置和编号，只是把「几个命题一起才能推出另一个」这件事记下来。
+前提和结论都必须是 `proposition`；界面只做增删查，不会拿它自动推导新结论。
 
 ### 编号
 
@@ -129,7 +129,7 @@
 ```bash
 bun install
 bun dev          # http://localhost:5173
-bun run test     # 编号、图算法、校验、推理（vitest）
+bun run test     # 编号、图算法、校验、导入导出（vitest）
 bun run lint
 bun run build
 ```
@@ -139,7 +139,7 @@ bun run build
 ```
 src/lib/schema.ts      9 种节点 / kind 枚举 / 9 种谓词 / 推理步骤 / zod
 src/lib/predicates.ts  谓词注册表（方向、传递性、类型白名单、显示文案）
-src/lib/graph.ts       纯函数：索引、递归编号、遍历、推理、拓扑排序、搜索
+src/lib/graph.ts       纯函数：索引、递归编号、遍历、covers 反查、搜索
 src/lib/validate.ts    全图不变式与单条校验
 src/lib/serialize.ts   导入校验、导出
 src/lib/citation.ts    来源字段合并（只改 source，保留 page / originalNumber）
@@ -150,16 +150,16 @@ examples/              可直接导入的 v6 样例
 
 ## 性能（本机实测，`bun run bench`）
 
-| 规模 | 建索引 | 搜索 | 前置排序（1000 候选） | 导入校验 | JSON | 堆内存 |
-|---|---|---|---|---|---|---|
-| 5.5k 节点 / 4.5k 边 | 4 ms | 1.2 ms | 6 ms | 20 ms | 1.8 MB | 19 MB |
-| 22k 节点 / 18k 边 | 17 ms | 5.7 ms | 17 ms | 44 ms | 7.3 MB | 73 MB |
+| 规模 | 建索引 | 搜索 | 导入校验 | JSON | 堆内存 |
+|---|---|---|---|---|---|
+| 5.5k 节点 / 4.5k 边 | 4 ms | 1.2 ms | 20 ms | 1.8 MB | 16 MB |
+| 22k 节点 / 18k 边 | 15 ms | 4.1 ms | 35 ms | 7.3 MB | 54 MB |
 
 全量内存 + 写穿的架构在万级节点下仍然可用；再往上（十万级）需要改增量索引。
 
 ## 已知限制
 
-- 未形式化验证的推理只是**带依据的候选关系**，不承诺从自由文本判断真假。
+- 关系只表达「知识库主张它成立」；软件不判断数学真假，也不给关系打质量分。
 - `condition` 只做保存与展示，不会自动判断两条条件是否等价。
 - 不做教材/PDF 解析、图床管理、小问实体、增量合并。
 - 搜索是全量线性扫描，二十万级以上需要倒排索引。

@@ -1,5 +1,5 @@
 import type { GraphIndex } from './graph';
-import { ancestorIds, collectSubtree, findPath } from './graph';
+import { collectSubtree, findPath } from './graph';
 import { PREDICATE_SPECS, canonicalizePair, isDirectionAllowed } from './predicates';
 import {
   KIND_OPTIONS,
@@ -22,7 +22,7 @@ import {
 // 一律返回「问题 + 位置 + 建议」，而不是抛一句看不懂的话。
 // 错误 = 不能保存；警告 = 可以保存，但让人复核。
 
-export type IssueSeverity = 'error' | 'warning';
+type IssueSeverity = 'error' | 'warning';
 
 export interface ValidationIssue {
   severity: IssueSeverity;
@@ -48,12 +48,6 @@ export class ValidationError extends Error {
 
 function errorOf(field: string, code: string, message: string, extra: Partial<ValidationIssue> = {}): ValidationError {
   return new ValidationError(field, message, [{ severity: 'error', code, message, field, ...extra }]);
-}
-
-function issuesMessage(issues: ValidationIssue[]): string {
-  const head = issues.slice(0, 3).map((issue) => issue.message).join('；');
-  const rest = issues.length > 3 ? `（还有 ${issues.length - 3} 个问题）` : '';
-  return `${head}${rest}`;
 }
 
 export interface NewNodeInput {
@@ -229,7 +223,7 @@ function assertKindChangeKeepsReferences(index: GraphIndex, node: Node, nextKind
   );
 }
 
-export function validateCanReparent(index: GraphIndex, id: string, newParentId: string | null): void {
+function validateCanReparent(index: GraphIndex, id: string, newParentId: string | null): void {
   const node = index.nodes.get(id);
   if (!node) throw errorOf('id', 'missing-node', '节点不存在。');
 
@@ -283,7 +277,7 @@ function normalizeCondition(condition?: string): string {
 type RelationKeyFields = Pick<Edge, 'predicate' | 'from' | 'to' | 'contextId' | 'condition'>;
 
 /** 去重键：谓词 + 端点（对称谓词无序）+ 语境 + 规范化条件 */
-export function relationKey(edge: RelationKeyFields): string {
+function relationKey(edge: RelationKeyFields): string {
   const spec = PREDICATE_SPECS[edge.predicate];
   const endpoints = spec.symmetric
     ? [edge.from, edge.to].sort().join('|')
@@ -300,7 +294,7 @@ export function sameRelationKey(a: RelationKeyFields, b: RelationKeyFields): boo
   return relationKey(a) === relationKey(b);
 }
 
-export interface EdgeCheckResult {
+interface EdgeCheckResult {
   warnings: ValidationIssue[];
 }
 
@@ -949,85 +943,3 @@ export function validateGraphInvariants(graph: {
 
   return issues;
 }
-
-// =============================================================================
-// 冲突提示（不是数学判定）
-// =============================================================================
-
-export interface ConflictHint {
-  code: string;
-  message: string;
-  edgeIds: string[];
-}
-
-/**
- * 「需要人工核查的线索」，不是严格的矛盾判定。
- * 反例反驳的是明确的命题，不能因为同端点就宣布某条蕴含错了。
- */
-export function findConflictHints(index: GraphIndex): ConflictHint[] {
-  const hints: ConflictHint[] = [];
-
-  /**
-   * predicate|from|to → 边列表。
-   * 同端点可以有多条不同前提的关系，不能只保留最后一条。
-   */
-  const byEndpoint = new Map<string, Edge[]>();
-  for (const edge of index.edges) {
-    const key = `${edge.predicate}|${edge.from}|${edge.to}`;
-    const list = byEndpoint.get(key);
-    if (list) list.push(edge);
-    else byEndpoint.set(key, [edge]);
-  }
-
-  for (const edge of index.edges) {
-    if (edge.predicate === 'generalizes') {
-      for (const reverse of byEndpoint.get(`generalizes|${edge.to}|${edge.from}`) ?? []) {
-        if (edge.id >= reverse.id) continue;
-        hints.push({
-          code: 'mutual-generalization',
-          message: '两个结论互为推广，可能只是同一件事的不同说法，请人工核查。',
-          edgeIds: [edge.id, reverse.id],
-        });
-      }
-    }
-
-    if (edge.predicate === 'implies') {
-      for (const reverse of byEndpoint.get(`implies|${edge.to}|${edge.from}`) ?? []) {
-        if (edge.id >= reverse.id) continue;
-        if (normalizeCondition(edge.condition) === normalizeCondition(reverse.condition)) continue;
-        hints.push({
-          code: 'mutual-implication-different-conditions',
-          message: '两个方向的蕴含前提不同，不能直接当成无条件等价。',
-          edgeIds: [edge.id, reverse.id],
-        });
-      }
-    }
-
-    if (edge.predicate === 'refutes') {
-      const target = index.nodes.get(edge.to);
-      if (target) {
-        hints.push({
-          code: 'counterexample-target',
-          message: `反例反驳的是命题「${target.title}」本身；如果要反驳某条蕴含，请在对应关系上标注状态。`,
-          edgeIds: [edge.id],
-        });
-      }
-    }
-  }
-
-  return hints;
-}
-
-export function subtreeSize(index: GraphIndex, id: string): number {
-  return collectSubtree(index, id).length;
-}
-
-export function isAncestor(index: GraphIndex, ancestorId: string, descendantId: string): boolean {
-  return ancestorIds(index, descendantId).includes(ancestorId);
-}
-
-export function nodeLabel(node: Node | undefined, fallback = '未知节点'): string {
-  return node ? node.title || NODE_TYPE_META[node.type].label : fallback;
-}
-
-export { issuesMessage };
