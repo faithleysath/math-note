@@ -1,5 +1,15 @@
 import { useState, useMemo } from 'react';
+import { SlidersHorizontal } from 'lucide-react';
 import { Input } from './ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from './ui/select';
 import { nodesMatching, searchNodes, type SearchFilter } from '../lib/graph';
 import { NODE_TYPE_META, typeLabel, type Node, type NodeType } from '../lib/schema';
 import { nodeBadgeColor } from './nodeColors';
@@ -20,7 +30,7 @@ const FILTER_GROUPS: { label: string; options: { value: string; label: string }[
     label: '知识',
     options: [
       { value: 'definition', label: '定义' },
-      { value: 'note', label: '笔记（全部）' },
+      { value: 'note', label: '全部笔记' },
       { value: 'note:method', label: '方法' },
       { value: 'note:context', label: '语境' },
       { value: 'note:summary', label: '总结' },
@@ -30,7 +40,7 @@ const FILTER_GROUPS: { label: string; options: { value: string; label: string }[
   {
     label: '命题',
     options: [
-      { value: 'proposition', label: '命题（全部）' },
+      { value: 'proposition', label: '全部命题' },
       { value: 'proposition:theorem', label: '定理' },
       { value: 'proposition:lemma', label: '引理' },
       { value: 'proposition:corollary', label: '推论' },
@@ -43,7 +53,7 @@ const FILTER_GROUPS: { label: string; options: { value: string; label: string }[
   {
     label: '题目',
     options: [
-      { value: 'problem', label: '题目（全部）' },
+      { value: 'problem', label: '全部题目' },
       { value: 'problem:example', label: '例题' },
       { value: 'problem:exercise', label: '练习' },
       { value: 'problem:exploration', label: '探究' },
@@ -109,28 +119,50 @@ const Search = ({ onSelectNode, showFilters = false }: SearchProps) => {
         onFocus={() => setIsOpen(true)}
       />
       {showFilters && (
-        <div className="mt-1 flex items-center justify-end gap-1">
-          <select
-            aria-label="按类型筛选"
-            className="h-7 rounded-md border bg-background px-1 text-xs text-muted-foreground"
-            value={filterValue}
-            onChange={(e) => {
-              setFilterValue(e.target.value);
+        <div className="mt-1.5 flex items-center gap-2">
+          <Select
+            value={filterValue || 'all'}
+            onValueChange={(value) => {
+              setFilterValue(value === 'all' ? '' : value);
               setIsOpen(true);
             }}
-            onBlur={() => setTimeout(() => setIsOpen(false), 150)}
           >
-            <option value="">全部类型</option>
-            {FILTER_GROUPS.map((group) => (
-              <optgroup key={group.label} label={group.label}>
-                {group.options.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
+            <SelectTrigger
+              size="sm"
+              aria-label="按类型筛选"
+              className={cn(
+                'h-6 w-auto gap-1 rounded-full px-2 text-[11px] focus-visible:ring-2',
+                filterValue
+                  ? 'border-solid bg-secondary text-secondary-foreground'
+                  : 'border-dashed bg-transparent text-muted-foreground hover:bg-accent',
+              )}
+            >
+              <SlidersHorizontal className="h-3 w-3" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="max-h-72">
+              <SelectItem value="all">全部类型</SelectItem>
+              {FILTER_GROUPS.map((group) => (
+                <SelectGroup key={group.label}>
+                  <SelectLabel>{group.label}</SelectLabel>
+                  {group.options.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              ))}
+            </SelectContent>
+          </Select>
+          {filterValue && (
+            <button
+              type="button"
+              className="text-[11px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+              onClick={() => setFilterValue('')}
+            >
+              清除
+            </button>
+          )}
         </div>
       )}
       {isOpen && results.length > 0 && (
