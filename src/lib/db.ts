@@ -121,6 +121,14 @@ export async function deleteNodesCascade(
   });
 }
 
+/** 修改教材信息；如需同步改根分支标题，和 meta 放在同一个事务里 */
+export async function updateBook(book: BookMeta, nodesToPut: Node[] = []): Promise<void> {
+  await db.transaction('rw', db.meta, db.nodes, async () => {
+    await db.meta.put({ id: 'active', ...book });
+    if (nodesToPut.length > 0) await db.nodes.bulkPut(nodesToPut);
+  });
+}
+
 /** 整库替换：book 与图数据必须在同一个事务里落盘，避免书名与内容短暂不一致 */
 export async function replaceAll(data: {
   book: BookMeta;

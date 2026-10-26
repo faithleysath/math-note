@@ -53,6 +53,7 @@ interface GraphState {
 
   init: () => Promise<void>;
   createBook: (book: BookMeta) => Promise<BookMeta>;
+  updateBook: (book: BookMeta) => Promise<BookMeta>;
   select: (id: string | null) => void;
   setEditing: (id: string | null) => void;
   toggleExpanded: (id: string) => void;
@@ -183,6 +184,43 @@ export const useGraphStore = create<GraphState>()((set, get) => {
       return book;
     },
 
+    updateBook: async (input) => {
+      const state = get();
+      const current = state.book;
+      if (!current) {
+        throw new ValidationError('book', '当前还没有教材，无法编辑教材信息。');
+      }
+      validateBook(input);
+
+      const book: BookMeta = {
+        subject: input.subject,
+        stage: input.stage,
+        title: input.title.trim(),
+        edition: input.edition?.trim() || undefined,
+      };
+
+      const now = Date.now();
+      const nodesToPut: Node[] = [];
+      const nodes = new Map(state.index.nodes);
+
+      // 新建教材时根分支就是书名；只有一个根分支且仍叫旧书名时，一起改名。
+      if (state.index.roots.length === 1) {
+        const root = state.index.nodes.get(state.index.roots[0]);
+        if (root?.type === 'branch' && root.title === current.title && root.title !== book.title) {
+          const nextRoot = { ...root, title: book.title, updatedAt: now };
+          nodes.set(root.id, nextRoot);
+          nodesToPut.push(nextRoot);
+        }
+      }
+
+      await db.updateBook(book, nodesToPut);
+      set({
+        book,
+        index: buildIndex(nodes.values(), state.index.edges, state.index.steps),
+      });
+      return book;
+    },
+
     select: (id) => {
       if (!id) {
         set({ selectedId: null });
@@ -217,6 +255,9 @@ export const useGraphStore = create<GraphState>()((set, get) => {
     createNode: async (input) => {
       const state = get();
       assertWritable(state);
+      if (!state.book) {
+        throw new ValidationError('book', '请先新建或导入教材，再添加内容。');
+      }
       validateNewNode(state.index, input);
 
       const now = Date.now();

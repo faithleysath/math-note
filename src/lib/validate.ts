@@ -190,6 +190,7 @@ export function validateNodePatch(index: GraphIndex, id: string, patch: NodePatc
   if (patch.kind !== undefined) {
     assertKind(node.type, patch.kind);
     assertKindChangeKeepsReferences(index, node, patch.kind);
+    assertKindChangeKeepsEdges(index, node, patch.kind);
   }
 
   if (patch.key) {
@@ -201,6 +202,42 @@ export function validateNodePatch(index: GraphIndex, id: string, patch: NodePatc
 
   if (patch.parentId !== undefined && patch.parentId !== node.parentId) {
     validateCanReparent(index, id, patch.parentId);
+  }
+}
+
+/**
+ * 修改 kind 可能让已存在的关系不再满足端点规则。
+ * 例如把 supports 的实验起点改成普通讲解，边仍然在，但 Schema 已不合法。
+ * 必须在保存前阻止，不能等到导出或下次导入才暴露。
+ */
+function assertKindChangeKeepsEdges(index: GraphIndex, node: Node, nextKind: string) {
+  if ((node.kind ?? '') === nextKind) return;
+  const patched: Node = { ...node, kind: nextKind || undefined };
+  const incident = [
+    ...(index.edgesFrom.get(node.id) ?? []),
+    ...(index.edgesTo.get(node.id) ?? []),
+  ];
+
+  for (const edge of incident) {
+    const fromNode = edge.from === node.id ? patched : index.nodes.get(edge.from);
+    const toNode = edge.to === node.id ? patched : index.nodes.get(edge.to);
+    if (!fromNode || !toNode) continue;
+    if (isEdgeAllowed(edge.predicate, fromNode, toNode)) continue;
+
+    const fromTitle = fromNode.title;
+    const toTitle = toNode.title;
+    throw errorOf(
+      'kind',
+      'kind-breaks-edge',
+      `改成「${NODE_TYPE_META[node.type].kindLabel(nextKind || undefined)}」会让已有关系「${fromTitle} ${
+        PREDICATE_HINT[edge.predicate]
+      } ${toTitle}」不再合法。`,
+      {
+        nodeId: node.id,
+        edgeId: edge.id,
+        suggestion: '先删除或调整这条关系，再修改 kind；或者保留当前的细分分类。',
+      },
+    );
   }
 }
 

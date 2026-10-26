@@ -25,7 +25,7 @@ import { Input } from '../ui/input';
 import { useGraphStore } from '../../stores/useGraphStore';
 import { toast } from 'sonner';
 import Search from '../Search';
-import { Upload, Download, Share2, X, Plus, BookPlus } from 'lucide-react';
+import { Upload, Download, Share2, X, Plus, BookPlus, Pencil } from 'lucide-react';
 import { SCHOOL_STAGES, STAGE_LABELS, SUBJECTS, SUBJECT_LABELS, type SchoolStage, type Subject } from '../../lib/schema';
 import { useWindowSize } from '@/hooks/useWindowSize';
 
@@ -34,6 +34,7 @@ const LeftSidebar = () => {
   const setExpandedBranch = useGraphStore(state => state.setExpandedBranch);
   const createNode = useGraphStore(state => state.createNode);
   const createBook = useGraphStore(state => state.createBook);
+  const updateBook = useGraphStore(state => state.updateBook);
   const book = useGraphStore(state => state.book);
   const index = useGraphStore(state => state.index);
   const exportGraph = useGraphStore(state => state.exportGraph);
@@ -44,6 +45,7 @@ const LeftSidebar = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isBookDialogOpen, setIsBookDialogOpen] = useState(false);
   const [isBookConfirmOpen, setIsBookConfirmOpen] = useState(false);
+  const [isEditingBook, setIsEditingBook] = useState(false);
   const [bookTitle, setBookTitle] = useState('');
   const [bookSubject, setBookSubject] = useState<Subject>('math');
   const [bookStage, setBookStage] = useState<SchoolStage>('senior');
@@ -56,6 +58,10 @@ const LeftSidebar = () => {
   const fileToImportRef = useRef<File | null>(null);
 
   const handleAddBranch = async () => {
+    if (!book) {
+      toast.warning('请先新建或导入教材。');
+      return;
+    }
     if (!newBranchTitle.trim()) return;
     try {
       const node = await createNode({
@@ -128,6 +134,17 @@ const LeftSidebar = () => {
     setBookStage('senior');
     setBookEdition('');
     setIsBookConfirmOpen(false);
+    setIsEditingBook(false);
+  };
+
+  const openEditBook = () => {
+    if (!book) return;
+    setBookTitle(book.title);
+    setBookSubject(book.subject);
+    setBookStage(book.stage);
+    setBookEdition(book.edition ?? '');
+    setIsEditingBook(true);
+    setIsBookDialogOpen(true);
   };
 
   const performCreateBook = async () => {
@@ -147,9 +164,29 @@ const LeftSidebar = () => {
     }
   };
 
-  const handleCreateBook = async () => {
+  const performUpdateBook = async () => {
+    try {
+      await updateBook({
+        title: bookTitle,
+        subject: bookSubject,
+        stage: bookStage,
+        edition: bookEdition.trim() || undefined,
+      });
+      toast.success('教材信息已更新。');
+      setIsBookDialogOpen(false);
+      resetBookForm();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : '更新教材信息失败。');
+    }
+  };
+
+  const handleSubmitBook = async () => {
     if (!bookTitle.trim()) {
       toast.warning('请填写教材名称。');
+      return;
+    }
+    if (isEditingBook) {
+      await performUpdateBook();
       return;
     }
     if (index.nodes.size > 0) {
@@ -217,7 +254,10 @@ const LeftSidebar = () => {
                   size="icon"
                   className="h-8 w-8"
                   aria-label="新建教材"
-                  onClick={() => setIsBookDialogOpen(true)}
+                  onClick={() => {
+                    resetBookForm();
+                    setIsBookDialogOpen(true);
+                  }}
                 >
                   <BookPlus className="h-4 w-4" />
                 </Button>
@@ -266,14 +306,29 @@ const LeftSidebar = () => {
           </div>
         </div>
         <div className="mb-3 rounded-md border px-2.5 py-2">
-          <p className="truncate text-sm font-semibold">{book?.title ?? '还没有教材'}</p>
-          <p className="mt-0.5 text-[11px] text-muted-foreground">
-            {book
-              ? [SUBJECT_LABELS[book.subject], STAGE_LABELS[book.stage], book.edition]
-                  .filter(Boolean)
-                  .join(' · ')
-              : '新建或导入一本教材后开始录入'}
-          </p>
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold">{book?.title ?? '还没有教材'}</p>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                {book
+                  ? [SUBJECT_LABELS[book.subject], STAGE_LABELS[book.stage], book.edition]
+                      .filter(Boolean)
+                      .join(' · ')
+                  : '新建或导入一本教材后开始录入'}
+              </p>
+            </div>
+            {book && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 shrink-0"
+                aria-label="编辑教材信息"
+                onClick={openEditBook}
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </Button>
+            )}
+          </div>
         </div>
         <div className="mb-4">
           <Search showFilters />
@@ -284,7 +339,11 @@ const LeftSidebar = () => {
         <div className="mt-4 flex-shrink-0">
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="w-full">
+              <Button
+                className="w-full"
+                disabled={!book}
+                title={!book ? '请先新建或导入教材' : undefined}
+              >
                 <Plus className="mr-2 h-4 w-4" />
                 添加分支
               </Button>
@@ -320,7 +379,7 @@ const LeftSidebar = () => {
         }}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>新建教材</DialogTitle>
+              <DialogTitle>{isEditingBook ? '编辑教材信息' : '新建教材'}</DialogTitle>
             </DialogHeader>
             <div className="space-y-3 py-4">
               <div>
@@ -382,7 +441,9 @@ const LeftSidebar = () => {
                 />
               </div>
               <p className="text-xs text-muted-foreground">
-                一本教材一份独立知识库。新建会替换当前浏览器里的活动教材。
+                {isEditingBook
+                  ? '修改学科或学段后，分类推荐和编号策略会立即按新配置显示。'
+                  : '一本教材一份独立知识库。新建会替换当前浏览器里的活动教材。'}
               </p>
             </div>
             <DialogFooter>
@@ -391,7 +452,7 @@ const LeftSidebar = () => {
                   取消
                 </Button>
               </DialogClose>
-              <Button onClick={handleCreateBook}>创建</Button>
+              <Button onClick={handleSubmitBook}>{isEditingBook ? '保存' : '创建'}</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

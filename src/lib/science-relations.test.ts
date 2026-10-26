@@ -5,6 +5,7 @@ import {
   validateBook,
   validateGraphInvariants,
   validateNewEdge,
+  validateNodePatch,
   ValidationError,
 } from './validate';
 import type { BookMeta, Edge } from './schema';
@@ -67,6 +68,31 @@ describe('supports：实验/观察 → 科学陈述', () => {
       edges: [edge('e1', 'note', 'law', 'supports')],
     });
     expect(issues.some((issue) => issue.code === 'invalid-endpoint-type')).toBe(true);
+  });
+});
+
+describe('修改 kind 不能破坏已有关系', () => {
+  const supportsIndex = buildIndex(
+    nodes,
+    [edge('e1', 'exp', 'law', 'supports'), edge('e2', 'phenomenon', 'law', 'supports')],
+  );
+
+  it('把实验改成普通讲解会被拒绝，并指出具体关系', () => {
+    expect(() =>
+      validateNodePatch(supportsIndex, 'exp', { kind: 'explanation' }),
+    ).toThrowError(/支持/);
+    expect(() =>
+      validateNodePatch(supportsIndex, 'phenomenon', { kind: 'explanation' }),
+    ).toThrowError(/支持/);
+  });
+
+  it('不影响端点规则时仍可修改 kind', () => {
+    expect(() =>
+      validateNodePatch(supportsIndex, 'law', { kind: 'principle' }),
+    ).not.toThrow();
+    expect(() =>
+      validateNodePatch(buildIndex(nodes, []), 'note', { kind: 'experiment' }),
+    ).not.toThrow();
   });
 });
 
