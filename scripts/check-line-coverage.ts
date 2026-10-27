@@ -143,7 +143,45 @@ for (const page of pages) {
   const regions = regionsByPage.get(page) ?? [];
   const misses: { text: string; x: number; y: number }[] = [];
 
-  for (const line of linesOf(words)) {
+  const lines = linesOf(words);
+  // 图注区：以「图…」或单独一行编号（13-20）为种子，向上下按左边界对齐扩张，
+  // 把折成多行的图注整块标记出来，避免逐行正则漏判（图 13-20 安培 那条就折成 4 行）。
+  const isCaption = new Array<boolean>(lines.length).fill(false);
+  const lineBox = (i: number) => {
+    const line = lines[i] ?? [];
+    return {
+      text: line.map((w) => w.text).join('').trim(),
+      x0: Math.min(...line.map((w) => w.x0)) / width,
+      y0: Math.min(...line.map((w) => w.y0)) / height,
+      y1: Math.max(...line.map((w) => w.y1)) / height,
+    };
+  };
+  const bareNumber = (t: string) => /^\d{1,3}\s*[-–—]\s*\d{1,3}$/.test(t);
+  for (let i = 0; i < lines.length; i++) {
+    const box = lineBox(i);
+    if (box.text.length === 0) continue;
+    const seed =
+      bareNumber(box.text) ||
+      (box.text.startsWith('图') && box.text.length < 40 && !/[。？！]$/.test(box.text));
+    if (!seed) continue;
+    isCaption[i] = true;
+    for (const dir of [1, -1]) {
+      let j = i + dir;
+      let ref = box;
+      while (j >= 0 && j < lines.length) {
+        const cur = lineBox(j);
+        const gap = dir === 1 ? cur.y0 - ref.y1 : ref.y0 - cur.y1;
+        if (Math.abs(cur.x0 - box.x0) > 0.03 || gap > 0.025 || cur.text.length > 40) break;
+        isCaption[j] = true;
+        ref = cur;
+        j += dir;
+      }
+    }
+  }
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (line === undefined) continue;
     const text = line.map((w) => w.text).join('');
     if (text.trim().length === 0) continue;
     const x0 = Math.min(...line.map((w) => w.x0)) / width;
@@ -155,6 +193,7 @@ for (const page of pages) {
     if (y1 < 0.07 || y0 > 0.93) continue;
     if (PAGE_NUMBER.test(text.trim())) continue;
     if (CAPTION_ORDERED.test(text.trim()) || (CAPTION_REVERSED.test(text.trim()) && /图/.test(text) && text.trim().length < 32)) continue;
+    if (isCaption[i] === true) continue;
 
     // 行中心 + 两端点，三点里至少两点被覆盖才算出问题（避免单点落在缝隙上误报）
     const probes: [number, number][] = [
