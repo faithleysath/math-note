@@ -8,7 +8,7 @@
 | 项 | 值 |
 |---|---|
 | 37 份 part / 清单 | `check:part` 全 0 错误；`check:expected` 0 错 0 警；`check:consistent` 0/0 |
-| 四册合并 | **2087 节点 / 1470 边 / 818 资源 / 818 anchors / warnings 0** |
+| 四册合并 | **2084 节点 / 1470 边 / 818 资源 / 818 anchors / warnings 0** |
 | 不变式 | 孤立 def/prop 0；depends-on 无环；无自环；无悬空端点 |
 | 资源 | 818/818 存在且 sha256 对齐；`crop:figures` 0 裁剪 / 818 跳过 |
 | 结构覆盖率 | 3584/3584（mapped 3582 + exception 2；missing/dup/undecided 0） |
@@ -17,8 +17,8 @@
 
 ## 交付
 
-- `~/Downloads/苏科版物理-全四册/`：`all.json`（2087/1470/818）+ 818 张图 + coverage + 两份 exceptions。
-- `~/Downloads/苏科版物理-八上八下/`：已重出，`all.json` 1178/773/458 + 458 张图。
+- `~/Downloads/苏科版物理-全四册/`：`all.json`（2084/1470/818）+ 818 张图 + coverage + 两份 exceptions。
+- `~/Downloads/苏科版物理-八上八下/`：已重出，`all.json` 1175/773/458 + 458 张图。
 - 界面验证（ego-browser，space 101 `math-note 教材图谱验收`）：导入成功；818/818 图片 sha256 命中；图 16-32 完整、`figcaption` 只一次；栏目不再自动编号。
 
 ## 复核与修复
@@ -52,3 +52,15 @@
 - 源缺图：图 16-50、18-5、12-32（保留 asset/图号，alt 写实）。
 - 图 13-12 (b) 玻璃顶切 15px；图 16-28(a)/(b) 未合并（清单冻结）。
 - c16 的 25 处文本 bbox 偏差、`p012-fig02` 左缘 1px 等，不影响交付图。
+
+## 第二轮复审（交付后补做）
+
+- `audit/reaudit-b9a.md`：26 处语义改动 24 真修好 / 2 半修 / 0 修错；新发现半导体假定义、4 对重复、6 条边引文错位等 16 条。
+- `audit/reaudit-b9b.md`：点名项全部落地，0 高/中语义错误；1 中（`@n` 缺 `src:` tag，85 个已补）+ 4 轻 + 9 极轻。
+- `audit/audit-4vol-graph.md`：30 项机械检查 24 全绿；抽样 26/30 节点、29/31 边成立。
+- 修复 + 独立验证：`audit/fix-b8-content.md`、`fix-b9-content.md`、`verify-content-fixes.md`；b8 5/5、b9 11 条落地，1 条 c16 例外文本返工已修。
+- 最终图 **2084 / 1470 / 818**；b8 1175 / 773 / 458。
+
+## 已知不阻断项（补充）
+
+- 4 个未登记 key（晶体/熔点/运动的相对性/物重）、跨学科实践 12 处口径、`活动 9.7` 双节点、原子/电子 ID 页码、6 个定义不纯、2 张表挂在命题/说明、气泡插画重复。

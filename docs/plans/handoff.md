@@ -8,14 +8,14 @@
 
 ## 1. 一句话现状（最终，2026-10-27 夜）
 
-**四册 536 页转写、8 章审计、8 章修复、8 章视觉复核全部完成；四册合并 2087 节点 / 1470 边 / 818 资源 / warnings 0。**
+**四册 536 页转写、8 章审计、8 章修复、8 章视觉复核全部完成；四册合并 2084 节点 / 1470 边 / 818 资源 / warnings 0。**
 **交付已生成并做界面验证：`~/Downloads/苏科版物理-全四册/`（all.json + 818 张图）与重出的 `~/Downloads/苏科版物理-八上八下/`。**
 
 ```
                                    最终状态
 Pass 1 清单（37 份，3584 条）         100%  · check:expected 0 错 0 警
 Pass 2 part（37 份）                  100%  · check:part 全 0 错误
-四册合并                             2087 节点 / 1470 边 / 818 资源 / warnings 0
+四册合并                             2084 节点 / 1470 边 / 818 资源 / warnings 0
 章审计（8 章）                        100%
 章修复（8 章）                        100%  · c16 的 D1–D11 已修
 视觉复核（8 章 216 页）                100%  · 19/19 章 fully-reviewed
@@ -33,7 +33,7 @@ local-textbook/sukey/
 ├─ expected/            16 份九年级清单（8 上 + 8 下）+ 21 份八年级
 ├─ parts/               37 份 part（八年级 21 + 九上 8 + 九下 8）
 ├─ parts-all/           parts 的逐字节副本，合并用（每次合并前 cp）
-├─ merged/4vol.json     四册合并产物（**稳定路径，最终 2087 节点**；`merged/all.json` 是八年级单册旧产物，别用）
+├─ merged/4vol.json     四册合并产物（**稳定路径，最终 2084 节点**；`merged/all.json` 是八年级单册旧产物，别用）
 ├─ entities.json        跨册实体注册表 **229 条**（merge 维护的 live 版，含 21 条非 definition key；**不要跑 export:entities**，会丢）
 ├─ assets/b8a b8b b9a b9b/  818 张裁好的图（b8a 260 / b8b 198 / b9a 178 / b9b 182）
 ├─ audit/               8 份章审计 + 8 份修复报告 + 2 份修复后验证 + add-edges-b9a/b9b + suggest-*.md
@@ -63,7 +63,7 @@ cp local-textbook/sukey/parts/*.json local-textbook/sukey/parts-all/
 bun run merge:parts --parts local-textbook/sukey/parts-all \
   --book local-textbook/sukey/book.json --entities local-textbook/sukey/entities.json \
   --out /tmp/merged-4vol.json --page-offset 7
-# 期望：2086 节点 / 1470 边 / 818 锚点 / 818 资源 / warnings 0
+# 期望：2084 节点 / 1470 边 / 818 锚点 / 818 资源 / warnings 0
 
 # 跨批一致性
 bun run check:consistent
@@ -201,8 +201,8 @@ bun run report:coverage --parts local-textbook/sukey/parts --expected local-text
 九上（c11–c14）        433   339   178   58   55
 九下（c15–c18）        475   358   182   88   50
 合计（九年级）          908   697   360  146  103
-八年级（已交付）       1178   773   458  139  126
-四册合计              2086  1470   818  285  229
+八年级（最终）         1175   773   458  139  124
+四册合计              2084  1470   818  286  225
 
 边/节点：八年级 0.66 · 九上 0.78 · 九下 0.75
 命题占比：八年级 11.8% · 九上 13.4% · 九下 18.5%（九年级定律/公式更密，正常）
@@ -236,7 +236,7 @@ bun run report:coverage --parts local-textbook/sukey/parts --expected local-text
 
 ```
 37 份 part          全部 JSON 可解析 · check:part 全部 0 错误
-四册合并            2086 节点 · 1470 边 · 818 资源 · 818 锚点 · warnings 0
+四册合并            2084 节点 · 1470 边 · 818 资源 · 818 锚点 · warnings 0
 不变式             孤立定义/命题 = 0 · depends-on 无环 · 推理步骤 0
 ```
 
@@ -273,7 +273,7 @@ bun run report:coverage --parts local-textbook/sukey/parts --expected local-text
 |---|---|
 | 37 份 part | `check:part` 全部 exit 0（告警与各章基线相同） |
 | 37 份清单 | `check:expected` 0 错 0 警；`check:consistent` 37 份 / 3584 条 0 错 0 警 |
-| 四册合并 | **2087 节点 / 1470 边 / 818 资源 / 818 anchors / 0 推理步骤 / warnings 0** |
+| 四册合并 | **2084 节点 / 1470 边 / 818 资源 / 818 anchors / 0 推理步骤 / warnings 0** |
 | 不变式 | 孤立 definition·proposition = 0；depends-on 无环；无自环；无悬空端点 |
 | 资源完整性 | 818/818 文件存在且 sha256 与 part 记录一致；全量 `crop:figures` 0 裁剪 / 818 跳过 / 0 失败 |
 | 结构覆盖率 | 3584/3584（mapped 3582 + exception 2；missing/duplicate/undecided 0） |
@@ -306,7 +306,7 @@ bun run report:coverage --parts local-textbook/sukey/parts --expected local-text
 
 ```
 ~/Downloads/苏科版物理-全四册/
-├─ all.json                 2087 节点 / 1470 边 / 818 资源（sha256 44ee0fbf…）
+├─ all.json                 2084 节点 / 1470 边 / 818 资源
 ├─ assets/b8a b8b b9a b9b/  818 张
 ├─ coverage.md              两栏
 ├─ exceptions-b9a.md        九上例外清单（26 条）
@@ -314,7 +314,7 @@ bun run report:coverage --parts local-textbook/sukey/parts --expected local-text
 └─ exceptions-b8a.md        八年级既有清单
 
 ~/Downloads/苏科版物理-八上八下/   已重出（旧版导图 mermaid 过时）
-├─ all.json                 1178 节点 / 773 边 / 458 资源
+├─ all.json                 1175 节点 / 773 边 / 458 资源
 ├─ assets/b8a b8b/          458 张
 ├─ coverage.md
 └─ exceptions-b8a.md
@@ -334,3 +334,23 @@ bun run report:coverage --parts local-textbook/sukey/parts --expected local-text
 - 图 16-28(a)/(b) 仍是两条 `figure`（清单冻结，不合并）。
 - c16 的 25 处文本 bbox 偏差、`p012-fig02` 左缘 1px、既有贴线；不影响交付图。
 - `entities.json` 必须保留 229 条 live 版；**不要跑 `export:entities`**（只收 definition，会丢 21 条非 definition key）。
+
+### 13.7 第二轮复审与内容修复（2026-10-27 深夜）
+
+在交付后补做了 handoff §D 的「修复后复审」，三类独立代理：
+
+| 复审 | 结论 |
+|---|---|
+| b9a 语义复审 `audit/reaudit-b9a.md` | 26 处语义改动：24 真修好 / 2 半修 / 0 修错；另发现半导体假定义、4 对兄弟节点重复、6 条边引文错位等 16 条新问题 |
+| b9b 语义复审 `audit/reaudit-b9b.md` | c15–c18 点名项全部落地；0 高/中语义错误；1 中（77 个 `@n` 缺 `src:` tag）+ 4 轻 + 9 极轻 |
+| 四册图谱总审计 `audit/audit-4vol-graph.md` | 30 项机械检查 24 项全绿（其余 7 项均有解释）；抽样 26/30 节点、29/31 边成立；原文回查 95.7% / 97.5% |
+
+修复（`audit/fix-b8-content.md`、`fix-b9-content.md`，由 `verify-content-fixes.md` 独立验证）：
+
+- **b8**：电子/夸克 definition 换原书界定句；质子/中子无界定句 → 降 note，4 条 `part-of→cites`（全库 part-of 15→11）；虚像/竖直方向/扩散 三组重复 note 并入 definition；图 4-33 补 caption；图 1-17/1-22 标 `captionOnImage`；`p078-01` 3 条 `depends-on→uses`。
+- **b9**：`p010-04` 引出句移出定义；`p087-01` 半导体拆成 definition + `@1` note（图 14-6 改挂）；`p071-05` 电压按「原书因果式定义」登记例外；`p003-09` 重复 note 并入 definition 并保留「信息快递」；85 个 `@n` 补 `src:` tag；发电机 `depends-on→cites`；c18 补回 3 处「这是因为」、2 个栏目 `originalNumber`、69 个 `citation.page` 去零；c15 `p003-02` 顺序修正；4 条 `depends-on→uses`。
+- **验证发现 1 条返工**：c16 part2 的图 16-45 例外条目被覆盖、两条发电机说明矛盾；已恢复并按 `cites` 统一。另 2 条 b8b 边注里的 `part-of` 字样已改为 `cites`。
+
+最终图：**2084 节点 / 1470 边 / 818 资源**；definition 225、note 713、proposition 286、problem 430、section 426、branch 4；谓词 covers 651 / depends-on 277 / uses 225 / supports 112 / cites 171 / is-a 23 / part-of 11。b8 合计 1175 / 773 / 458。
+
+已知未做（不影响交付）：4 个未登记 key、跨学科实践 12 处口径、活动 9.7 双节点、原子/电子 ID 页码、6 个定义不纯、2 张表挂在命题/说明、气泡插画重复。这些在 `audit/reaudit-b9a.md`、`reaudit-b9b.md`、`audit-4vol-graph.md` 的「未做/已知」里已逐条登记。
