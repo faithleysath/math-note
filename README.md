@@ -166,7 +166,7 @@ mindmap
 ### 导入格式
 
 当前主格式是 v9。`schemaVersion` 不是 9（v8 会先自动迁移，v7 及更早直接拒绝）、出现未知字段、结构不对或全图校验不通过，导入会被整个拒绝，现有数据不会变。
-数据库名固定为 `textbook-graph`，版本号只由 DB version 区分；旧库 `textbook-graph-v8` 原样保留，不会被读取或删除。
+数据库名固定为 `textbook-graph`，版本号只由 DB version 区分（Dexie 内部把版本号 ×10 存进 IndexedDB，DevTools 里看到 90 对应逻辑版本 9）；旧库 `textbook-graph-v8` 原样保留，不会被读取或删除。
 
 ```jsonc
 {

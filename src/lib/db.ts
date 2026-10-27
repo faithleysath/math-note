@@ -15,6 +15,7 @@ import { SCHEMA_VERSION, type AssetMeta, type BookMetaV9, type Edge, type Infere
  * 库名固定为 `textbook-graph`，不带版本号；数据格式版本由 Dexie 的 DB version 区分。
  * 当前 DB version = SCHEMA_VERSION = 9。以后数据格式升到 v10，就加 `this.version(10)`，
  * 不再改库名。旧的 `textbook-graph-v8` 库不再读取，也不做兼容迁移。
+ * 注意：Dexie 在 IndexedDB 里把版本号 ×10 存（9 → 90），DevTools 里看到 90 是正常的。
  */
 class MathNoteDB extends Dexie {
   nodes!: Table<Node, string>;
