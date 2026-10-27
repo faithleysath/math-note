@@ -122,7 +122,7 @@ export function asExpectedManifest(raw: unknown, path: string): ExpectedManifest
 export function asEntityRegistry(raw: unknown, path: string): EntityEntry[] {
   // 规约 §9 的文件形状是 `{ "entities": [...] }`，但历史调用写的都是裸数组。
   // 两种都收，避免「导出脚本写出的文件，合并器读不进去」这种自相矛盾。
-  const list: unknown = Array.isArray(raw)
+  const list: unknown[] | null = Array.isArray(raw)
     ? raw
     : typeof raw === 'object' && raw !== null && Array.isArray((raw as { entities?: unknown }).entities)
       ? (raw as { entities: unknown[] }).entities
