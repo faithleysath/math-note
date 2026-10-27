@@ -33,7 +33,7 @@
 | `module`（信息快递/读一读/方法技巧/生活物理社会/国家工程） | 承载术语定义 → `definition`；否则 `note(explanation|topic|method)` |
 | `figure` | **不建独立节点**，只产 `assets[]` 一条，`nodeId` 指向引用它的节点，figure 的 srcId 由该节点 `tags` 认领 |
 | `table` | 不建节点，srcId 由所属节点的 `tags` 认领；表内数据用 GFM 表格写进那个节点的 content |
-| `block-title`（实践与练习 / 素养进阶 等） | 建 `section(kind='topic')`，id 用该 srcId（八年级就是这么做的，照抄） |
+| `block-title`（实践与练习 / 素养进阶 等） | 建 `section(kind='topic')`，**id 用结构 ID `<父节id>-ss<两位序号>`**（如 `phy-b9b-c16-s01-ss03`），srcId 走 `tags`。用 srcId 当 id 会被判 `id-wrong-system` |
 | `exercise` | `problem(kind='exercise')`，一题一节点 |
 | `question` | `problem(kind='review')`，一题一节点 |
 | `summary` | `note(kind='summary')` + 整图存 asset |
@@ -85,8 +85,8 @@
 v9 的根是自己那一册的 `branch` 节点，**它不自动生成**，必须写进 part 的 `nodes` 里。
 八年级的做法：写进**本册第一章那个 part**（b8a 写在 c01，b8b 写在 c06）。九年级照做：
 
-- **九上**：写在 `b9a-c11-p008-022.json`（批次 A）
-- **九下**：写在 `b9b-c15-p008-022.json`（批次 I）
+- **九上**：写在 `b9a-c11-p008-022.json`（批次 A）—— **已建好**
+- **九下**：已写在 `b9b-c16-p036-053.json`（第十六章前半批）—— **已建好，后续批次不要再建**
 
 ```json
 { "id": "phy-b9a", "type": "branch", "title": "九年级上册", "content": "", "parentId": null,
