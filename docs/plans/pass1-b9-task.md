@@ -196,6 +196,15 @@ bun run check:lines    --expected local-textbook/sukey/expected/<你的清单>.j
 
 它用 PDF 文字层的每一行做探针，检查是否落在某个条目的 region 里。剩下的任何一行都是**漏块或 region 画得不够大**，必须修到 0。
 
+**九下（b9b）没有文字层，上面这条跑不了。** 用墨迹覆盖率代替：
+
+```bash
+python3 scripts/check-ink-coverage.py --expected local-textbook/sukey/expected/<你的清单>.json
+```
+
+它统计页面上有多少深色像素落在 region 里。八年级已验证良好的清单基线是 **97–99%**，低于 90% 的页基本上是真漏块。
+（章首页整版背景照已自动排除。）
+
 为什么加这一关：第一批实测里有 8 份清单，其中一份因 region 整体偏小漏了 45 行正文，而 `check:expected` 完全看不出来——它只查坐标合法性，不知道页上还有哪些字没被框住。
 
 逐像素量不准时用：`pdftotext -f <pdfPage> -l <pdfPage> -bbox <pdf> -`，每个词的 bbox 都有，除以页面的 `<page width height>` 就是归一化坐标。
