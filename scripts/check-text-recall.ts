@@ -53,9 +53,31 @@ if (pdfPath === undefined || !existsSync(pdfPath)) {
 const partsDir = resolve(arg('parts') ?? join(SUK, 'parts'));
 const threshold = Number(arg('threshold') ?? 0.85);
 
-/** 只留文字骨架：去掉空白、标点、markdown 记号 */
+/**
+ * 只留文字骨架：去掉空白、标点、markdown 记号。
+ *
+ * 公式要先还原，否则 `$R_1=15\ \Omega$` 的骨架是 `R1=15Omega`，
+ * 而 PDF 文字层是 `R1 = 15 Ω` → `R1=15Ω`，两边永远对不上
+ * （九年级电学全是 Ω / V / A，不处理会让整页判成 0% 召回）。
+ */
+const LATEX_SYMBOLS: ReadonlyArray<readonly [RegExp, string]> = [
+  [/\\Omega/g, 'Ω'],
+  [/\\omega/g, 'ω'],
+  [/\\times/g, '×'],
+  [/\\cdot/g, '·'],
+  [/\\circ/g, '°'],
+  [/\\degree/g, '°'],
+  [/\\pm/g, '±'],
+  [/\\(?:mathrm|text|mathbf|textnormal|operatorname)\s*\{([^{}]*)\}/g, '$1'],
+  [/\\(?:frac|dfrac)\s*\{([^{}]*)\}\s*\{([^{}]*)\}/g, '$1$2'],
+  [/\\[a-zA-Z]+/g, ''],
+  [/[{}^_$]/g, ''],
+];
+
 function skeleton(text: string): string {
-  return text.replace(/[^\w\u4e00-\u9fff]/g, '');
+  let out = text;
+  for (const [pattern, replacement] of LATEX_SYMBOLS) out = out.replace(pattern, replacement);
+  return out.replace(/[^\w\u4e00-\u9fff]/g, '');
 }
 
 interface PartMeta {
