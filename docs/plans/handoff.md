@@ -1,260 +1,220 @@
-# Handoff：苏科版初中物理整书转写 —— 当前状态与作业规程
+# Handoff：苏科版初中物理整书转写
 
-> 写于八年级上下册完成时。这份文档的目的是：**新会话读完它 + `transcribe-spec.md`，就能接着干九年级，不需要任何会话历史。**
-> 如果需要更早的细节（某条规则是怎么被逼出来的、某次审计说了什么），用 `vcc_recall` 捞，关键词见文末。
+> 最后更新：九年级上册 8 份 part 全部完成、校验通过之后暂停的那一刻。
+> **新会话读完这份 + `transcribe-spec.md` 就能接着干，不需要任何会话历史。**
+> 需要更早的细节用 `vcc_recall`，检索词见文末。
 
 ---
 
 ## 1. 一句话现状
 
-苏科版初中物理**八年级上、下两册（272 页正文）已全部转写**成一份 v9 图谱，并通过结构校验 + 逐页视觉复核。
-**九年级上、下两册（222 页正文）尚未开始。**
+**八年级上、下两册（272 页正文）已完整交付**（转写 + 审计 + 修复 + 逐页视觉复核 + 裁图 + 合并，`~/Downloads/苏科版物理-八上八下/`）。
+**九年级上册（109 页）转写完成，8 份 part 全部通过校验，但尚未审计、未裁图、未合并。**
+**九年级下册（113 页）只有 1 份 Pass 1 清单。**
 
 ---
 
-## 2. 交付物在哪
+## 2. 盘上有什么
 
 ```
-local-textbook/sukey/            （.gitignore，受版权，不进仓库）
-├─ raw/            4 册 PDF（343 MB，九年级两册已就位）
-├─ pages/b8a|b8b/  整页渲染 PNG（200 dpi，151 + 126 张）+ geometry.json
-├─ assets/b8a|b8b/ 裁好的插图 458 张
-├─ expected/       21 份 Pass 1 清单（1958 条源条目）
-├─ parts/          21 份 Pass 2 中间格式 + 21 份 .report.md
-├─ merged/all.json 两册合一的成品（1178 节点 / 773 边 / 458 资源）
-├─ manifest.json   四册元信息 + 目录 + 页码偏移
-├─ ocr/            八下、九下的逐页 OCR（无文字层的册子用来校对）
-├─ review/         256 个 bbox 核对图 HTML + 11 份复核结论 JSON
-├─ audit/          15 份审计报告
-├─ coverage.md     结构覆盖率 / 视觉复核 两栏
-└─ exceptions-b8a.md  例外清单（含已知限制 15 项）
-
-~/Downloads/苏科版物理-八上八下/   可直接导入的成品（all.json + 458 张图）
+local-textbook/sukey/                      （.gitignore，受版权，不进仓库）
+├─ raw/                 4 册 PDF（343 MB）
+├─ pages/b8a b8b b9a b9b/  整页渲染 PNG（200 dpi）：151 / 126 / 109 / 113 张 + geometry.json
+├─ expected/            Pass 1 清单：八年级 21 份（1958 条）+ 九年级上 8 份（792 条）+ 九下 1 份
+├─ parts/               Pass 2 中间格式：八年级 21 份（1178 节点 / 773 边 / 458 资源）
+│                                              九上  8 份（421 节点 / 268 边 / 178 资源）
+├─ merged/all.json      八年级成品的合并结果
+├─ entities.json        跨册实体注册表（108 条，八年级定义节点导出）
+├─ ocr/                 八下 138 份、九下 122 份逐页 OCR（无文字层的册子校对用）
+├─ review/              bbox 核对图（HTML，按册/章分目录）
+├─ audit/               八年级 15 份审计报告 + scan-parts.md（机械候选清单）
+└─ coverage.md          结构覆盖率 / 视觉复核 两栏（由脚本生成，不要手改）
 ```
 
-**成品验证**（三条都该过）：
+**工程脚本**（都在仓库里、已提交）：见 §7 的表。
+
+---
+
+## 3. 一键看状态
 
 ```bash
-bun run scripts/check-examples.ts                    # 5 个内置样例
-bun run scripts/merge-book-parts.ts --parts local-textbook/sukey/parts-only \
-  --book local-textbook/sukey/book.json \
-  --out /tmp/x.json --page-offset 7                   # 应输出 1178 节点 / 773 边 / warnings 0
-bun run check:consistent                            # 21 份清单 · 1958 条 · 0 错 0 警
+cd /Users/laysath/Projects/math-note
+
+# 清单质量
+bun run check:expected local-textbook/sukey/expected/<清单>.json     # 坐标合法性 / 重叠 / 暂停
+bun run check:lines    --expected local-textbook/sukey/expected/<清单>.json   # 正文行有没有漏框（有文字层的册子）
+bun run check:ink      --expected local-textbook/sukey/expected/<清单>.json   # 无文字层用这个
+
+# 产物质量
+bun run check:part local-textbook/sukey/parts/<part>.json --expected local-textbook/sukey/expected/<part>.json
+
+# 批量看九上八份现状
+for f in local-textbook/sukey/parts/b9a-*.json; do
+  n=$(basename $f .json); printf "%-24s " $n
+  bun run check:part "$f" --expected "local-textbook/sukey/expected/$n.json" 2>&1 | tail -1
+done
 ```
 
+当前预期：**八份全部「错误 0 → 通过」，覆盖率 100%**。告警只有两三类：`asset-pipeline-pending`（等裁图回填）、`external-endpoint`（跨 part 端点，合并时才硬校验）、个别 `depends-on-same-subsection`（已逐条在 report 里说明理由）。
+
 ---
 
-## 3. 流水线（按顺序，都有 `bun run` 别名）
+## 4. 流水线
 
-| 步 | 命令 | 作用 | 幂等 |
+| 步 | 命令 / 谁做 | 作用 | 幂等 |
 |---|---|---|---|
-| 1 | `render:pages --volume b8b --from 8 --to 133` | PDF → 整页 PNG + geometry.json | 会跳过已存在 |
-| 2 | （子代理）Pass 1 | 逐页看图，产清单：`expected/<册>-<章>-p<起>-<止>.json` | — |
-| 3 | `check:expected <清单>` | 单清单 18 条规则 | — |
-| 4 | `draw:boxes --expected <清单>` | bbox 叠回页图，生成核对 HTML | 覆盖 |
-| 5 | （子代理）Pass 2 | 清单 → `parts/<同名>.json` | — |
+| 1 | `render:pages --volume b9b --from 8 --to 120` | PDF → 整页 PNG + geometry.json | 跳过已存在 |
+| 2 | **子代理** Pass 1 | 逐页看图产清单 | — |
+| 3 | `check:expected` + `check:lines`/`check:ink` | 清单两道关 | — |
+| 4 | `draw:boxes --expected <清单>` | bbox 叠回页图，出核对 HTML | 覆盖 |
+| 5 | **子代理** Pass 2 | 清单 → part | — |
 | 6 | `check:part <part> --expected <清单>` | 结构/覆盖率/资源闭合/依赖质量 | — |
-| 7 | `apply:captions` | 按清单的 `captionOnImage` 把 caption 搬进 alt | 幂等 |
+| 7 | `apply:captions` | 按 `captionOnImage` 把图注搬进 alt | 幂等 |
 | 8 | `crop:figures --parts local-textbook/sukey/parts` | 按 region 裁图 + 回填 sha256/宽高 | 幂等（`--force` 重裁） |
-| 9 | `merge:parts --parts <目录> --book book.json --out merged/all.json --page-offset 7` | 合并成 v9 | — |
-| 10 | `report:coverage --parts <目录> --expected <目录>` | 两栏报告 | — |
+| 9 | `merge:parts --parts <目录> --book book.json --entities entities.json --out merged/all.json --page-offset 7` | 合并成 v9 | — |
+| 10 | `report:coverage --parts <目录> --expected <目录>` | 两栏覆盖报告 | — |
 | 11 | `check:consistent` | 跨批一致性（8 条规则） | — |
 
+**册分支节点不自动生成**：`phy-<册>` 必须写进**该册第一个 part**（b8a 在 c01、b8b 在 c06、b9a 在 c11 前半、b9b 在 c15 前半）。漏了整册会变成孤儿。
+
 ---
 
-## 4. 作业规程（每条都是踩出来的，违反过就会出事）
+## 5. 作业规程
 
-### 4.1 枚举与转写
+### 5.1 枚举与转写
 
-1. **同章两批必须串行**：先落盘前半 part，再启后半。
-   否则后写的代理看不到先写的节点 ID，**跨 part 边会系统性缺失**（八下 c02b 就这样漏了 5 道题的 covers）。
-   跨章可以并行。
-2. **清单一旦被 Pass 2 消费就不能改条目数**。增删拆条都会让覆盖率对不上。
-   确需改，必须连 part 一起改（八上 c05 拆 headline 时踩过）。
-3. **清单 `region` 与 part `region` 必须一致**。二者不同步过一次（第一章 30 张），
-   后果是**书对、清单坏**——谁按清单重裁就退回带图注的版本。
-   同步清单前先确认 part 是"已逐张看过"的那一侧。
-4. **改 region 后必须重跑 `check:expected`**：`overlaps` 声明会因为框缩小而失效
-   （`overlaps-phantom` / `overlaps-asymmetric` / `overlap-undeclared` 三连）。
-5. **figure 的 region 不含印刷图注行，但必须含 `(a)(b)(c)` 标号行**。
+1. **同章两批 Pass 2 必须串行**：先落盘前半 part，再启后半，否则后写的看不到先写的节点 ID，跨 part 边会系统性缺失。跨章可以并行。
+2. **清单一旦被 Pass 2 消费就不能改条目数**。确需改，必须连 part 一起改。
+3. **清单 `region` 与 part `region` 必须一致**。Pass 2 把 figure 的 region 原样复制进 `assets[]`；
+   清单事后被重测，必须让**同一个 Pass 2 代理**做一次同步（按「同页第 N 张图」配对），否则裁出来的图全是旧框。
+4. **改 region 后必须重跑 `check:expected`**：框长大/缩小会让 `overlaps` 声明失效
+   （`overlaps-phantom` / `overlap-undeclared` / `overlaps-is-containment`）。
+5. **`figure` 的 region 不含印刷图注行，但必须含 `(a)(b)(c)` 标号行**。
    一个图注管多大范围就是一条 figure；外接框会盖到第三方内容时才拆成两条。
-6. **图注印在画面上、裁不掉的**（满版出血照、图注压在照片上）→ 清单标 `captionOnImage: true`，
-   Pass 2 不写 caption、图注文字放 alt。**标记要打在 figure 条目上**，打错到 heading 会被 `captionOnImage-misuse` 抓。
-7. **无文字层的册子**（八下、九下）：用 `ocr/<册>/` 交叉校对虚词和数字，**以页图为准**；
-   图注行/子图标号位置只能像素测量，`pdftotext -bbox` 用不上。
+6. **图注印在画面上、裁不掉的** → 清单标 `captionOnImage: true`，Pass 2 不写 caption、图注文字放 alt。
+   **标记要打在 figure 条目上**。
+7. **region 不要目测**。有文字层的册子用 `pdftotext -bbox`（除以 `<page width height>` 即归一化坐标）；
+   没文字层的用 `page:bands`。目测的后果实测过：整批 region 偏短 1–3 行，45 行正文落在框外，
+   而 `check:expected` 完全看不出来。
 
-### 4.2 修复（最危险的一步）
+### 5.2 修复（最危险的一步）
 
-8. **先改指，改不了再删**。
-   八上直接删了 66 条假边 → 137 个节点变孤儿 → 事后补 41 条。
-   如果依据成立、只是端点选错，**换端点**。改指时优先"把断言拆成独立命题再指过去"（八上「光能」就是这么救回来的）。
+8. **先改指，改不了再删**。八年级直接删了 66 条假边 → 137 个节点变孤儿 → 事后补 41 条。
 9. **修复完必须报孤立节点变化**（改前/改后、新增的逐个说明）。
-10. **修复本身要复审**。八下修了 40 多处，复审抽 20 处发现 **5 处没修好（25% 错误率）**，
-    其中一处是"伪定义换了个形态还没解决"。修复代理和复审代理必须是不同的实例。
-11. **正文里不许出现元话语**。"图中层级已结构化：…"「mindmap 只能挂在…」这类说明是给人看的，
-    模型会当成教材正文抄进去。要写就写进 `tags` 或 `.report.md`。
+10. **修复本身要复审**，且复审必须与修复是**不同实例**。八下实测修复错误率 **25%**。
+11. **正文里不许出现元话语**。「图中层级已结构化：…」这类说明会被当成教材正文。
 
-### 4.3 校验与复核
+### 5.3 校验与复核
 
-12. **结构覆盖率 100% 不代表没问题**。分母是清单，清单漏一页、框画小一圈，覆盖率照样 100%。
-13. **视觉复核必须逐页**，而且要给它**三个输入**：页图 + 清单 + `merged/all.json`。
-    只给前两个会误报（第四五章把 `extraRegions` 覆盖的页判成"整页漏块"）。
-14. **审查类任务的报告要记 `from → predicate → to`，不要只记边 id**。
-    边 id 每次合并都会重排，审计报告里的 id 在修复后就失效了。
-15. **审计抽样的判据要可复述**。例如判"题目有没有知识落点"：
-    题干含「用…知识解释/说明/计算」→ 必须有 `covers`；只有「参观/查阅/写/调查/建议/反思」→ 该孤立。
+12. **结构覆盖率 100% 不代表没问题**。分母是清单，清单漏页、框画小，覆盖率照样 100%。
+    `check:lines`（有文字层）/ `check:ink`（无）就是补这个缺口的。
+13. **视觉复核必须逐页**，且必须给**三个输入**：页图 + 清单 + `merged/all.json`。只给前两个会误报。
+14. **审查类报告要记 `from → predicate → to`，不要只记边 id**。边 id 每次合并都会重排。
+15. **抽样判据要可复述**（「N 个节点里等距取 floor(i·N/k)」），不许写「抽查了若干」。
 
-### 4.4 工具与环境
+### 5.4 子代理与环境
 
-16. **ego-browser 用一个 space 名复用**：`taskSpace("math-note 教材图谱验收")`。
-    每换一个名字就新建一个空间（这次开了几十个）。用完 `task.listTaskSpaces()` 清理。
-17. **不要用"包含某文字"去点按钮**。这次误点过目录行的删除键，弹出了"级联删除整棵树"的确认框。
-    用 `[aria-label]`、`[data-*]` 之类的精确选择器。
-18. **`local-textbook/` 在 .gitignore 里**，`git status` 干净是正常的；代码和文档才进仓库。
+16. **并发上限 3 个**。超了会出现整批请求同时超时的现象，返工比排队慢。队列见 `b9-queue.md`。
+17. **网络超时 / 连接错误 → 原样发「继续」，不换模型**。实测 deepseek-flash 偶发超时，续上即可。
+18. **不要让代理「像素级对齐」**。给它 `page:bands` 的条带表和页图，±0.005 就收工，剩下交给核对图那一轮。
+19. **`use` 之类的校验器硬约束会打回设计**：`uses` 的起点不能是 `proposition`（实测），
+    `note` 下只能挂 `note`，`branch` 下不能直接挂命题。
+20. **`local-textbook/` 在 .gitignore 里**，`git status` 干净是正常的。
 
 ---
 
-## 5. 否决清单（不要重新发明）
+## 6. 否决清单（不要重新发明）
 
 | 已否决 | 原因 |
 |---|---|
-| `implies` / `iff` / `proves` / `generalizes` / `refutes` | 初中物理没有可机器判定的形式推理，用了只会造假 |
-| 把栏目框（信息快递/读一读/生活物理社会）整块做成 `definition` | 栏目是容器，不是术语；正确做法是「栏目 `note` + 里面定义句单独 `definition`」 |
-| 把断言留在 `note` 里 | §4.1 优先于 §4.0：可判真假的结论必须立 `proposition`，否则没有端点挂 supports/covers |
-| 为消除孤立而硬连 | 零条边好过错一条边。纯实践调查题、栏目容器、编者按本来就该孤立 |
+| `implies` / `iff` / `proves` / `generalizes` / `refutes` | 初中物理没有可机器判定的形式推理 |
+| 把栏目框整块做成 `definition` | 栏目是容器；正确做法是「栏目 note + 里面定义句单独 definition」 |
+| 把断言留在 `note` 里 | 可判真假的结论必须立 `proposition`，否则没有端点挂 supports/covers |
+| 为消除孤立而硬连 | 零条边好过错一条边 |
 | 用固定像素窗口测 region | 会截断右边界（第九章整章这么错过） |
-| 按清单重裁图 | 先核 part 的 region 是否已同步 |
-| 让审查代理"顺手修一下" | 审计只读，修复另派，否则分不清谁改了什么 |
+| 给 figure 加**同页** `extraRegions` 去「声明覆盖」图注行 | `extraRegions` 语义是跨页续接区；这么干只是骗过检查器 |
+| 并排图按 `region.y` 排序配对 | 两图 y 差 0.0037 就互换；**按页内 srcId 顺序配对**，配完裁图核对 |
+| 让审查代理「顺手修一下」 | 审计只读，修复另派，否则分不清谁改了什么 |
 
 ---
 
-## 6. 已知限制（不打算修，别当 bug 报）
+## 7. 这轮新增的工程工具
 
-1. 栏目框整框一条，框内正文没有独立条目 → 核对图上像"整段无框"
-2. `extraRegions` 不被 `draw-expected-boxes` 绘制 → 跨页续接区在核对图上看不见
-3. 双栏例题的「分析/解答/反思」框只覆盖左栏（约 6 处）→ 只影响核对图，正文完整
-4. 章首页的节目录导航列表在框内但不单独登记（按目录处理）
-5. 思维导图的四类结构 mindmap 表达不了：多父汇流 / 双中心 / 有环 / 无落点 → 记在节点 `tags` 的 `mindmap:*` 里
-6. 12 道题零 `covers`（已逐题判定为纯实践题）
-7. 图 4-38 是跨书脊拼接图，`manual: true`，裁图脚本会跳过它
+| 命令 | 作用 | 基线 |
+|---|---|---|
+| `check:lines` | 用 PDF 文字层**每一行**做探针，查 region 漏没漏正文 | 八年级 0–3 行（全是图注残留） |
+| `check:ink` | 只统计**文字墨迹**（形态学开运算减掉照片），给无文字层册子兜底 | 八上 86–90% / 九上 94% |
+| `page:bands` | 页面墨迹条带 → 每块归一化矩形，代替 `pdftotext -bbox` | — |
+| `scan:parts` | 把「判断类」要求变机械候选：断言引导词 / 伪定义 / 公式散落 / 元话语 | 八年级 21 份扫出 82 条 |
+| `check:recall` | 句级召回，拿 PDF 原文反查图谱完整度 | 八上 91.0%（未命中多为双栏并行的产物） |
+| `export:entities` | 从 `all.json` 导出跨册实体注册表 | 108 条 |
 
----
-
-## 7. 本机环境
-
-```
-bun 1.4 / node 26 · vitest · vite 8
-pdftoppm / pdfimages（poppler）· python3 + PIL 13 · sips
-ego-browser（ego lite，单 space 复用）
-仓库：/Users/laysath/Projects/math-note（package name: textbook-graph）
-dev server: bun run dev → localhost:5173
-```
+**为什么加这些**：八年级审计的结论是「写成『必须/禁止』的规则执行准确率接近满分，
+写成『应该这样判断』的地方只有一半」。所以能机械识别的绝不靠代理人肉判断。
 
 ---
 
-## 8. 九年级怎么开工
+## 8. 恢复顺序
 
-**前提**：先读 `docs/plans/transcribe-spec.md`（567 行，全部规则 + 每个规则背后的真实页面案例）。
+**先读三个文件**：`b9-status.md`（暂停快照 + 逐批数字）、`b9-queue.md`（13 条队列，带解锁关系）、`b9-issues.md`（问题单）。
 
-### 8.1 两册的实际结构（已从 manifest 核过，不用再查）
+### 第一批（并发 3）
 
-```
-pageOffset 全四册一致：pdfPage = printedPage + 7（正文 pdf 8 起；附录之后是后记/封底，无页码）
-章号全书连续：八上 1–5、八下 6–10、九上 11–14、九下 15–18
-```
+1. **章审计 ×3**：十一、十二、十三章（十四章随后）
+   - 任务书 `audit-b9-task.md` §A，输入是两份 part + 清单 + **逐页页图**，只读
+   - 先读 `bun run scan:parts` 的候选，逐条去页图核实
+   - 输出 `audit/b9a-c<章号>.md`，缺陷必须写位置 → 问题 → 页图证据
+2. **Pass 1 K**（`b9b-c16-p036-053`）：清单已有，只差 p0042 三处框
+   - 第 2 题 region 短一行；第 4 题的框是 y≈0.444 的空条带（题干在 0.4849）；图 16-13 的 region 盖住题干却没盖住图片（图片在 0.65–0.84，标号行 0.8301，图注行 0.8530）
 
-| 册 | 章 | 章名 | 印刷页 | PDF 页 | 页数 | 节 | 建议批数 |
-|---|---|---|---|---|---|---|---|
-| 九上 | 11 | 简单机械和功 | 1–28 | 8–35 | 28 | 5+跨学科 | 2 |
-| 九上 | 12 | 机械能和内能 | 29–54 | 36–61 | 26 | 4 | 2 |
-| 九上 | 13 | 简单电路 | 55–82 | 62–89 | 28 | 5+跨学科 | 2 |
-| 九上 | 14 | 欧姆定律 | 83–106 | 90–113 | 24 | 4+跨学科 | 2 |
-| 九上 | 附 | 常用物理量+中英文索引 | 107–109 | 114–116 | 3 | — | **不转** |
-| 九下 | 15 | 电功和电热 | 1–28 | 8–35 | 28 | 4+跨学科 | 2 |
-| 九下 | 16 | 电和磁 | 29–62 | 36–69 | 34 | 4+跨学科 | 2 |
-| 九下 | 17 | 电磁波与现代通信 | 63–84 | 70–91 | 22 | 3 | 1 |
-| 九下 | 18 | 能源与可持续发展 | 85–110 | 92–117 | 26 | 4+跨学科 | 2 |
-| 九下 | 附 | 常用物理量+中英文索引 | 111–113 | 118–120 | 3 | — | **不转** |
+### 之后
 
-合计 **15 批 Pass 1 + 15 批 Pass 2**，正文 222 页。
-
-**附录不转写**：与八上八下同一处理，已在 `exceptions-b8a.md` 头部记过理由（工具性参考页，非教学内容）。
-但 `manifest.json` 的 toc 里它是个 chapter，合并时**不要**给它建 branch，否则会出现空章节点。
-
-### 8.2 开工前必须先补的一件事：`entities.json` 不存在
-
-规约 §9 要求批次开跑前查跨册实体注册表，`merge:parts` 也有 `--entities` 参数——
-**但八上八下从来没传过，`local-textbook/sukey/entities.json` 不存在。**
-
-后果已经能量到：八下 parts 里指向八上节点的边只有 **4 条**（而八下第七章「力」到处在用八上第五章的「速度」）。
-八年级还能靠“子代理读过前一份 part”蒙混，**九年级会直接崩**：九下第十五章「电功和电热」整章建立在九上的电压/电流/电阻上，
-没有注册表就会在九下重量产一批重复概念节点。
-
-开工前做这两件事：
-
-1. **导出初始注册表**：从 `merged/all.json` 取全部 `type=definition` 且有 `key` 的节点，
-   写成 `entities.json`（`{id, key, title, aliases, firstSeen}`）。这是机械导出，不用重新判断。
-2. 之后**每次合并都传 `--entities local-textbook/sukey/entities.json`**，让它自己长。
-
-### 8.3 九上 → 九下 必须串行
-
-规约 §9：“册与册之间的合并**串行**（b8a → b8b → b9a → b9b）”。
-具体到九年级就是：
-
-- 九上 4 章全部 Pass 2 完成、合并进 `all.json` 之后，**才能开九下的 Pass 2**
-- 九下的 Pass 1（枚举）可以提前并行跑，因为它不建边
-
-如果九下 Pass 2 里出现指向 `phy-b9a-*` 的边但九上还没合并，
-`check:part` 会把它降级成 `external-endpoint` 警告——**这不是错误，合并时才是硬校验**。
-
-### 8.4 步骤
-
-1. `render:pages --volume b9a --from 8 --to 116`（再 `--volume b9b --from 8 --to 120`）
-2. 每册 7–8 批 Pass 1（按章切，章 22–34 页，每批 11–17 页），**跨章可并行**
-3. `check:expected` + `draw:boxes` 逐批过
-4. Pass 2 按章派，**同章两批串行**
-5. 四章审计 + 关系审计（这次要专门看 `InferenceStep`：九上电学是全书唯一有"多前提共同推出结论"的地方，八上八下 0 条是因为内容里确实没有）
-6. 修复 → **修复后复审**（换实例）
-7. 视觉复核逐页（三个输入：页图 + 清单 + merged）
-8. 合并 → 界面验证 → 更新 coverage / exceptions → 提交
-
-**九年级的预期新问题**
-
-- **电路图**：全书图形密度最高。元件符号密集、引线细，region 要按整体电路图框，
-  不能框到单个元件；`(a)(b)` 子图、电路图旁边的“图 13-5”标注行都需像素测量
-- **公式推导**：九上 14.3 欧姆定律、九下 15.3 焦耳定律是 `InferenceStep` 的首次真实素材。
-  要先把前提建成 `proposition`，再建超边；**前提必须是可判真假的断言**，不能是短语
-- **串并联**：13.5“串、并联电路的特点”是 `is-a` / `part-of` 的密集处，也容易出现一命题挂十几条 `covers` 的星形
-- **单位与量纲**：新出现 `\text{A}`、`\text{V}`、`\Omega`、`\text{kW·h}`，`\Omega` 写法要与已有节点统一
-- **图片量的估计**：这两册图密度高于八上八下，total 条目可能到 1500–1800，子代理单批负载要控制
-- **无文字层**：九上**有**文字层，九下**没有**（用 `ocr/九下/` 逐页校对）；九上可直接 `pdftotext -bbox` 量位置
+- 九下 Pass 1 剩 7 批（I / J / L / M / N / O / P），每批 ~15 页
+- 九下 Pass 2：只挂**已裁剪好 region 的** part（九下没有文字层 + 十四页以后的区域，务必用 `page:bands` 当标尺），同章两批串行
+- 九上 audits 完成后 → 修复 → 复审（换实例）→ 视觉复核逐页
+- 全部 part 齐 → **跨章补边**（见 §9 第 1 条）→ 裁图 → 合并 → 界面验证 → 更新 coverage/exceptions → 提交 → 交付到 `~/Downloads/`
 
 ---
 
-## 9. 词汇表
+## 9. 欠账（不做完不算完成）
+
+1. **跨章 / 跨册补边**。九上各批落盘时别的批还没写，拿不到对方节点 ID，所以委托给后续批次补。
+   实测九上目前**几乎没有**「十三 章电流电压 → 十四 章欧姆定律 → 十五 章电功」这条链上的边。
+   全部 part 齐后单跑一轮，用**合并后的** `all.json` 查真实 ID。
+2. **region 同步**。c12、c14 已做完（分别 22 条、20 条 asset）。九下每批若清单事后重测，同样要做。
+3. **`entities.json` 只含八年级 108 条**。九上各批报告里列了新建的核心概念（约 60 个 key），
+   合并时要用 `merge:parts --entities entities.json` 让它自己长。
+4. **视觉复核一页都还没做**（九上）。八年级是逐页三个输入过的。
+5. **附录不转写**（九上 107–109 / 九下 111–113：单位表 + 索引）。`manifest.json` 的 toc 里它是 chapter，
+   合并时**不要**给它建 branch。
+
+---
+
+## 10. 词汇表
 
 | 词 | 意思 |
 |---|---|
 | **清单 / expected** | Pass 1 产物，覆盖率的分母：一条 srcId 对应版面上一块 |
-| **srcId** | 源条目 ID，形如 `phy-b8a-p045-02`（册 + 印刷页码 + 页内序） |
+| **srcId** | `phy-b9a-p045-02`（册 + 印刷页码 + 页内序） |
 | **part** | Pass 2 产物，分章中间格式（无 order/时间戳/边 id，由合并器补） |
-| **node id** | 图谱节点 ID：结构节点用 `phy-b8a-c01-s02`，内容节点也用页码派生 `phy-b8a-p045-02` |
 | **`@1`/`@2`** | 同一源条目拆成多个节点时的后缀 |
 | **`captionOnImage`** | 图注印在画面上、裁不掉 → 不写 caption，图注放 alt |
+| **`extraRegions`** | **跨页续接区**，不是「再框一块」的通用字段 |
 | **`manual: true`** | 手工装配的 asset（跨页拼接），裁图脚本跳过 |
 | **fully-reviewed** | 该章每一页都人工看过核对图（不是抽样） |
-| **结构覆盖率** | 已映射 srcId / 清单条目数；与"视觉复核"是两个独立指标 |
+| `assets 数` | = 清单里 `figure` 条数 + `summary` 条数（思维导图也存 asset） |
 
 ---
 
-## 10. 需要 deeper context 时，用 vcc_recall 捞这些词
+## 11. 需要更深上下文时，用 vcc_recall 捞
 
 ```
-"transcribe-spec 第几版"      规则是怎么一版版改出来的
-"图 7-28" / "图 1-11"         拆与并的判据出自哪两个真实页面
-"孤儿" / "137"                八上删边事故
-"元话语"                      说明性指令被当成教材正文
-"covers 星形"                 同一命题挂 7 条 covers
-"captionOnImage"              图注重复显示的两轮排查
-"region 不一致"               清单与 part 不同步
+"45 行"             C 那份清单整批 region 偏短的事故
+"extraRegions"      F 用同页 extraRegions 骗检查器、被撤回
+"并排图" / "12-15"  按 y 排会互换，改按 srcId
+"557 / 554 / 超时"   网络抖动，一律原样继续不换模型
+"图 7-28" / "图 1-11"  拆与并的判据出自哪两个真实页面
+"孤儿" / "137"      八上删边事故
+"元话语"            说明性指令被当成教材正文
+"invalid-endpoint-type"  uses 起点不能是 proposition
 ```
