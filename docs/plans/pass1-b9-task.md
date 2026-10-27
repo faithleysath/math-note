@@ -184,9 +184,21 @@ region 按**整张电路图**框（含电源、开关、元件符号与引线）
 ```bash
 cd /Users/laysath/Projects/math-note
 bun run check:expected local-textbook/sukey/expected/<你的清单>.json
+bun run check:lines    --expected local-textbook/sukey/expected/<你的清单>.json
 ```
 
-必须 **0 错误**。告警逐条看：能改就改，改不了在汇报里说明原因。
+**`check:expected` 必须 0 错误。告警逐条看**：能改就改，改不了在汇报里说明原因。
+
+**`check:lines` 必须只剩两类未覆盖**：
+
+1. 图注行（含「图」+ 编号，倒序写法也算）
+2. 章首页的栏目导航列表
+
+它用 PDF 文字层的每一行做探针，检查是否落在某个条目的 region 里。剩下的任何一行都是**漏块或 region 画得不够大**，必须修到 0。
+
+为什么加这一关：第一批实测里有 8 份清单，其中一份因 region 整体偏小漏了 45 行正文，而 `check:expected` 完全看不出来——它只查坐标合法性，不知道页上还有哪些字没被框住。
+
+逐像素量不准时用：`pdftotext -f <pdfPage> -l <pdfPage> -bbox <pdf> -`，每个词的 bbox 都有，除以页面的 `<page width height>` 就是归一化坐标。
 
 然后生成核对图，肉眼扫一遍有没有明显漏块：
 
