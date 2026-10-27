@@ -123,7 +123,11 @@ function linesOf(words: Word[]): Word[][] {
     if (last !== undefined) {
       const ref = last[0];
       const mid = (w.y0 + w.y1) / 2;
-      if (ref !== undefined && Math.abs((ref.y0 + ref.y1) / 2 - mid) < 4 && w.x0 - (last[last.length - 1]?.x1 ?? 0) < 40) {
+      const lastX1 = last[last.length - 1]?.x1 ?? 0;
+      // 只并「右侧且贴得住」的词：y0 排序会把同一排里偏左上方的词排到前面，
+      // 若不加方向判断，图注序号（13-39）会被并进左边另一栏的正文行（见 b9a p0084）。
+      const gap = w.x0 - lastX1;
+      if (ref !== undefined && Math.abs((ref.y0 + ref.y1) / 2 - mid) < 4 && gap > -2 && gap < 40) {
         last.push(w);
         continue;
       }
