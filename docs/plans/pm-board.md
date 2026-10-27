@@ -64,3 +64,10 @@
 ## 已知不阻断项（补充）
 
 - 4 个未登记 key（晶体/熔点/运动的相对性/物重）、跨学科实践 12 处口径、`活动 9.7` 双节点、原子/电子 ID 页码、6 个定义不纯、2 张表挂在命题/说明、气泡插画重复。
+
+## 交换包 `.tbg`（2026-10-28）
+
+- 规范 `docs/EXCHANGE-FORMAT.md`；ZIP = manifest + graph.json + assets + 可选 documents。
+- 应用导出直接出 `.tbg`；导入兼容 `.tbg` / 旧 `.json`；逐张校验 sha256，失败整包拒绝。
+- CLI `bun run pack:exchange`；已产出全四册 153.8 MiB、八上八下 96.3 MiB。
+- 线上 `pi.laysath.cn` 实测 `.tbg` 导入 3.1 s、818/818 图命中。

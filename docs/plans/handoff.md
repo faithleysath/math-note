@@ -354,3 +354,18 @@ bun run report:coverage --parts local-textbook/sukey/parts --expected local-text
 最终图：**2084 节点 / 1470 边 / 818 资源**；definition 225、note 713、proposition 286、problem 430、section 426、branch 4；谓词 covers 651 / depends-on 277 / uses 225 / supports 112 / cites 171 / is-a 23 / part-of 11。b8 合计 1175 / 773 / 458。
 
 已知未做（不影响交付）：4 个未登记 key、跨学科实践 12 处口径、活动 9.7 双节点、原子/电子 ID 页码、6 个定义不纯、2 张表挂在命题/说明、气泡插画重复。这些在 `audit/reaudit-b9a.md`、`reaudit-b9b.md`、`audit-4vol-graph.md` 的「未做/已知」里已逐条登记。
+
+### 13.8 交换数据格式 `.tbg`（2026-10-28）
+
+为「一个文件搞定图 + 图片」，新增教材交换包 `.tbg`（ZIP，MIME `application/x-textbook-graph`）。
+
+- 规范：`docs/EXCHANGE-FORMAT.md`（v1）
+- 结构：`manifest.json` + `graph.json`（v9）+ `assets/...`（graph.assets[].path 指向的原图）+ 可选 `documents/...`
+- 版本：容器 `formatVersion=1`，数据 `schemaVersion=9`；两者独立演进
+- 完整性：导入逐张校验路径、字节数、sha256；任何一张不对整包拒绝，现有数据不动
+- 应用：导出按钮直接生成 `.tbg`；导入支持 `.tbg` 和旧版 `.json`（JSON 只有数据，图片另载）
+- CLI：`bun run pack:exchange --graph ... --root ... --out ... [--doc ...]`
+- 已生成：
+  - `~/Downloads/苏科版物理-全四册.tbg`：2084 节点 / 1470 边 / 818 图 / 4 份文档，153.8 MiB
+  - `~/Downloads/苏科版物理-八上八下.tbg`：1175 / 773 / 458 / 2 份文档，96.3 MiB
+- 实测（本地 + 线上 `pi.laysath.cn`）：`.tbg` 导入约 3.1 s，818/818 资源落库，图片正常渲染
