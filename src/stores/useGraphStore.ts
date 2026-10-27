@@ -24,6 +24,7 @@ import {
   type Node,
 } from '../lib/schema';
 import { parseGraph, serializeGraph } from '../lib/serialize';
+import { buildExchangePackage, toArrayBuffer, type ExchangeAsset } from '../lib/exchange';
 import {
   ValidationError,
   validateBook,
@@ -106,7 +107,9 @@ interface GraphState {
   deleteStep: (id: string) => Promise<void>;
 
   exportGraph: () => GraphJSONV9;
-  importGraph: (json: unknown) => Promise<void>;
+  /** 把当前图和已载入的图片打成 .tbg 交换包；有资源缺二进制时报错。 */
+  exportExchangePackage: () => Promise<Uint8Array>;
+  importGraph: (json: unknown, options?: { assets?: ExchangeAsset[] }) => Promise<void>;
   loadAssetFiles: (files: File[]) => Promise<AssetLoadResult>;
   clearAll: () => Promise<void>;
 }
@@ -664,15 +667,43 @@ export const useGraphStore = create<GraphState>()((set, get) => {
       );
     },
 
-    importGraph: async (json) => {
+    exportExchangePackage: async () => {
+      const graph = get().exportGraph();
+      const records = await db.assetsWithBinary();
+      const blobs = new Map(records.map((record) => [record.id, record.data]));
+      const assets: ExchangeAsset[] = [];
+      for (const meta of graph.assets) {
+        const blob = blobs.get(meta.id);
+        if (!blob) {
+          throw new ValidationError('assets', `资源 ${meta.id} 还没有载入图片，无法导出完整交换包。`);
+        }
+        assets.push({ meta, bytes: new Uint8Array(await blob.arrayBuffer()) });
+      }
+      return buildExchangePackage(graph, assets);
+    },
+
+    importGraph: async (json, options) => {
       const parsed = parseGraph(json);
-      // 二进制在 JSON 里不存在，这里只落元信息；用户之后用 loadAssetFiles 补图
+      let assetRecords: (AssetMeta & { data?: Blob })[] = parsed.assets;
+      if (options?.assets) {
+        const byId = new Map(options.assets.map((asset) => [asset.meta.id, asset.bytes]));
+        const extra = [...byId.keys()].filter((id) => !parsed.assets.some((meta) => meta.id === id));
+        if (extra.length > 0) {
+          throw new ValidationError('assets', `交换包包含图里没有的资源：${extra.slice(0, 5).join(', ')}`);
+        }
+        assetRecords = parsed.assets.map((meta) => {
+          const bytes = byId.get(meta.id);
+          if (!bytes) throw new ValidationError('assets', `交换包缺少资源 ${meta.id}。`);
+          return { ...meta, data: new Blob([toArrayBuffer(bytes)], { type: meta.mimeType }) };
+        });
+      }
+      // 纯 JSON 里没有二进制，这里只落元信息；交换包则连同图片一起落库
       await db.replaceAll({
         book: parsed.book,
         nodes: parsed.nodes,
         edges: parsed.edges,
         steps: parsed.steps,
-        assets: parsed.assets,
+        assets: assetRecords,
       });
       assetMetas = parsed.assets;
       const missingAssetIds = await refreshAssetUrls(parsed.assets);

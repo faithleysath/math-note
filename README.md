@@ -8,9 +8,9 @@
 
 ## 一教材一知识库
 
-- 每本教材 = 一份独立的 JSON / 一套独立的节点、关系、推理步骤。不同教材之间没有共享节点、统一知识 ID 或自动去重。
+- 每本教材 = 一份独立的 JSON（或含图片的 `.tbg` 交换包）/ 一套独立的节点、关系、推理步骤。不同教材之间没有共享节点、统一知识 ID 或自动去重。
 - `id` 和 `key` 只在**当前知识库内部**唯一；两本教材各有一个 `pythagorean-theorem` 完全合法。
-- 软件一个数据库只保存一个活动知识库，导入或新建即整库替换；切换教材靠导入各自的 JSON。
+- 软件一个数据库只保存一个活动知识库，导入或新建即整库替换；切换教材靠导入各自的 JSON / `.tbg`。
 - 所有搜索、编号、校验都只在当前活动知识库内进行。
 
 ## 教材元信息（v8）
@@ -158,14 +158,14 @@ mindmap
 ## 数据
 
 - 全部存在浏览器 IndexedDB（数据库 `textbook-graph`，**DB version 与数据格式版本对齐，当前 9**），不联网、不登录。旧库 `textbook-graph-v8` 不再读取，也不做兼容迁移。
-- 「导出」下载 v9 JSON，「导入」整份替换（二次确认，失败不改动原数据）；v8 备份会自动迁移到 v9，v7 及更早拒绝。
+- 「导出」下载 `.tbg` 交换包（v9 图 + 所有图片）；「导入」支持 `.tbg` 和旧版 `.json`，整份替换（二次确认，失败不改动原数据）。v8 JSON 会自动迁移到 v9，v7 及更早拒绝。
 - 新建教材时选择学科、学段、名称和可选版本说明；点教材卡片上的铅笔可随时修改这些信息，学科/学段变更会立即切换分类推荐与编号策略。
 - 还没有教材时不能添加分支或节点，避免录入一份无法导出为合法 v9 的无主数据。
 - `book + nodes + edges + steps` 在同一个事务里替换；新建教材会覆盖当前活动库，修改教材信息只动 `book`（必要时同步默认根分支名）。
 
 ### 导入格式
 
-当前主格式是 v9。`schemaVersion` 不是 9（v8 会先自动迁移，v7 及更早直接拒绝）、出现未知字段、结构不对或全图校验不通过，导入会被整个拒绝，现有数据不会变。
+当前主格式是 v9。`.tbg` 交换包 = ZIP（`manifest.json` + `graph.json` + `assets/` 图片），导入时逐张校验大小与 sha256，任何一张不对就整包拒绝；旧版 `.json` 仍然可以导入，但图片要另外载入。`schemaVersion` 不是 9（v8 会先自动迁移，v7 及更早直接拒绝）、出现未知字段、结构不对或全图校验不通过，导入会被整个拒绝，现有数据不会变。格式细节见 `docs/EXCHANGE-FORMAT.md`。
 数据库名固定为 `textbook-graph`，版本号只由 DB version 区分（Dexie 内部把版本号 ×10 存进 IndexedDB，DevTools 里看到 90 对应逻辑版本 9）；旧库 `textbook-graph-v8` 原样保留，不会被读取或删除。
 
 ```jsonc
@@ -218,7 +218,8 @@ src/lib/subjects.ts    五门学科配置、kind 推荐、筛选器、编号策�
 src/lib/predicates.ts  谓词注册表（方向、kind 约束、传递性、显示文案）
 src/lib/graph.ts       纯函数：索引、递归编号、显示编号、遍历、covers 反查、搜索
 src/lib/validate.ts    全图不变式、book、新关系端点与单条校验
-src/lib/serialize.ts   v8 导入校验、导出
+src/lib/serialize.ts   v9 导入校验、导出
+src/lib/exchange.ts    `.tbg` 交换包打包 / 解包
 src/lib/markdown.ts    编辑与阅读共用的 Markdown/KaTeX 配置
 src/lib/citation.ts    来源字段合并（source / page / originalNumber）
 src/lib/db.ts          Dexie 持久化（book + 图数据同事务）

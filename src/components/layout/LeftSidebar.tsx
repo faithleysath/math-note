@@ -27,6 +27,7 @@ import { toast } from 'sonner';
 import Search from '../Search';
 import { Upload, Download, X, Plus, BookPlus, Pencil, ImagePlus } from 'lucide-react';
 import { SCHOOL_STAGES, STAGE_LABELS, SUBJECTS, SUBJECT_LABELS, type SchoolStage, type Subject } from '../../lib/schema';
+import { EXCHANGE_MIME, exchangeFileName, isExchangeFileName, readExchangePackage, toArrayBuffer } from '../../lib/exchange';
 import { useWindowSize } from '@/hooks/useWindowSize';
 
 const LeftSidebar = () => {
@@ -37,7 +38,7 @@ const LeftSidebar = () => {
   const updateBook = useGraphStore(state => state.updateBook);
   const book = useGraphStore(state => state.book);
   const index = useGraphStore(state => state.index);
-  const exportGraph = useGraphStore(state => state.exportGraph);
+  const exportExchangePackage = useGraphStore(state => state.exportExchangePackage);
   const importGraph = useGraphStore(state => state.importGraph);
   const loadAssetFiles = useGraphStore(state => state.loadAssetFiles);
   const assetCount = useGraphStore(state => state.assetCount);
@@ -78,18 +79,17 @@ const LeftSidebar = () => {
     }
   };
 
-  const handleExport = () => {
+  const handleExport = async () => {
     try {
-      const data = exportGraph();
-      const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(
-        JSON.stringify(data, null, 2)
-      )}`;
-      const link = document.createElement("a");
-      link.href = jsonString;
-      const safeTitle = (book?.title ?? 'backup').replace(/[\\/:*?"<>|\s]+/g, '-');
-      link.download = `textbook-graph-${safeTitle}-${new Date().toISOString().slice(0, 10)}.json`;
+      const bytes = await exportExchangePackage();
+      const blob = new Blob([toArrayBuffer(bytes)], { type: EXCHANGE_MIME });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = exchangeFileName(book?.title);
       link.click();
-      toast.success('数据已成功导出。');
+      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      toast.success('交换包（.tbg，含图片）已导出。');
     } catch (error) {
       console.error('Failed to export data:', error);
       toast.error(error instanceof Error ? error.message : '数据导出失败。');
@@ -180,28 +180,30 @@ const LeftSidebar = () => {
     const file = fileToImportRef.current;
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      try {
-        const text = e.target?.result;
-        if (typeof text !== 'string') {
-          throw new Error('File content is not a string.');
-        }
+    try {
+      if (isExchangeFileName(file.name, file.type)) {
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        const pkg = await readExchangePackage(bytes);
+        await importGraph(pkg.graph, { assets: pkg.assets });
+        toast.success(
+          `交换包已导入：${pkg.manifest.counts.nodes} 个节点 / ${pkg.manifest.counts.edges} 条关系 / ${pkg.assets.length} 张图。`,
+        );
+      } else {
+        const text = await file.text();
         const data = JSON.parse(text);
         await importGraph(data);
-        toast.success('数据已成功导入。');
-      } catch (error) {
-        console.error('Failed to import data:', error);
-        toast.error(`数据导入失败: ${error instanceof Error ? error.message : '未知错误'}`);
-      } finally {
-        setIsImportConfirmOpen(false);
-        fileToImportRef.current = null;
-        if (fileInputRef.current) {
-          fileInputRef.current.value = '';
-        }
+        toast.success('JSON 数据已导入；图片可在左侧「载入图片…」补充。');
       }
-    };
-    reader.readAsText(file);
+    } catch (error) {
+      console.error('Failed to import data:', error);
+      toast.error(`数据导入失败: ${error instanceof Error ? error.message : '未知错误'}`);
+    } finally {
+      setIsImportConfirmOpen(false);
+      fileToImportRef.current = null;
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
   };
 
   const handleAssetFiles = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -272,14 +274,14 @@ const LeftSidebar = () => {
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                <p>导入</p>
+                <p>导入（.tbg 交换包 / .json）</p>
               </TooltipContent>
             </Tooltip>
             <input
               type="file"
               ref={fileInputRef}
               onChange={handleFileChange}
-              accept=".json"
+              accept=".tbg,.json,application/x-textbook-graph,application/json"
               className="hidden"
             />
             <Tooltip>
@@ -289,7 +291,7 @@ const LeftSidebar = () => {
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                <p>导出</p>
+                <p>导出交换包（.tbg，含图片）</p>
               </TooltipContent>
             </Tooltip>
           </div>
@@ -492,7 +494,7 @@ const LeftSidebar = () => {
             <AlertDialogHeader>
               <AlertDialogTitle>确认导入？</AlertDialogTitle>
               <AlertDialogDescription>
-                这将覆盖您当前的所有数据，此操作无法撤销。请确保您已备份当前数据。
+                支持 .tbg 交换包（数据 + 图片）和旧版 .json（只有数据）。导入会覆盖当前所有数据，此操作无法撤销；失败不会改动原数据。
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
