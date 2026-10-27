@@ -7,17 +7,23 @@
 为什么需要它：九下没有文字层，`check:lines` 那种「用每个词做探针」的办法用不了。
 但页面渲染图还在 —— 直接统计墨迹：一个 region 漏了一整段正文，页面的墨迹覆盖率会明显掉下来。
 
+只统计**文字墨迹**：先做 9 像素形态学开运算把照片/满版插图减掉（它们按规则不登记 region），
+否则章首页、插图页的覆盖率永远很低（实测 p0008 只有 5.9%，纯属误报）。
+
 判据宽松但有效，专抓「整块没登记」这种量级的缺失，抓不到「框略小一圈」。
 真正精细的仍然靠 `draw:boxes` 的核对图人眼过。
 
-校准（八年级上册，已逐页视觉复核）：见 README 或跑一遍看基线。
+校准（已逐页视觉复核的清单）：
+- 八年级上册若干批：**86.5% / 90.1%**
+- 九年级上册（region 全按文字层行框对齐）：**93.9% / 94.0%**
+所以默认阈值 80%，看的是「明显低于这个区间」而不是「不到 90%」。
 """
 import argparse
 import json
 import sys
 from pathlib import Path
 
-from PIL import Image
+from PIL import Image, ImageFilter
 
 ROOT = Path(__file__).resolve().parent.parent
 SUK = ROOT / "local-textbook" / "sukey"
@@ -29,10 +35,24 @@ def ink_mask(img: Image.Image) -> Image.Image:
     return gray.point(lambda v: 255 if v < 170 else 0, mode="L")
 
 
+def text_mask(mask: Image.Image) -> Image.Image:
+    """
+    去掉「大块实心深色区」后的文字墨迹。
+
+    照片、满版插图、整版背景照也是深色像素，但它们按规则不登记 region，
+    留在分母里会让章首页、插图页的覆盖率永远很低（实测 p0008 只有 5.9%）。
+    这里做一次形态学开运算：9 像素内还能活下来的就是成片的实心区（照片），
+    从墨迹里减掉，只留下笔画细的文字与线条。
+    """
+    solid = mask.filter(ImageFilter.MinFilter(9)).filter(ImageFilter.MaxFilter(9))
+    from PIL import ImageChops
+    return ImageChops.subtract(mask, solid)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--expected", required=True)
-    ap.add_argument("--threshold", type=float, default=0.90)
+    ap.add_argument("--threshold", type=float, default=0.80)
     ap.add_argument("--pages", default="", help="逗号分隔的 pdfPage，默认全部")
     args = ap.parse_args()
 
@@ -55,11 +75,7 @@ def main() -> int:
 
     # 章首页：整版背景照 + 大标题（按规则背景不登记），墨迹本身就是画面，跳过
     import re
-    opener_pages = {
-        item["pdfPage"]
-        for item in expected["items"]
-        if item.get("kind") == "heading" and re.match(r"^第[一二三四五六七八九十]+章", (item.get("text") or "").strip())
-    }
+    opener_pages = set()
 
     total_ink = 0
     total_hit = 0
@@ -73,7 +89,7 @@ def main() -> int:
             continue
         img = Image.open(png).convert("RGB")
         W, H = img.size
-        mask = ink_mask(img)
+        mask = text_mask(ink_mask(img))
 
         covered = Image.new("L", (W, H), 0)
         for r in regions[page]:
@@ -97,11 +113,6 @@ def main() -> int:
                     page_ink += 1
                     if cov[x, y]:
                         page_hit += 1
-        # 整版插图页（跨页图、满版信息图）也是画面，不能算漏
-        sampled = (W // 2) * (H // 2)
-        if page_ink / sampled > 0.45:
-            rows.append((1.0, page, 0, 0))
-            continue
         total_ink += page_ink
         total_hit += page_hit
         ratio = page_hit / page_ink if page_ink else 1.0
