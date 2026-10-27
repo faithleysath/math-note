@@ -28,7 +28,8 @@
     "check:recall": "bun run scripts/check-text-recall.ts",
     "check:lines": "bun run scripts/check-line-coverage.ts",
     "check:ink": "python3 scripts/check-ink-coverage.py",
-    "page:bands": "python3 scripts/page-bands.py"
+    "page:bands": "python3 scripts/page-bands.py",
+    "suggest:edges": "bun run scripts/suggest-edges.ts"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "^1.3.1",

@@ -120,10 +120,17 @@ export function asExpectedManifest(raw: unknown, path: string): ExpectedManifest
 
 /** 跨册实体注册表（§9）：形状不对就报 CliError，别让合并器拿到半个注册表 */
 export function asEntityRegistry(raw: unknown, path: string): EntityEntry[] {
-  if (!Array.isArray(raw)) {
-    throw new CliError(`实体注册表必须是数组：${path}`);
+  // 规约 §9 的文件形状是 `{ "entities": [...] }`，但历史调用写的都是裸数组。
+  // 两种都收，避免「导出脚本写出的文件，合并器读不进去」这种自相矛盾。
+  const list: unknown = Array.isArray(raw)
+    ? raw
+    : typeof raw === 'object' && raw !== null && Array.isArray((raw as { entities?: unknown }).entities)
+      ? (raw as { entities: unknown[] }).entities
+      : null;
+  if (list === null) {
+    throw new CliError(`实体注册表必须是数组，或 { "entities": [...] }：${path}`);
   }
-  return raw.map((entry, index) => {
+  return list.map((entry, index) => {
     const source = (typeof entry === 'object' && entry !== null ? entry : {}) as Record<string, unknown>;
     const text = (key: string) => (typeof source[key] === 'string' ? (source[key] as string) : '');
     const aliases = Array.isArray(source.aliases) ? source.aliases.filter((item) => typeof item === 'string') : [];
