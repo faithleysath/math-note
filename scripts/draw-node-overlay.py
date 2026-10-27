@@ -12,6 +12,10 @@
 
 配色：
   绿 note · 蓝 problem · 紫 proposition · 橙 definition · 红 asset(figure) · 灰 section
+
+**怎么读这张图**：同一个节点标签可能出现在**多个框**上 —— 那表示这个节点吞并了多块清单条目
+（规约允许：`note` 吞并连续源条目时，其余 srcId 记在 `tags` 里）。所以「一块正文旁边还有一个
+同标签的小框」不是重复，而是「这一块也归这个节点」。反过来，**一个框里出现两个不同标签**才是问题。
 """
 import argparse
 import json
