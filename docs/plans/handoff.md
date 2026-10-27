@@ -181,7 +181,33 @@ pageOffset 全四册一致：pdfPage = printedPage + 7（正文 pdf 8 起；附�
 **附录不转写**：与八上八下同一处理，已在 `exceptions-b8a.md` 头部记过理由（工具性参考页，非教学内容）。
 但 `manifest.json` 的 toc 里它是个 chapter，合并时**不要**给它建 branch，否则会出现空章节点。
 
-### 8.2 步骤
+### 8.3 开工前必须先补的一件事：`entities.json` 不存在
+
+规约 §9 要求批次开跑前查跨册实体注册表，`merge:parts` 也有 `--entities` 参数——
+**但八上八下从来没传过，`local-textbook/sukey/entities.json` 不存在。**
+
+后果已经能量到：八下 parts 里指向八上节点的边只有 **4 条**（而八下第七章「力」到处在用八上第五章的「速度」）。
+八年级还能靠“子代理读过前一份 part”蒙混，**九年级会直接崩**：九下第十五章「电功和电热」整章建立在九上的电压/电流/电阻上，
+没有注册表就会在九下重量产一批重复概念节点。
+
+开工前做这两件事：
+
+1. **导出初始注册表**：从 `merged/all.json` 取全部 `type=definition` 且有 `key` 的节点，
+   写成 `entities.json`（`{id, key, title, aliases, firstSeen}`）。这是机械导出，不用重新判断。
+2. 之后**每次合并都传 `--entities local-textbook/sukey/entities.json`**，让它自己长。
+
+### 8.4 九上 → 九下 必须串行
+
+规约 §9：“册与册之间的合并**串行**（b8a → b8b → b9a → b9b）”。
+具体到九年级就是：
+
+- 九上 4 章全部 Pass 2 完成、合并进 `all.json` 之后，**才能开九下的 Pass 2**
+- 九下的 Pass 1（枚举）可以提前并行跑，因为它不建边
+
+如果九下 Pass 2 里出现指向 `phy-b9a-*` 的边但九上还没合并，
+`check:part` 会把它降级成 `external-endpoint` 警告——**这不是错误，合并时才是硬校验**。
+
+### 8.5 步骤
 
 1. `render:pages --volume b9a --from 8 --to 116`（再 `--volume b9b --from 8 --to 120`）
 2. 每册 7–8 批 Pass 1（按章切，章 22–34 页，每批 11–17 页），**跨章可并行**
