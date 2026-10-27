@@ -6,20 +6,20 @@
 
 ---
 
-## 1. 一句话现状
+## 1. 一句话现状（最终，2026-10-27 夜）
 
-**四册 536 页已全部转写完成，八章审计全部完成，七章修复完成（第十六章正在修）。**
-**卡在视觉复核（逐页），复核完就能出片。**
+**四册 536 页转写、8 章审计、8 章修复、8 章视觉复核全部完成；四册合并 2087 节点 / 1470 边 / 818 资源 / warnings 0。**
+**交付已生成并做界面验证：`~/Downloads/苏科版物理-全四册/`（all.json + 818 张图）与重出的 `~/Downloads/苏科版物理-八上八下/`。**
 
 ```
-                                   估算完成度
-Pass 1 清单（16 份，1935 条）          100%
-Pass 2 part（37 份）                  100%
-四册合并                             100%（2086 节点 / 1470 边 / 818 资源 / warnings 0）
+                                   最终状态
+Pass 1 清单（37 份，3584 条）         100%  · check:expected 0 错 0 警
+Pass 2 part（37 份）                  100%  · check:part 全 0 错误
+四册合并                             2087 节点 / 1470 边 / 818 资源 / warnings 0
 章审计（8 章）                        100%
-章修复（8 章）                         87%（第十六章在修）
-视觉复核（8 章 222 页）                 0%（7 章代理在跑，尚未产出）
-coverage / exceptions / 界面验证 / 交付   0%
+章修复（8 章）                        100%  · c16 的 D1–D11 已修
+视觉复核（8 章 216 页）                100%  · 19/19 章 fully-reviewed
+coverage / exceptions / 界面验证 / 交付   100%  · 见 §13
 ```
 
 ---
@@ -33,16 +33,19 @@ local-textbook/sukey/
 ├─ expected/            16 份九年级清单（8 上 + 8 下）+ 21 份八年级
 ├─ parts/               37 份 part（八年级 21 + 九上 8 + 九下 8）
 ├─ parts-all/           parts 的逐字节副本，合并用（每次合并前 cp）
-├─ merged/all.json      八年级单册产物（已过时，别用来生成实体表）
-├─ entities.json        跨册实体注册表 206 条（从四册合并产物导出）
+├─ merged/4vol.json     四册合并产物（**稳定路径，最终 2087 节点**；`merged/all.json` 是八年级单册旧产物，别用）
+├─ entities.json        跨册实体注册表 **229 条**（merge 维护的 live 版，含 21 条非 definition key；**不要跑 export:entities**，会丢）
 ├─ assets/b8a b8b b9a b9b/  818 张裁好的图（b8a 260 / b8b 198 / b9a 178 / b9b 182）
-├─ audit/               8 份章审计 + 7 份修复报告 + add-edges-b9a/b9b + suggest-*.md
-├─ review/nodes-b9a b9b/    「节点叠加图」106 + 113 张（视觉复核的主要输入）
+├─ audit/               8 份章审计 + 8 份修复报告 + 2 份修复后验证 + add-edges-b9a/b9b + suggest-*.md
+├─ review/nodes-b9a b9b/    「节点叠加图」（视觉复核的主要输入）
+├─ review/b9*-c*.json/md    8 章视觉复核记录（全部 fully-reviewed）
+├─ exceptions-b9a.md    九上例外清单
+├─ exceptions-b9b.md    九下例外清单
 ├─ ocr/                 八下、九下的逐页 OCR（无文字层的册子校对用）
 └─ coverage.md          两栏报告（脚本生成，别手改）
 ```
 
-`/tmp/merged-4vol.json` 是当前四册合并产物；**重启机器会丢**，用 §3 的命令重新生成。
+`/tmp/merged-4vol.json` 是临时合并产物（重启会丢）；稳定产物用 `merged/4vol.json`。
 
 ---
 
@@ -158,7 +161,7 @@ bun run report:coverage --parts local-textbook/sukey/parts --expected local-text
 |---|---|---|
 | 图 16-50 白鹤滩水电站 | 九下 pdfPage 63 | 整页压平为单张 JPEG，该处照片丢版；`pdfimages -list` 只有 1 个全页对象 |
 | 图 18-5 海上风力发电场 | 九下 pdfPage 95 | 同上，只剩印在浅青空框里的白色图注 |
-| 图 12-32 | 九上 pdfPage 59 | PDF 里就是半截图：stencil 墨迹从第 0 列起，页面 830–867 无墨 |
+| 图 12-32 | 九上 pdfPage 56（印刷 49） | PDF 里就是半截图：stencil 墨迹从第 0 列起，页面 830–867 无墨 |
 
 处理：保留 asset 与图号，`alt` 陈述事实（不描述不存在的画面），登记进 exceptions。
 
@@ -259,3 +262,75 @@ bun run report:coverage --parts local-textbook/sukey/parts --expected local-text
 4. `report:coverage` 重生成两栏
 5. `exceptions-b9a.md` / `exceptions-b9b.md`（含 §7 的三条源缺陷）
 6. 最终合并 → 裁图 → 界面验证 → 交付（**八年级那份也要重新生成**，导图改过）
+
+---
+
+## 13. 最终交付记录（2026-10-27 夜）
+
+### 13.1 最终校验
+
+| 项 | 结果 |
+|---|---|
+| 37 份 part | `check:part` 全部 exit 0（告警与各章基线相同） |
+| 37 份清单 | `check:expected` 0 错 0 警；`check:consistent` 37 份 / 3584 条 0 错 0 警 |
+| 四册合并 | **2087 节点 / 1470 边 / 818 资源 / 818 anchors / 0 推理步骤 / warnings 0** |
+| 不变式 | 孤立 definition·proposition = 0；depends-on 无环；无自环；无悬空端点 |
+| 资源完整性 | 818/818 文件存在且 sha256 与 part 记录一致；全量 `crop:figures` 0 裁剪 / 818 跳过 / 0 失败 |
+| 结构覆盖率 | 3584/3584（mapped 3582 + exception 2；missing/duplicate/undecided 0） |
+| 视觉复核 | 19/19 章 `fully-reviewed`；九上 106 页 + 九下 110 页逐页有记录 |
+| 实体注册表 | `entities.json` **229 条**，与 229 个带 key 节点一一对应；含 21 条非 definition key |
+
+### 13.2 视觉复核与修复
+
+| 章 | 页 | 复核缺陷 | 处置 |
+|---|---|---|---|
+| b9a-c11 | 28 | 7 | 5 修好、2 误报/可接受 |
+| b9a-c12 | 26 | 3 | 3 修好 |
+| b9a-c13 | 28 | 9 | 8 修好、1 条结构性限制（图 13-12 不拆） |
+| b9a-c14 | 24 | 1 | 1 修好 |
+| b9b-c15 | 28 | 17 | 12 修好、5 误报（p027 五题，叠加图框线误判） |
+| b9b-c16 | 34 | 1 | 图 16-50 源缺图，alt + 例外登记 |
+| b9b-c17 | 22 | 1 | 1 修好 |
+| b9b-c18 | 26 | 0 | — |
+
+- b9a 修复后独立验证：15 真修好 / 1 半修 / 0 修坏 / 2 误报 / 2 按政策保留（`audit/verify-b9a-c11-c14.md`）。
+- b9b c15/c17 修复后独立验证：13 真修好 / 5 误报成立 / 0 返工（`audit/verify-b9b-c15-c17.md`）。
+- c16 修复后复核：34/34 页，资产类只剩图 16-50 源缺图；25 处文本 bbox 偏差登记为不影响交付（`review/b9b-c16.json` 的 `textBbox`）。
+
+### 13.3 最终元数据批次
+
+- 全书 40 个空 `originalNumber` 的 topic 栏目节点已补齐（= 栏目标题），c18 `s04` 章节号补「四」。交付图里栏目不再出现 UI 自动编号（「2.6. 实践与练习」这类）。
+- 各章「跨学科实践」subsection 仍按全库统一口径：栏目名落在子 note 的 `originalNumber`，subsection 本身由 UI 自动编号（全库一致，不是本章缺陷）。
+
+### 13.4 交付物
+
+```
+~/Downloads/苏科版物理-全四册/
+├─ all.json                 2087 节点 / 1470 边 / 818 资源（sha256 44ee0fbf…）
+├─ assets/b8a b8b b9a b9b/  818 张
+├─ coverage.md              两栏
+├─ exceptions-b9a.md        九上例外清单（26 条）
+├─ exceptions-b9b.md        九下例外清单（26 条）
+└─ exceptions-b8a.md        八年级既有清单
+
+~/Downloads/苏科版物理-八上八下/   已重出（旧版导图 mermaid 过时）
+├─ all.json                 1178 节点 / 773 边 / 458 资源
+├─ assets/b8a b8b/          458 张
+├─ coverage.md
+└─ exceptions-b8a.md
+```
+
+### 13.5 界面验证（ego-browser，单 space `math-note 教材图谱验收`）
+
+1. 导入 `~/Downloads/苏科版物理-全四册/all.json` → 弹窗「确认导入」→ 成功，显示「初中物理（苏科版·全册）」。
+2. 图片按卷分批 `setInputFiles('input[accept="image/*"]', [...])`，**sha256 自动匹配 818/818**，状态从「缺 818 张」到「资源 818 张」。
+3. 抽查九年级下册第十六章：图 16-32 裁图完整（含 (a)(b)(c) 子注），`figcaption` 只出现一次；图 16-31/16-33 等正常渲染。
+4. 修复后重新导入并重传 818 张，仍 818/818 命中；栏目「实践与练习」「素养进阶」不再显示自动编号。
+
+### 13.6 仍存在的已知项（不阻断交付）
+
+- 图 16-50（九下 pdf 63）、图 18-5（pdf 95）源 PDF 缺图，asset 空白，alt 写实；图 12-32（九上 pdf 56）源半截图。
+- 图 13-12 (b) 灯泡玻璃顶切 15px（单矩形无解，拆图需新增 srcId+asset）。
+- 图 16-28(a)/(b) 仍是两条 `figure`（清单冻结，不合并）。
+- c16 的 25 处文本 bbox 偏差、`p012-fig02` 左缘 1px、既有贴线；不影响交付图。
+- `entities.json` 必须保留 229 条 live 版；**不要跑 `export:entities`**（只收 definition，会丢 21 条非 definition key）。
