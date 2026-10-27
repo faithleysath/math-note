@@ -400,6 +400,11 @@ Pass 2 只做映射：`srcId → 一个或多个节点`。
 - `branch` 册节点没有对应印刷页 → **允许不填 `page`**，填 `originalNumber`（如「八年级上册」）。禁止编造页码。
 - 无印刷页码的前言、插页、封面 → 不填 `page`，在 `report.md` 记例外。
 - `originalNumber`：原书自带编号（活动号/题号/图号），没有就不填。
+  **栏目节点例外**：`section(kind='topic')` 与承载栏目的节点，`originalNumber` 写**栏目标题**
+  （「实践与练习」「素养进阶」「内容梳理」「信息快递」…）。
+  原因在渲染链路 `src/lib/graph.ts` 的 `numberDisplayFor()`：有 `originalNumber` 就直接显示它，
+  否则退回 UI 自动编号——那样树上会出现「1.2.3」这种原书不存在的编号。
+  所以**审计不要把它当「填错编号」报**，这是八年级定下的约定（见 `exceptions-b8a.md` §6.4）。
 
 ## 7. 关系（只用这 7 种）
 
