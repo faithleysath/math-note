@@ -93,7 +93,7 @@ export function migrateV8ToV9(g: GraphJSON): GraphJSONV9
 
 - 构造函数里追加：
   ```ts
-  this.version(2).stores({
+  this.version(SCHEMA_VERSION).stores({
     nodes: '&id, type, key, parentId',
     edges: '&id, from, to, predicate',
     steps: '&id, conclusionId, *premiseIds',
@@ -101,7 +101,7 @@ export function migrateV8ToV9(g: GraphJSON): GraphJSONV9
     assets: '&id',
   });
   ```
-  **库名 `textbook-graph-v8` 绝对不许改。**
+  **2026-10 决策变更**：库名固定为 `textbook-graph`（不带版本号），DB version 与数据格式版本对齐（当前 `SCHEMA_VERSION = 9`）。以后升到 v10 就加 `this.version(10)`，不再改库名；旧库 `textbook-graph-v8` 不读取、不迁移。
 - 新增 `assets!: Table<AssetRecord, string>`，`AssetRecord = AssetMeta & { data: Blob }`
 - `loadAll()` 多返回 `assets: AssetMeta[]`（**不带 blob**）
 - `replaceAll()` 增加可选 `assets?: AssetRecord[]`，与其它表在**同一事务**里 clear + bulkAdd

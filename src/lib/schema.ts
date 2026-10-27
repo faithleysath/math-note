@@ -1,6 +1,12 @@
 import { z } from 'zod';
 import { REGION_EPS } from './coords';
 
+/**
+ * 当前数据格式版本。Dexie 的 DB version 与它对齐（见 `db.ts`）：
+ * 数据格式升到 v10 时，DB 也加 `this.version(10)`，库名始终保持 `textbook-graph`。
+ */
+export const SCHEMA_VERSION = 9 as const;
+
 // =============================================================================
 // 节点类型（恰好 9 种）
 // =============================================================================

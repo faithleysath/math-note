@@ -1,4 +1,5 @@
 import {
+  SCHEMA_VERSION,
   graphJSONSchema,
   graphJSONSchemaV9,
   type AssetMeta,
@@ -12,8 +13,6 @@ import {
 } from './schema';
 import { migrateV8ToV9 } from './migrations/v8-to-v9';
 import { validateGraphInvariants, ValidationError, type ValidationIssue } from './validate';
-
-const SCHEMA_VERSION = 9;
 
 function messageOf(error: unknown): string {
   if (error && typeof error === 'object' && 'issues' in error) {

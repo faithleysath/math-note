@@ -1,5 +1,5 @@
 import Dexie, { type Table } from 'dexie';
-import type { AssetMeta, BookMetaV9, Edge, InferenceStep, Node } from './schema';
+import { SCHEMA_VERSION, type AssetMeta, type BookMetaV9, type Edge, type InferenceStep, type Node } from './schema';
 
 /**
  * 持久化层。
@@ -12,8 +12,9 @@ import type { AssetMeta, BookMetaV9, Edge, InferenceStep, Node } from './schema'
  * 这里只是落盘。v8 起多一张单行 meta 表保存 book；
  * 导入/新建时 book + nodes + edges + steps（v9 起还有 assets）在同一个事务里替换。
  *
- * v9 只加了一张 assets 表（asset:// 引用的本地媒体），
- * 库名保持 textbook-graph-v8 不变，避免老用户的库变成另一个库。
+ * 库名固定为 `textbook-graph`，不带版本号；数据格式版本由 Dexie 的 DB version 区分。
+ * 当前 DB version = SCHEMA_VERSION = 9。以后数据格式升到 v10，就加 `this.version(10)`，
+ * 不再改库名。旧的 `textbook-graph-v8` 库不再读取，也不做兼容迁移。
  */
 class MathNoteDB extends Dexie {
   nodes!: Table<Node, string>;
@@ -23,19 +24,14 @@ class MathNoteDB extends Dexie {
   assets!: Table<AssetRecord, string>;
 
   constructor() {
-    super('textbook-graph-v8');
-    this.version(1).stores({
+    super('textbook-graph');
+    // DB version 与数据格式版本对齐；v8 旧库（textbook-graph-v8）不迁移。
+    this.version(SCHEMA_VERSION).stores({
       nodes: '&id, type, key, parentId',
       edges: '&id, from, to, predicate',
       steps: '&id, conclusionId, *premiseIds',
       meta: '&id',
-    });
-    // v9：媒体资源元信息 + blob 存在同一张表，按 id 主键
-    this.version(2).stores({
-      nodes: '&id, type, key, parentId',
-      edges: '&id, from, to, predicate',
-      steps: '&id, conclusionId, *premiseIds',
-      meta: '&id',
+      // v9：媒体资源元信息 + blob 存在同一张表，按 id 主键
       assets: '&id',
     });
   }
