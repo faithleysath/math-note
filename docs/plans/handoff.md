@@ -401,7 +401,8 @@ bun run report:coverage --parts local-textbook/sukey/parts --expected local-text
 
 - 八上 7 条 → +10 节点 / +6 边；八下 12 条 → +18 节点 / +30 边；九上 5 条 → +6 节点 / +6 边；九下 7 条 → +9 节点 / +8 边。
 - 原节点保留第一结论，新节点用下一个未占用 `@n`、紧跟原节点、带 `src:<base>` tag；content 逐字切分；原边逐条映射，新增边均有页图依据。
-- 最终：**2128 节点 / 1523 边 / 818 资源**；supports 118 / depends-on 256 / cites 212 / uses 230 / covers 672 / is-a 23 / part-of 12；孤立定义·命题 0，depends-on 无环。
+- 最终：**2128 节点 / 1524 边 / 818 资源**；supports 118 / depends-on 257 / cites 212 / uses 230 / covers 672 / is-a 23 / part-of 12；孤立定义·命题 0，depends-on 无环。
+- 拆分后 bookkeeping 已补：7 个 `src:` tag、1 条 note 端点、`p069-06@2` 共享状语、`p089-10` 标题、`p088-01→p075-05@2` depends-on。
 - 四份独立验证 `audit/verify-split-multi-b8a/b8b/b9a/b9b.md`：31/31 通过；0 条返工。
-- 遗留低风险（非阻断）：6 个原节点可补 `src:` tag；`p106-08` 一条边 note 端点笔误；`p107-05` 句序、`p069-06@2` 共享状语、`p089-10` 标题偏窄、`p088-01` 可补 depends-on、`p009-03@1` 可补支撑；b9 两份报告告警计数笔误。
+- 仍保留（非 bookkeeping）：`p107-05` 句序按两节点结构备查；`p009-03@1` 可选支撑；`p057-05` 生活举例 supports 口径边界。其余（7 个 src tag、p106 note 端点、p069 状语、p089 标题、p088-01 depends-on）已补。
 - 交付：`.tbg` 已重打（全四册 154.0 MiB / 八上八下 96.5 MiB），交付目录 all.json 已同步。
