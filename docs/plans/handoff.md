@@ -381,3 +381,16 @@ bun run report:coverage --parts local-textbook/sukey/parts --expected local-text
 - 修掉的代表项：11+ 处「信息快递」栏目名、图 4-42 左右 1px 页框虚线、图 2-26/2-27 边界错位、图 4-33 冰凌、图 6-8 氢/氮、图 6-27 车筐数、图 15-21 接地插片、图 17-18/17-24/18-8 alt、图 12-36 导图层级等。
 - 仍未闭合（结构性/源缺陷）：图 13-12 (b) 泡顶 15px、图 11-31 手部与正文行矩形交错、图 6-14 正文行与量筒口交错、图 10-32 顶弧 9 行、图 9-4 手顶 10 行、图 4-23 电源线在扫描页边出框；图 16-50 / 18-5 / 12-32 源缺图；`b8b-c07 p045-03` 清单/part region 既有 61px 漂移（asset 更紧、不切内容）。
 - 交付：重新合并 2084/1470/818；重打 `.tbg`（全四册 153.9 MiB / 八上八下 96.4 MiB）；线上导入 2.0 s、818/818，图片正常。
+
+### 13.10 语义质量清理（2026-10-28）
+
+按评审意见做了一轮**不改 Schema**的语义清理：
+
+- 全量审计：`depends-on` 277 条、`supports` 112 条、`law/principle/phenomenon/model/experiment/exploration` 176 个、多结论候选 120 个（其中 32 条判 multi）。
+- `supports`：112→100；12 条类比/模型/反事实/弱举例降 `cites`，起点 kind 改 `model/context/explanation`。
+- `depends-on`：277→253；contains/mentions/题目误用改 `cites`/`covers`/`part-of`；`p009-05` 四要素 4 条改 `cites`。
+- kind：19 处；`p066-06` law→note、`p033-01` law→claim、`p076-07/08` principle→claim、`p121-02`/`p071-03` phenomenon→model、反事实→context、调查/辩论/填图→explanation、制作→process。
+- **拆分 `p068-08`**：凸透镜/凹透镜两条结论分开，`p076-07@1` 改指凹透镜 `@1`，`p070-02` 补凹侧 covers。
+- 多结论拆分 32 条**未做**（清单在 `audit/semantic-kinds.json`），留待下一轮；`p057-05` 生活实例 supports 按「事实表明归纳」保留。
+- 最终：**2085 节点 / 1473 边 / 818 资源**；supports 100 / depends-on 253 / cites 203 / uses 227 / covers 655 / is-a 23 / part-of 12；孤立定义·命题 0，depends-on 无环。
+- 验证：`audit/verify-semantic-b8a/b8b/b9/rework.md`，逐条成立、无越界、回归全绿。
